@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif-display: "Cormorant Garamond", Georgia, serif;
+  --font-cinzel: "Cinzel", serif;
+
+  --color-legacy-gold: #C5A880;
+  --color-legacy-gold-light: #DFCDAB;
+  --color-legacy-gold-dark: #A68A60;
+  --color-legacy-navy: #0A1128;
+  --color-legacy-navy-light: #1C2541;
+  --color-legacy-navy-dark: #020817;
+  --color-legacy-paper: #FDFBF7;
+}
+
+/* Custom animation for subtle ambient pulse */
+@keyframes ambient-pulse {
+  0%, 100% {
+    opacity: 0.15;
+    transform: scale(1) translate(0px, 0px);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(1.05) translate(10px, -10px);
+  }
+}
+
+.animate-ambient-pulse {
+  animation: ambient-pulse 8s ease-in-out infinite;
+}
+
