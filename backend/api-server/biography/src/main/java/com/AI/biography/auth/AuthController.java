@@ -31,7 +31,10 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request) {
 
         return authService.login(request);
+
+        
 }
 
 
 }
+

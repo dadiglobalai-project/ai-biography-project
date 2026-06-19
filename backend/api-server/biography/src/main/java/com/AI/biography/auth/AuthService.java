@@ -15,12 +15,19 @@ import java.util.UUID;
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final JwtService jwtService;
+    private final BCryptPasswordEncoder passwordEncoder;
 
-    public AuthService(UserRepository userRepository) {
+    public AuthService(
+            UserRepository userRepository,
+            JwtService jwtService,
+            BCryptPasswordEncoder passwordEncoder) {
+
         this.userRepository = userRepository;
+        this.jwtService = jwtService;
+        this.passwordEncoder = passwordEncoder;
     }
-
+    
     public AuthResponse register(RegistrationRequest request) {
 
         if (!request.getPassword().equals(request.getConfirmPassword())) {
@@ -32,6 +39,7 @@ public class AuthService {
         }
 
         String hashedPassword = passwordEncoder.encode(request.getPassword());
+        
 
         User user = new User();
         user.setUserId(UUID.randomUUID().toString());
@@ -39,16 +47,20 @@ public class AuthService {
         user.setPasswordHash(hashedPassword);
         user.setStatus("ACTIVE");
         user.setCreatedAt(LocalDateTime.now());
+        
+        String token = jwtService.generateToken(user);
 
         userRepository.save(user);
 
-        return new AuthResponse("Registration successful");
+        return new AuthResponse("Registration successful", token);
     }
 
     public AuthResponse login(LoginRequest request) {
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElse(null);
+
+        String token = jwtService.generateToken(user);
 
         if (user == null) {
             return new AuthResponse("Invalid email or password");
@@ -58,6 +70,6 @@ public class AuthService {
             return new AuthResponse("Invalid email or password");
         }
 
-        return new AuthResponse("Login successful");
+        return new AuthResponse("Login successful", token);
     }
 }
