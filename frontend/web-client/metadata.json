@@ -1,0 +1,6 @@
+{
+  "name": "Xinghuoji Registration",
+  "description": "An elegant registration screen for Xinghuoji AI Biography & Digital Legacy Platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
