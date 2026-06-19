@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 
 public class RegistrationRequest {
     @NotBlank
-    private String name;
+    private String fullName;
 
     @NotBlank
     @Email
@@ -22,12 +22,12 @@ public class RegistrationRequest {
     public RegistrationRequest() {
     }
 
-    public String getName() {
-        return name;
+    public String getFullName() {
+        return fullName;
     }
 
-    public void setName(String name) {
-        this.name = name;
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
     }
 
     public String getEmail() {
