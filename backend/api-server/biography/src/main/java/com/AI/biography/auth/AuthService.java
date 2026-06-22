@@ -60,8 +60,6 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElse(null);
 
-        String token = jwtService.generateToken(user);
-
         if (user == null) {
             return new AuthResponse("Invalid email or password");
         }
@@ -69,6 +67,8 @@ public class AuthService {
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             return new AuthResponse("Invalid email or password");
         }
+
+        String token = jwtService.generateToken(user);
 
         return new AuthResponse("Login successful", token);
     }
