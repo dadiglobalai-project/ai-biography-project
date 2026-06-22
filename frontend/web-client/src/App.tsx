@@ -5,7 +5,14 @@ import AuthLayout from './components/AuthLayout';
 import SuccessView from './components/SuccessView';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
-import { ActiveFormView, AuthApiResponse, AuthUser, FormErrors, LegalDocument, RegisterFormState } from './types';
+import {
+  ActiveFormView,
+  AuthApiResponse,
+  AuthUser,
+  FormErrors,
+  LegalDocument,
+  RegisterFormState
+} from './types';
 
 const AUTH_ROUTES: Record<ActiveFormView, string> = {
   register: '/register',
@@ -35,7 +42,8 @@ const readAuthResponse = async (response: Response): Promise<AuthApiResponse> =>
   }
 };
 
-const getApiError = (data: AuthApiResponse, fallback: string) => data.error || data.message || fallback;
+const getApiError = (data: AuthApiResponse, fallback: string) =>
+  data.error || data.message || fallback;
 
 export default function App() {
   const [activeView, setActiveView] = useState<ActiveFormView>(() => {
@@ -45,6 +53,7 @@ export default function App() {
 
     return getAuthViewFromPath(window.location.pathname);
   });
+
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isCheckingSession, setIsCheckingSession] = useState<boolean>(true);
@@ -118,9 +127,16 @@ export default function App() {
         const response = await fetch('/api/auth/me', {
           credentials: 'include'
         });
+
+        if (response.status === 401) {
+          setAuthUser(null);
+          return;
+        }
+
         const data = await readAuthResponse(response);
 
         if (!isMounted || !response.ok || !data.user) {
+          setAuthUser(null);
           return;
         }
 
@@ -135,7 +151,7 @@ export default function App() {
         }));
         setIsSubmitted(true);
       } catch {
-        // An absent or expired cookie should quietly leave the auth form visible.
+        setAuthUser(null);
       } finally {
         if (isMounted) {
           setIsCheckingSession(false);
@@ -209,59 +225,57 @@ export default function App() {
   };
 
   const handleRegisterSubmit = async (
-  event: React.FormEvent<HTMLFormElement>
-) => {
-  event.preventDefault();
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
 
-  setApiError(null);
-  setApiSuccess(null);
-  setIsSubmitting(true);
+    setApiError(null);
+    setApiSuccess(null);
+    setIsSubmitting(true);
 
-  try {
-    const response = await fetch(getAuthPath('register'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        fullName: form.fullName,
-        email: form.email,
-        password: form.password,
-        confirmPassword: form.confirmPassword,
-      }),
-    });
+    try {
+      const response = await fetch(getAuthPath('register'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fullName: form.fullName,
+          email: form.email,
+          password: form.password,
+          confirmPassword: form.confirmPassword
+        })
+      });
 
-    const data = await readAuthResponse(response);
+      const data = await readAuthResponse(response);
 
-    if (!response.ok || !data.user) {
-      setApiError(getApiError(data, 'Registration failed'));
-      return;
+      if (!response.ok || !data.user) {
+        setApiError(getApiError(data, 'Registration failed'));
+        return;
+      }
+
+      setApiSuccess(data.message || 'Registration complete');
+      setAuthUser(data.user);
+
+      setForm(prev => ({
+        ...prev,
+        fullName: data.user?.fullName || prev.fullName,
+        email: data.user?.email || prev.email,
+        password: '',
+        confirmPassword: ''
+      }));
+
+      setIsSubmitted(true);
+    } catch {
+      setApiError('Unable to connect to the archival nodes. Check connection.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setApiSuccess(data.message || 'Registration complete');
-
-    setAuthUser(data.user);
-
-    setForm(prev => ({
-      ...prev,
-      fullName: data.user?.fullName || prev.fullName,
-      email: data.user?.email || prev.email,
-      password: '',
-      confirmPassword: '',
-    }));
-
-    setIsSubmitted(true);
-  } catch (err) {
-    setApiError(
-      'Unable to connect to the archival nodes. Check connection.'
-    );
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   const handleLoginSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
     setApiError(null);
     setApiSuccess(null);
 
@@ -272,6 +286,7 @@ export default function App() {
       loginErrors.email = 'Email address is required';
       hasErrors = true;
     }
+
     if (!form.password) {
       loginErrors.password = 'A password is required';
       hasErrors = true;
@@ -283,45 +298,45 @@ export default function App() {
     }
 
     setIsSubmitting(true);
+
     try {
-  const response = await fetch('/api/auth/login', {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      email: form.email,
-      password: form.password
-    })
-  });
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password
+        })
+      });
 
-  const data = await readAuthResponse(response);
+      const data = await readAuthResponse(response);
 
-  if (!response.ok || !data.user) {
-    setApiError(getApiError(data, 'Authentication failed'));
-    return;
-  }
+      if (!response.ok || !data.user) {
+        setApiError(getApiError(data, 'Authentication failed'));
+        return;
+      }
 
-  setApiSuccess(data.message || 'Signature verified');
+      setApiSuccess(data.message || 'Signature verified');
+      setAuthUser(data.user);
 
-  setAuthUser(data.user);
+      setForm(prev => ({
+        ...prev,
+        fullName: data.user?.fullName || 'Archival Successor',
+        email: data.user?.email || prev.email,
+        password: '',
+        confirmPassword: ''
+      }));
 
-  setForm(prev => ({
-    ...prev,
-    fullName: data.user?.fullName || 'Archival Successor',
-    email: data.user?.email || prev.email,
-    password: '',
-    confirmPassword: ''
-  }));
-
-  setIsSubmitted(true);
-
-} catch (err) {
-  setApiError('Unable to establish secure gateway session. Check connection.');
-} finally {
-  setIsSubmitting(false);
-}
+      setIsSubmitted(true);
+    } catch {
+      setApiError('Unable to establish secure gateway session. Check connection.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleGoogleAuth = () => {
     setApiSuccess(null);
@@ -342,9 +357,11 @@ export default function App() {
       setForm(createEmptyForm());
       resetAuthFeedback();
       setActiveView('login');
+
       if (typeof window !== 'undefined') {
         window.history.pushState(null, '', getAuthPath('login'));
       }
+
       setIsSubmitting(false);
     }
   };
@@ -432,5 +449,4 @@ export default function App() {
       </AnimatePresence>
     </AuthLayout>
   );
-}
 }
