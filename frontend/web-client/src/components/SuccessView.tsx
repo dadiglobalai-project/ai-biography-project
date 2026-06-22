@@ -1,14 +1,22 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Sparkles, ArrowRight, ShieldCheck, Calendar, Hash, Mail, Award, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Calendar, CheckCircle2, LogOut, ShieldCheck } from 'lucide-react';
 
 interface SuccessViewProps {
   fullName: string;
   email: string;
+  actionLabel?: string;
+  isBusy?: boolean;
   onContinue: () => void;
 }
 
-export default function SuccessView({ fullName, email, onContinue }: SuccessViewProps) {
+export default function SuccessView({
+  fullName,
+  email,
+  actionLabel = 'ENTER YOUR MEMORIAL SANCTUARY',
+  isBusy = false,
+  onContinue
+}: SuccessViewProps) {
   // Let's generate a beautiful mock ledger key and certificate number
   const ledgerKey = `CEL-${Math.floor(100000 + Math.random() * 900000)}`;
   const signatureHash = `0x${Array.from({ length: 16 }, () => 
@@ -107,10 +115,11 @@ export default function SuccessView({ fullName, email, onContinue }: SuccessView
         {/* Continue to Platform Button */}
         <button
           onClick={onContinue}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-lg bg-legacy-navy hover:bg-legacy-navy-light text-white font-cinzel text-xs font-semibold tracking-widest transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5"
+          disabled={isBusy}
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-lg bg-legacy-navy hover:bg-legacy-navy-light disabled:bg-legacy-navy/60 text-white font-cinzel text-xs font-semibold tracking-widest transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5"
         >
-          ENTER YOUR MEMORIAL SANCTUARY
-          <ArrowRight className="w-4 h-4 ml-1" />
+          {isBusy ? 'SIGNING OUT...' : actionLabel}
+          {actionLabel === 'SIGN OUT' ? <LogOut className="w-4 h-4 ml-1" /> : <ArrowRight className="w-4 h-4 ml-1" />}
         </button>
 
         {/* Small motivational footer */}

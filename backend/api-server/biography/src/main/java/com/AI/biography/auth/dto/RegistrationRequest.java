@@ -3,6 +3,7 @@ package com.AI.biography.auth.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.AssertTrue;
 
 public class RegistrationRequest {
     @NotBlank
@@ -18,6 +19,9 @@ public class RegistrationRequest {
 
     @NotBlank
     private String confirmPassword;
+
+    @AssertTrue(message = "You must agree to the Terms & Privacy protocols")
+    private boolean agreedToTerms;
 
     public RegistrationRequest() {
     }
@@ -52,5 +56,13 @@ public class RegistrationRequest {
 
     public void setConfirmPassword(String confirmPassword) {
         this.confirmPassword = confirmPassword;
+    }
+
+    public boolean isAgreedToTerms() {
+        return agreedToTerms;
+    }
+
+    public void setAgreedToTerms(boolean agreedToTerms) {
+        this.agreedToTerms = agreedToTerms;
     }
 }
