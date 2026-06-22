@@ -243,7 +243,8 @@ export default function App() {
           fullName: form.fullName,
           email: form.email,
           password: form.password,
-          confirmPassword: form.confirmPassword
+          confirmPassword: form.confirmPassword,
+          agreedToTerms: form.agreedToTerms
         })
       });
 
@@ -263,6 +264,7 @@ export default function App() {
         email: data.user?.email || prev.email,
         password: '',
         confirmPassword: ''
+        
       }));
 
       setIsSubmitted(true);
