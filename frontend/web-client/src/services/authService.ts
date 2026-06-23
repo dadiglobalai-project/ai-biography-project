@@ -1,5 +1,28 @@
 import { RegisterFormState } from '../types';
 
+const DEFAULT_API_PORT = '8080';
+
+function getApiBaseUrl() {
+  const configuredApiUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+
+  if (configuredApiUrl) {
+    return configuredApiUrl.replace(/\/$/, '');
+  }
+
+  if (import.meta.env.DEV) {
+    const { protocol, hostname } = window.location;
+    return `${protocol}//${hostname}:${DEFAULT_API_PORT}`;
+  }
+
+  return '';
+}
+
+const API_BASE_URL = getApiBaseUrl();
+
+function apiUrl(path: string) {
+  return `${API_BASE_URL}${path}`;
+}
+
 export interface AuthResponse {
   success: boolean;
   message: string;
@@ -14,8 +37,9 @@ export const authService = {
    * Register a new user in the archives.
    */
   async register(form: RegisterFormState): Promise<AuthResponse> {
-    const response = await fetch('/api/auth/register', {
+    const response = await fetch(apiUrl('/api/auth/register'), {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -38,8 +62,9 @@ export const authService = {
    * Log in to verify signature and identity.
    */
   async login(credentials: { email: string; password?: string }): Promise<AuthResponse> {
-    const response = await fetch('/api/auth/login', {
+    const response = await fetch(apiUrl('/api/auth/login'), {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -62,8 +87,9 @@ export const authService = {
    * Fetch authenticated user details of active session.
    */
   async getCurrentUser(): Promise<AuthResponse> {
-    const response = await fetch('/api/auth/me', {
+    const response = await fetch(apiUrl('/api/auth/me'), {
       method: 'GET',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       }
@@ -85,8 +111,9 @@ export const authService = {
    * Clear secure session and log out.
    */
   async logout(): Promise<{ success: boolean; message: string }> {
-    const response = await fetch('/api/auth/logout', {
+    const response = await fetch(apiUrl('/api/auth/logout'), {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       }
@@ -107,8 +134,9 @@ export const authService = {
    * Request password reset link.
    */
   async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetch('/api/auth/forgot-password', {
+    const response = await fetch(apiUrl('/api/auth/forgot-password'), {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
