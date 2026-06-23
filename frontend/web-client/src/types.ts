@@ -39,3 +39,11 @@ export interface LegalDocument {
   lastUpdated: string;
   content: string[];
 }
+
+export interface AuthApiResponse {
+  success?: boolean;
+  message?: string;
+  error?: string;
+  token?: string | null;
+  user?: AuthUser;
+}

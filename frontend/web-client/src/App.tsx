@@ -124,8 +124,17 @@ export default function App() {
 
     const syncSession = async () => {
       try {
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+          setAuthUser(null);
+          return;
+        }
+
         const response = await fetch('/api/auth/me', {
-          credentials: 'include'
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
         });
 
         if (response.status === 401) {
@@ -316,13 +325,18 @@ export default function App() {
 
       const data = await readAuthResponse(response);
 
-      if (!response.ok || !data.user) {
+          if (!response.ok || !data.token) {
         setApiError(getApiError(data, 'Authentication failed'));
         return;
       }
 
-      setApiSuccess(data.message || 'Signature verified');
-      setAuthUser(data.user);
+      localStorage.setItem('token', data.token);
+
+      setApiSuccess(data.message || 'Login successful');
+
+      if (data.user) {
+        setAuthUser(data.user);
+      }
 
       setForm(prev => ({
         ...prev,
@@ -349,24 +363,31 @@ export default function App() {
     setIsSubmitting(true);
     setApiError(null);
 
-    try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
-      });
-    } finally {
-      setAuthUser(null);
-      setForm(createEmptyForm());
-      resetAuthFeedback();
-      setActiveView('login');
+   try {
+  const token = localStorage.getItem('token');
 
-      if (typeof window !== 'undefined') {
-        window.history.pushState(null, '', getAuthPath('login'));
-      }
-
-      setIsSubmitting(false);
+  await fetch('/api/auth/logout', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
     }
-  };
+  });
+
+  localStorage.removeItem('token');
+
+} finally {
+  setAuthUser(null);
+  setForm(createEmptyForm());
+  resetAuthFeedback();
+  setActiveView('login');
+
+  if (typeof window !== 'undefined') {
+    window.history.pushState(null, '', getAuthPath('login'));
+  }
+
+  setIsSubmitting(false);
+}
+  }
 
   if (isCheckingSession) {
     return (
