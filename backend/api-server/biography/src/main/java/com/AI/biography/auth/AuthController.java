@@ -3,6 +3,8 @@ package com.AI.biography.auth;
 import com.AI.biography.auth.dto.AuthResponse;
 import com.AI.biography.auth.dto.LoginRequest;
 import com.AI.biography.auth.dto.RegistrationRequest;
+import com.AI.biography.auth.dto.ForgotPasswordRequest;
+import com.AI.biography.auth.dto.ResetPasswordRequest;
 
 import jakarta.validation.Valid;
 
@@ -31,9 +33,21 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request) {
 
         return authService.login(request);
+    }
 
-        
-}
+    @PostMapping("/forgot-password")
+    public AuthResponse forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+
+        return authService.forgotPassword(request);
+    }
+
+    @PostMapping("/reset-password")
+    public AuthResponse resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+
+        return authService.resetPassword(request);
+    }
 
 
 }

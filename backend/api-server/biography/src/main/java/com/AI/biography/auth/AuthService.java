@@ -1,12 +1,16 @@
 package com.AI.biography.auth;
 
 import com.AI.biography.auth.dto.AuthResponse;
+import com.AI.biography.auth.dto.ForgotPasswordRequest;
 import com.AI.biography.auth.dto.LoginRequest;
 import com.AI.biography.auth.dto.RegistrationRequest;
+import com.AI.biography.auth.dto.ResetPasswordRequest;
 import com.AI.biography.user.User;
 import com.AI.biography.user.UserRepository;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import com.AI.biography.auth.dto.ForgotPasswordRequest;
+import com.AI.biography.auth.dto.ResetPasswordRequest;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -17,15 +21,18 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
 
     public AuthService(
-            UserRepository userRepository,
-            JwtService jwtService,
-            BCryptPasswordEncoder passwordEncoder) {
+        UserRepository userRepository,
+        JwtService jwtService,
+        BCryptPasswordEncoder passwordEncoder,
+        PasswordResetTokenRepository passwordResetTokenRepository) {
 
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
     }
     
     public AuthResponse register(RegistrationRequest request) {
@@ -71,5 +78,70 @@ public class AuthService {
         String token = jwtService.generateToken(user);
 
         return new AuthResponse("Login successful", token);
+    }
+
+    public AuthResponse forgotPassword(ForgotPasswordRequest request) {
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElse(null);
+
+        if (user == null) {
+            return new AuthResponse("If the email exists, a reset link will be sent");
+        }
+
+        String resetTokenValue = UUID.randomUUID().toString();
+
+        PasswordResetToken resetToken = new PasswordResetToken();
+        resetToken.setTokenId(UUID.randomUUID().toString());
+        resetToken.setUserId(user.getUserId());
+        resetToken.setResetToken(resetTokenValue);
+        resetToken.setExpiresAt(LocalDateTime.now().plusMinutes(30));
+        resetToken.setUsed(false);
+        resetToken.setCreatedAt(LocalDateTime.now());
+
+        passwordResetTokenRepository.save(resetToken);
+
+        // Temporary for testing only. Later, send this by email.
+        return new AuthResponse("Password reset token generated: " + resetTokenValue);
+    }
+
+    public AuthResponse resetPassword(ResetPasswordRequest request) {
+
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            return new AuthResponse("Passwords do not match");
+        }
+
+        PasswordResetToken resetToken = passwordResetTokenRepository
+                .findByResetToken(request.getToken())
+                .orElse(null);
+
+        if (resetToken == null) {
+            return new AuthResponse("Invalid reset token");
+        }
+
+        if (Boolean.TRUE.equals(resetToken.getUsed())) {
+            return new AuthResponse("Reset token has already been used");
+        }
+
+        if (resetToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+            return new AuthResponse("Reset token has expired");
+        }
+
+        User user = userRepository.findById(resetToken.getUserId())
+                .orElse(null);
+
+        if (user == null) {
+            return new AuthResponse("User not found");
+        }
+
+        String hashedPassword = passwordEncoder.encode(request.getNewPassword());
+        user.setPasswordHash(hashedPassword);
+
+        userRepository.save(user);
+
+        resetToken.setUsed(true);
+        passwordResetTokenRepository.save(resetToken);
+
+        return new AuthResponse("Password reset successful");
     }
 }
