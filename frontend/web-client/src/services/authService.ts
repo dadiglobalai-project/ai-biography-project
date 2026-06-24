@@ -1,10 +1,17 @@
 import { RegisterFormState } from '../types';
 
+const DEFAULT_API_PORT = '8080';
+
 function getApiBaseUrl() {
   const configuredApiUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 
   if (configuredApiUrl) {
     return configuredApiUrl.replace(/\/$/, '');
+  }
+
+  if (import.meta.env.DEV) {
+    const { protocol, hostname } = window.location;
+    return `${protocol}//${hostname}:${DEFAULT_API_PORT}`;
   }
 
   return '';
@@ -14,20 +21,6 @@ const API_BASE_URL = getApiBaseUrl();
 
 function apiUrl(path: string) {
   return `${API_BASE_URL}${path}`;
-}
-
-async function parseApiResponse(response: Response) {
-  const text = await response.text();
-
-  if (!text) {
-    return { error: response.statusText || 'Request failed' };
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { error: text };
-  }
 }
 
 export interface AuthResponse {
@@ -53,9 +46,9 @@ export const authService = {
       body: JSON.stringify(form)
     });
 
-    const data = await parseApiResponse(response);
+    const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.error || data.message || 'Registration failed');
+      throw new Error(data.error || 'Registration failed');
     }
 
     return {
@@ -78,9 +71,9 @@ export const authService = {
       body: JSON.stringify(credentials)
     });
 
-    const data = await parseApiResponse(response);
+    const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.error || data.message || 'Authentication failed');
+      throw new Error(data.error || 'Authentication failed');
     }
 
     return {
@@ -102,9 +95,9 @@ export const authService = {
       }
     });
 
-    const data = await parseApiResponse(response);
+    const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.error || data.message || 'No active session');
+      throw new Error(data.error || 'No active session');
     }
 
     return {
@@ -126,9 +119,9 @@ export const authService = {
       }
     });
 
-    const data = await parseApiResponse(response);
+    const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.error || data.message || 'Logout failed');
+      throw new Error(data.error || 'Logout failed');
     }
 
     return {
@@ -150,9 +143,9 @@ export const authService = {
       body: JSON.stringify({ email })
     });
 
-    const data = await parseApiResponse(response);
+    const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.error || data.message || 'Password reset request failed');
+      throw new Error(data.error || 'Password reset request failed');
     }
 
     return {

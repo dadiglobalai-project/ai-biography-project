@@ -70,8 +70,7 @@ async function startServer() {
     return res.status(200).json({ 
       success: true, 
       message: "Legacy compilation completed successfully", 
-      user: { fullName, email },
-      token
+      user: { fullName, email } 
     });
   });
 
@@ -109,20 +108,13 @@ async function startServer() {
     return res.status(200).json({ 
       success: true, 
       message: "Access granted successfully", 
-      user: { fullName: matchedUser.fullName, email: matchedUser.email },
-      token
+      user: { fullName: matchedUser.fullName, email: matchedUser.email } 
     });
   });
 
   // Verify current token validity and fetch active session matching identity
   app.get("/api/auth/me", (req, res) => {
-    let token = req.cookies?.token;
-    
-    // Support standard Authorization: Bearer <token> header defined by user's leader
-    if (req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
-      token = req.headers.authorization.split(" ")[1];
-    }
-
+    const token = req.cookies?.token;
     if (!token) {
       return res.status(401).json({ error: "Unauthorized. Please authenticate to open the sanctuary." });
     }
@@ -169,7 +161,7 @@ async function startServer() {
     });
   });
 
-  // Reset password endpoint (Updates the password for the account)
+    // Reset password endpoint (Updates the password for the account)
   app.post("/api/auth/reset-password", (req, res) => {
     const { email, password, confirmPassword } = req.body;
 
@@ -198,6 +190,8 @@ async function startServer() {
       message: "Your new credentials have been safely archived. Your password has been updated."
     });
   });
+
+
 
   // Vite middleware for development or serving index.html in production
   if (process.env.NODE_ENV !== "production") {
