@@ -23,9 +23,24 @@ function apiUrl(path: string) {
   return `${API_BASE_URL}${path}`;
 }
 
+function getAuthHeaders(): HeadersInit {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  const token = localStorage.getItem('token');
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
 export interface AuthResponse {
   success: boolean;
   message: string;
+  token?: string | null;
   user?: {
     fullName: string;
     email: string;
@@ -33,124 +48,119 @@ export interface AuthResponse {
 }
 
 export const authService = {
-  /**
-   * Register a new user in the archives.
-   */
   async register(form: RegisterFormState): Promise<AuthResponse> {
     const response = await fetch(apiUrl('/api/auth/register'), {
       method: 'POST',
-      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(form)
+      body: JSON.stringify(form),
     });
 
     const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || 'Registration failed');
+
+    if (!response.ok || !data.user) {
+      throw new Error(data.error || data.message || 'Registration failed');
     }
 
     return {
       success: true,
       message: data.message || 'Registration complete',
-      user: data.user
+      user: data.user,
     };
   },
 
-  /**
-   * Log in to verify signature and identity.
-   */
   async login(credentials: { email: string; password?: string }): Promise<AuthResponse> {
     const response = await fetch(apiUrl('/api/auth/login'), {
       method: 'POST',
-      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(credentials)
+      body: JSON.stringify(credentials),
     });
 
     const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || 'Authentication failed');
+
+    if (!response.ok || !data.token) {
+      throw new Error(data.error || data.message || 'Authentication failed');
     }
+
+    localStorage.setItem('token', data.token);
 
     return {
       success: true,
-      message: data.message || 'Signature verified',
-      user: data.user
+      message: data.message || 'Login successful',
+      token: data.token,
+      user: data.user,
     };
   },
 
-  /**
-   * Fetch authenticated user details of active session.
-   */
   async getCurrentUser(): Promise<AuthResponse> {
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      throw new Error('No active session');
+    }
+
     const response = await fetch(apiUrl('/api/auth/me'), {
       method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      }
+      headers: getAuthHeaders(),
     });
 
     const data = await response.json();
+
     if (!response.ok) {
-      throw new Error(data.error || 'No active session');
+      localStorage.removeItem('token');
+      throw new Error(data.error || data.message || 'No active session');
     }
 
     return {
       success: true,
       message: 'Active session resolved',
-      user: data.user
+      user: data.user,
     };
   },
 
-  /**
-   * Clear secure session and log out.
-   */
   async logout(): Promise<{ success: boolean; message: string }> {
+    const token = localStorage.getItem('token');
+
     const response = await fetch(apiUrl('/api/auth/logout'), {
       method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      }
+      headers: getAuthHeaders(),
     });
 
-    const data = await response.json();
+    localStorage.removeItem('token');
+
     if (!response.ok) {
-      throw new Error(data.error || 'Logout failed');
+      throw new Error('Logout failed');
     }
+
+    const data = await response.json();
 
     return {
       success: true,
-      message: data.message || 'Session closed'
+      message: data.message || 'Session closed',
     };
   },
 
-  /**
-   * Request password reset link.
-   */
   async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
     const response = await fetch(apiUrl('/api/auth/forgot-password'), {
       method: 'POST',
-      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ email }),
     });
 
     const data = await response.json();
+
     if (!response.ok) {
-      throw new Error(data.error || 'Password reset request failed');
+      throw new Error(data.error || data.message || 'Password reset request failed');
     }
 
     return {
       success: true,
-      message: data.message || 'Password reset link sent'
+      message: data.message || 'Password reset link sent',
     };
-  }
+  },
 };
