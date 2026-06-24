@@ -67,11 +67,12 @@ async function startServer() {
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
-    return res.status(200).json({ 
-      success: true, 
-      message: "Legacy compilation completed successfully", 
-      user: { fullName, email } 
-    });
+    return res.status(200).json({
+    success: true,
+    message: "Legacy compilation completed successfully",
+    user: { fullName, email },
+    token
+  });
   });
 
   app.post("/api/auth/login", (req, res) => {
@@ -105,16 +106,24 @@ async function startServer() {
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
-    return res.status(200).json({ 
-      success: true, 
-      message: "Access granted successfully", 
-      user: { fullName: matchedUser.fullName, email: matchedUser.email } 
-    });
+      return res.status(200).json({
+    success: true,
+    message: "Access granted successfully",
+    user: { fullName: matchedUser.fullName, email: matchedUser.email },
+    token
+  });
   });
 
   // Verify current token validity and fetch active session matching identity
   app.get("/api/auth/me", (req, res) => {
-    const token = req.cookies?.token;
+    let token = req.cookies?.token;
+
+    if (
+      req.headers.authorization &&
+      req.headers.authorization.startsWith("Bearer ")
+    ) {
+      token = req.headers.authorization.split(" ")[1];
+    }
     if (!token) {
       return res.status(401).json({ error: "Unauthorized. Please authenticate to open the sanctuary." });
     }

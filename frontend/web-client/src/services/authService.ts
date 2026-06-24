@@ -163,4 +163,26 @@ export const authService = {
       message: data.message || 'Password reset link sent',
     };
   },
-};
+
+  
+  async resetPassword(payload: { email: string; password?: string; confirmPassword?: string }): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(apiUrl('/api/auth/reset-password'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Password update failed');
+    }
+
+    return {
+      success: true,
+      message: data.message || 'Password updated successfully',
+    };
+  }
+  }
