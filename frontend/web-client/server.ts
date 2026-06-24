@@ -70,7 +70,8 @@ async function startServer() {
     return res.status(200).json({ 
       success: true, 
       message: "Legacy compilation completed successfully", 
-      user: { fullName, email } 
+      user: { fullName, email },
+      token
     });
   });
 
@@ -108,13 +109,20 @@ async function startServer() {
     return res.status(200).json({ 
       success: true, 
       message: "Access granted successfully", 
-      user: { fullName: matchedUser.fullName, email: matchedUser.email } 
+      user: { fullName: matchedUser.fullName, email: matchedUser.email },
+      token
     });
   });
 
   // Verify current token validity and fetch active session matching identity
   app.get("/api/auth/me", (req, res) => {
-    const token = req.cookies?.token;
+    let token = req.cookies?.token;
+    
+    // Support standard Authorization: Bearer <token> header defined by user's leader
+    if (req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
+      token = req.headers.authorization.split(" ")[1];
+    }
+
     if (!token) {
       return res.status(401).json({ error: "Unauthorized. Please authenticate to open the sanctuary." });
     }
@@ -158,6 +166,36 @@ async function startServer() {
     return res.status(200).json({
       success: true,
       message: `A password reset link has been dispatched to ${email}.`
+    });
+  });
+
+  // Reset password endpoint (Updates the password for the account)
+  app.post("/api/auth/reset-password", (req, res) => {
+    const { email, password, confirmPassword } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "No target legacy account identified." });
+    }
+
+    const matchedUser = tempUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+    if (!matchedUser) {
+      return res.status(404).json({ error: "The digital legacy account was not found in the archives." });
+    }
+
+    if (!password || password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters long." });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ error: "Passwords do not match." });
+    }
+
+    // Update password in memory
+    matchedUser.password = password;
+
+    return res.status(200).json({
+      success: true,
+      message: "Your new credentials have been safely archived. Your password has been updated."
     });
   });
 
