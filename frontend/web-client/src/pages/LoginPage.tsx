@@ -72,6 +72,7 @@ export default function LoginPage() {
             fullName={successUser.fullName}
             email={successUser.email}
             onContinue={handleContinue}
+            type="login"
           />
         ) : (
           <LoginForm onSuccess={handleLoginSuccess} />

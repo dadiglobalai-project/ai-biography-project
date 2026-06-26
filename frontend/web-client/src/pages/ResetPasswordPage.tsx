@@ -1,30 +1,59 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Eye, EyeOff, ArrowLeft, ArrowRight, AlertCircle, Sparkles, CheckCircle2 } from 'lucide-react';
 import { authService } from '../services/authService';
 
+const RESET_EMAIL_STORAGE_KEY = 'passwordResetEmail';
+const RESET_TOKEN_STORAGE_KEY = 'passwordResetToken';
+
 export default function ResetPasswordPage() {
-  const navigate = useNavigate();
   const location = useLocation();
 
   // Retrieve email from:
   // 1. router location state (passed if coming directly from forgot password pages)
   // 2. URL query parameters (?email=test@example.com)
-  // 3. Fallback default account for a flawless preview experience
+  // 3. Session storage from the forgot-password flow
   const getEmailAddress = (): string => {
     if (location.state && (location.state as any).email) {
-      return (location.state as any).email;
+      return String((location.state as any).email).trim();
     }
     const params = new URLSearchParams(location.search);
     const queryEmail = params.get('email');
     if (queryEmail) {
-      return queryEmail;
+      return queryEmail.trim();
     }
-    return 'theo@legacy.com'; // Default historical archivist account
+    const storedEmail = sessionStorage.getItem(RESET_EMAIL_STORAGE_KEY);
+    if (storedEmail) {
+      return storedEmail.trim();
+    }
+    return '';
   };
 
   const email = getEmailAddress();
+
+  const getResetToken = (): string => {
+    if (location.state && (location.state as any).token) {
+      return String((location.state as any).token).trim();
+    }
+    const params = new URLSearchParams(location.search);
+    const queryToken = params.get('token');
+    if (queryToken) {
+      return queryToken.trim();
+    }
+    return sessionStorage.getItem(RESET_TOKEN_STORAGE_KEY)?.trim() || '';
+  };
+
+  const resetToken = getResetToken();
+
+  useEffect(() => {
+    if (email) {
+      sessionStorage.setItem(RESET_EMAIL_STORAGE_KEY, email);
+    }
+    if (resetToken) {
+      sessionStorage.setItem(RESET_TOKEN_STORAGE_KEY, resetToken);
+    }
+  }, [email, resetToken]);
 
   // State Management
   const [password, setPassword] = useState('');
@@ -60,6 +89,11 @@ export default function ResetPasswordPage() {
     setError(null);
 
     // Validation checks
+    if (!resetToken) {
+      setError('Please use the reset link from your email or request a new password reset.');
+      return;
+    }
+
     if (!hasMinLength) {
       setError('Please ensure your password is at least 8 characters long.');
       return;
@@ -73,10 +107,12 @@ export default function ResetPasswordPage() {
     setIsSubmitting(true);
     try {
       await authService.resetPassword({
-        email,
-        password,
+        token: resetToken,
+        newPassword: password,
         confirmPassword
       });
+      sessionStorage.removeItem(RESET_EMAIL_STORAGE_KEY);
+      sessionStorage.removeItem(RESET_TOKEN_STORAGE_KEY);
       setSuccess(true);
     } catch (err: any) {
       setError(err?.message || 'Failed to update credentials. Please try again.');
@@ -135,9 +171,11 @@ export default function ResetPasswordPage() {
               </div>
 
               {/* Target Email Banner for User Context */}
-              <div className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-between text-xs text-slate-500 font-mono">
-                <span>Account:</span>
-                <span className="font-semibold text-slate-700">{email}</span>
+              <div className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-between gap-3 text-xs text-slate-500 font-mono">
+                <span className="shrink-0">Account Email:</span>
+                <span className={`font-semibold text-right break-all ${email ? 'text-slate-700' : 'text-rose-500'}`}>
+                  {email || 'Use the reset link to continue'}
+                </span>
               </div>
 
               {/* Error Handling Banner */}

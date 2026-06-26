@@ -1,6 +1,8 @@
 import { RegisterFormState } from '../types';
 
 const DEFAULT_API_PORT = '8080';
+const AUTH_TOKEN_STORAGE_KEY = 'token';
+const AUTH_USER_STORAGE_KEY = 'authUser';
 
 function getApiBaseUrl() {
   const configuredApiUrl = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -28,7 +30,7 @@ function getAuthHeaders(): HeadersInit {
     'Content-Type': 'application/json',
   };
 
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
 
   if (token) {
     headers.Authorization = `Bearer ${token}`;
@@ -41,131 +43,201 @@ export interface AuthResponse {
   success: boolean;
   message: string;
   token?: string | null;
+  resetToken?: string | null;
   user?: {
     fullName: string;
     email: string;
   };
 }
 
+function getMessage(data: any, fallback: string) {
+  return data?.error || data?.message || fallback;
+}
+
+function storeAuthSession(token: string, user?: AuthResponse['user']) {
+  localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+
+  if (user) {
+    localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(user));
+  }
+}
+
+function clearAuthSession() {
+  localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+}
+
+function readStoredUser(): AuthResponse['user'] | undefined {
+  const storedUser = localStorage.getItem(AUTH_USER_STORAGE_KEY);
+  if (!storedUser) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(storedUser);
+  } catch {
+    localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+    return undefined;
+  }
+}
+
+function getSessionFromJwt(token: string) {
+  try {
+    const [, payload] = token.split('.');
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = JSON.parse(atob(normalizedPayload));
+    const email = typeof decoded.email === 'string' ? decoded.email : '';
+    const expiresAt = typeof decoded.exp === 'number' ? decoded.exp * 1000 : 0;
+
+    if (!email || (expiresAt && expiresAt <= Date.now())) {
+      return null;
+    }
+
+    return { email };
+  } catch {
+    return null;
+  }
+}
+
+function extractResetToken(message?: string) {
+  return message?.match(/Password reset token generated:\s*(.+)$/i)?.[1]?.trim() || null;
+}
+
 export const authService = {
   async register(form: RegisterFormState): Promise<AuthResponse> {
+    const user = {
+      fullName: form.fullName.trim(),
+      email: form.email.trim(),
+    };
+
     const response = await fetch(apiUrl('/api/auth/register'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(form),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok || !data.user) {
-      throw new Error(data.error || data.message || 'Registration failed');
-    }
-
-    return {
-      success: true,
-      message: data.message || 'Registration complete',
-      user: data.user,
-    };
-  },
-
-  async login(credentials: { email: string; password?: string }): Promise<AuthResponse> {
-    const response = await fetch(apiUrl('/api/auth/login'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(credentials),
+      body: JSON.stringify({
+        ...form,
+        fullName: user.fullName,
+        email: user.email,
+      }),
     });
 
     const data = await response.json();
 
     if (!response.ok || !data.token) {
-      throw new Error(data.error || data.message || 'Authentication failed');
+      throw new Error(getMessage(data, 'Registration failed'));
     }
 
-    localStorage.setItem('token', data.token);
+    storeAuthSession(data.token, user);
+
+    return {
+      success: true,
+      message: data.message || 'Registration complete',
+      token: data.token,
+      user,
+    };
+  },
+
+  async login(credentials: { email: string; password?: string }): Promise<AuthResponse> {
+    const email = credentials.email.trim();
+    const response = await fetch(apiUrl('/api/auth/login'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...credentials,
+        email,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.token) {
+      throw new Error(getMessage(data, 'Authentication failed'));
+    }
+
+    const user = data.user || { fullName: 'Archival Successor', email };
+    storeAuthSession(data.token, user);
 
     return {
       success: true,
       message: data.message || 'Login successful',
       token: data.token,
-      user: data.user,
+      user,
     };
   },
 
   async getCurrentUser(): Promise<AuthResponse> {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
 
     if (!token) {
       throw new Error('No active session');
     }
 
-    const response = await fetch(apiUrl('/api/auth/me'), {
-      method: 'GET',
-      headers: getAuthHeaders(),
-    });
+    const storedUser = readStoredUser();
+    const tokenSession = getSessionFromJwt(token);
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      localStorage.removeItem('token');
-      throw new Error(data.error || data.message || 'No active session');
+    if (!tokenSession) {
+      clearAuthSession();
+      throw new Error('No active session');
     }
 
     return {
       success: true,
       message: 'Active session resolved',
-      user: data.user,
+      token,
+      user: storedUser || {
+        fullName: 'Archival Successor',
+        email: tokenSession?.email || '',
+      },
     };
   },
 
   async logout(): Promise<{ success: boolean; message: string }> {
-    const token = localStorage.getItem('token');
-
-    const response = await fetch(apiUrl('/api/auth/logout'), {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    });
-
-    localStorage.removeItem('token');
-
-    if (!response.ok) {
-      throw new Error('Logout failed');
+    try {
+      await fetch(apiUrl('/api/auth/logout'), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+    } catch {
+      // The Java backend uses stateless JWTs and does not require server logout.
     }
 
-    const data = await response.json();
+    clearAuthSession();
 
     return {
       success: true,
-      message: data.message || 'Session closed',
+      message: 'Session closed',
     };
   },
 
-  async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
+  async forgotPassword(email: string): Promise<{ success: boolean; message: string; resetToken?: string | null }> {
     const response = await fetch(apiUrl('/api/auth/forgot-password'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email: email.trim() }),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || data.message || 'Password reset request failed');
+      throw new Error(getMessage(data, 'Password reset request failed'));
     }
+
+    const message = data.message || 'Password reset link sent';
 
     return {
       success: true,
-      message: data.message || 'Password reset link sent',
+      message,
+      resetToken: data.resetToken || extractResetToken(message),
     };
   },
 
   
-  async resetPassword(payload: { email: string; password?: string; confirmPassword?: string }): Promise<{ success: boolean; message: string }> {
+  async resetPassword(payload: { token: string; newPassword: string; confirmPassword: string }): Promise<{ success: boolean; message: string }> {
     const response = await fetch(apiUrl('/api/auth/reset-password'), {
       method: 'POST',
       headers: {
@@ -175,14 +247,15 @@ export const authService = {
     });
 
     const data = await response.json();
+    const message = getMessage(data, 'Password update failed');
 
-    if (!response.ok) {
-      throw new Error(data.error || data.message || 'Password update failed');
+    if (!response.ok || !/password reset successful/i.test(message)) {
+      throw new Error(message);
     }
 
     return {
       success: true,
-      message: data.message || 'Password updated successfully',
+      message,
     };
   }
-  }
+};

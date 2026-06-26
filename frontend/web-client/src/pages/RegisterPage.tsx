@@ -72,6 +72,7 @@ export default function RegisterPage() {
             fullName={successUser.fullName}
             email={successUser.email}
             onContinue={handleContinue}
+            type="register"
           />
         ) : (
           <RegisterForm onSuccess={handleRegisterSuccess} />

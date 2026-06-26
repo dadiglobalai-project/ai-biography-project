@@ -4,6 +4,9 @@ import { motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, AlertCircle } from 'lucide-react';
 import { authService } from '../services/authService';
 
+const RESET_EMAIL_STORAGE_KEY = 'passwordResetEmail';
+const RESET_TOKEN_STORAGE_KEY = 'passwordResetToken';
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,16 +36,23 @@ export default function ForgotPasswordPage() {
     setTouched(true);
     setError(null);
 
-    const validationMsg = validateEmail(email);
+    const targetEmail = email.trim();
+    const validationMsg = validateEmail(targetEmail);
     if (validationMsg) {
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await authService.forgotPassword(email);
+      const response = await authService.forgotPassword(targetEmail);
+      sessionStorage.setItem(RESET_EMAIL_STORAGE_KEY, targetEmail);
+      if (response.resetToken) {
+        sessionStorage.setItem(RESET_TOKEN_STORAGE_KEY, response.resetToken);
+      } else {
+        sessionStorage.removeItem(RESET_TOKEN_STORAGE_KEY);
+      }
       // Success: Navigate to check-email with state
-      navigate('/check-email', { state: { email } });
+      navigate('/check-email', { state: { email: targetEmail, resetToken: response.resetToken } });
     } catch (err: any) {
       setError(err?.message || 'Unable to process reset request. Please try again.');
     } finally {

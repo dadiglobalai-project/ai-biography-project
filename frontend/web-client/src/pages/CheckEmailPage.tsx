@@ -4,10 +4,16 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Mail, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 import { authService } from '../services/authService';
 
+const RESET_EMAIL_STORAGE_KEY = 'passwordResetEmail';
+const RESET_TOKEN_STORAGE_KEY = 'passwordResetToken';
+
 export default function CheckEmailPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const email = location.state?.email || 'user@example.com';
+  const email = location.state?.email || sessionStorage.getItem(RESET_EMAIL_STORAGE_KEY) || '';
+  const [resetToken, setResetToken] = useState(
+    location.state?.resetToken || sessionStorage.getItem(RESET_TOKEN_STORAGE_KEY) || ''
+  );
 
   const [isResending, setIsResending] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -17,8 +23,18 @@ export default function CheckEmailPage() {
     setIsResending(true);
     setToastMessage(null);
     setErrorMessage(null);
+    if (!email) {
+      setErrorMessage('Please start password reset again so we know which account to update.');
+      setIsResending(false);
+      return;
+    }
+
     try {
-      await authService.forgotPassword(email);
+      const response = await authService.forgotPassword(email);
+      if (response.resetToken) {
+        sessionStorage.setItem(RESET_TOKEN_STORAGE_KEY, response.resetToken);
+        setResetToken(response.resetToken);
+      }
       setToastMessage("A fresh authentic reset link has been dispatched to your inbox.");
       setTimeout(() => setToastMessage(null), 5000);
     } catch (err: any) {
@@ -113,6 +129,15 @@ export default function CheckEmailPage() {
         >
           Return to Login
         </button>
+
+        {resetToken && (
+          <button
+            onClick={() => navigate('/reset-password', { state: { email, token: resetToken } })}
+            className="w-full bg-[#FED362] hover:bg-[#FED362]/90 text-slate-900 py-4 rounded-lg font-mono text-xs font-semibold tracking-wider uppercase transition-all duration-300 text-center block max-w-sm mx-auto mt-3 cursor-pointer shadow-md hover:shadow-lg"
+          >
+            Continue to Reset Password
+          </button>
+        )}
 
         <div className="text-xs text-slate-400 font-sans text-center mt-8">
           Didn&apos;t receive the email? Check your spam folder or
