@@ -9,8 +9,8 @@ import com.AI.biography.user.User;
 import com.AI.biography.user.UserRepository;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
-import com.AI.biography.auth.dto.ForgotPasswordRequest;
-import com.AI.biography.auth.dto.ResetPasswordRequest;
+import com.AI.biography.user.UserProfile;
+import com.AI.biography.user.UserProfileRepository;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -22,19 +22,25 @@ public class AuthService {
     private final JwtService jwtService;
     private final BCryptPasswordEncoder passwordEncoder;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final EmailService emailService;
+    private final UserProfileRepository userProfileRepository;
 
     public AuthService(
-        UserRepository userRepository,
-        JwtService jwtService,
-        BCryptPasswordEncoder passwordEncoder,
-        PasswordResetTokenRepository passwordResetTokenRepository) {
+            UserRepository userRepository,
+            JwtService jwtService,
+            BCryptPasswordEncoder passwordEncoder,
+            PasswordResetTokenRepository passwordResetTokenRepository,
+            EmailService emailService,
+            UserProfileRepository userProfileRepository) {
 
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
+        this.emailService = emailService;
+        this.userProfileRepository = userProfileRepository;
     }
-    
+
     public AuthResponse register(RegistrationRequest request) {
 
         if (!request.getPassword().equals(request.getConfirmPassword())) {
@@ -46,7 +52,6 @@ public class AuthService {
         }
 
         String hashedPassword = passwordEncoder.encode(request.getPassword());
-        
 
         User user = new User();
         user.setUserId(UUID.randomUUID().toString());
@@ -54,10 +59,27 @@ public class AuthService {
         user.setPasswordHash(hashedPassword);
         user.setStatus("ACTIVE");
         user.setCreatedAt(LocalDateTime.now());
-        
-        String token = jwtService.generateToken(user);
+
+
+        String fullName = request.getFullName().trim();
+        String[] nameParts = fullName.split(" ", 2);
+
+        String firstName = nameParts[0];
+        String lastName = nameParts.length > 1 ? nameParts[1] : "";
+
+        UserProfile profile = new UserProfile();
+        profile.setProfileId(UUID.randomUUID().toString());
+        profile.setUserId(user.getUserId());
+        profile.setFirstName(firstName);
+        profile.setLastName(lastName);
+        profile.setProfilePhoto(null);
+        profile.setBio(null);
 
         userRepository.save(user);
+        userProfileRepository.save(profile);
+
+        
+        String token = jwtService.generateToken(user);
 
         return new AuthResponse("Registration successful", token);
     }
@@ -101,8 +123,17 @@ public class AuthService {
 
         passwordResetTokenRepository.save(resetToken);
 
-        // Temporary for testing only. Later, send this by email.
-        return new AuthResponse("Password reset token generated: " + resetTokenValue);
+        String firstName = userProfileRepository.findByUserId(user.getUserId())
+        .map(UserProfile::getFirstName)
+        .orElse("User");
+
+        emailService.sendPasswordResetEmail(
+                user.getEmail(),
+                firstName,
+                resetTokenValue
+        );
+
+        return new AuthResponse("If the email exists, a reset link will be sent");
     }
 
     public AuthResponse resetPassword(ResetPasswordRequest request) {
