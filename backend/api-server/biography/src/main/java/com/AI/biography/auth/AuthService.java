@@ -165,6 +165,11 @@ public class AuthService {
             return new AuthResponse("User not found");
         }
 
+        // Prevent using the same password again
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
+            return new AuthResponse("New password cannot be the same as your current password");
+        }
+
         String hashedPassword = passwordEncoder.encode(request.getNewPassword());
         user.setPasswordHash(hashedPassword);
 
