@@ -201,7 +201,6 @@ async function startServer() {
   });
 
 
-
   // Vite middleware for development or serving index.html in production
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

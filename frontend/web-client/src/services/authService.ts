@@ -249,7 +249,7 @@ export const authService = {
     const data = await response.json();
     const message = getMessage(data, 'Password update failed');
 
-    if (!response.ok || !/password reset successful/i.test(message)) {
+    if (!response.ok) {
       throw new Error(message);
     }
 
