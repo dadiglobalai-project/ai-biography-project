@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Check, Star, ArrowRight, PenTool, LogOut, Award, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -14,10 +14,31 @@ const SERVICE_TYPE_BY_OPTION: Record<StoryOption, ServiceType> = {
 
 export default function PreserveStoryPage() {
   const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState<{ fullName: string; email: string } | null>(null);
   const [selectedOption, setSelectedOption] = useState<StoryOption | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    authService.getCurrentUser()
+      .then((res) => {
+        if (active && res.user) {
+          setCurrentUser(res.user);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          navigate('/login', { replace: true });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [navigate]);
 
   const handleSelect = (option: StoryOption) => {
     setSelectedOption(option);
@@ -53,7 +74,6 @@ export default function PreserveStoryPage() {
     } catch (err) {
       console.error("Unable to clear secure session:", err);
     }
-    localStorage.removeItem('token');
     navigate('/login');
   };
 
@@ -81,14 +101,24 @@ export default function PreserveStoryPage() {
             </button>
           </nav>
 
-          {/* Logout Button */}
-          <button 
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-5 py-2 border border-slate-200 hover:border-slate-800 hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-full text-xs font-bold tracking-wide transition-all duration-200 shadow-sm cursor-pointer"
-          >
-            <LogOut className="w-3.5 h-3.5 text-slate-500" />
-            Logout
-          </button>
+          <div className="flex items-center gap-3">
+            {currentUser && (
+              <div className="hidden sm:flex items-center max-w-[190px] rounded-full border border-slate-100 bg-white/70 px-3 py-2 text-xs text-slate-500 shadow-sm">
+                <span className="truncate font-medium text-slate-700">
+                  {currentUser.fullName || currentUser.email}
+                </span>
+              </div>
+            )}
+
+            {/* Logout Button */}
+            <button 
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-5 py-2 border border-slate-200 hover:border-slate-800 hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-full text-xs font-bold tracking-wide transition-all duration-200 shadow-sm cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5 text-slate-500" />
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 
