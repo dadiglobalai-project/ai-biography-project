@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import AuthLayout from '../components/auth/AuthLayout';
 import LoginForm from '../components/auth/LoginForm';
@@ -6,6 +7,7 @@ import SuccessView from '../components/SuccessView';
 import { authService } from '../services/authService';
 
 export default function LoginPage() {
+  const navigate = useNavigate();
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [successUser, setSuccessUser] = useState({ fullName: '', email: '' });
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -16,8 +18,7 @@ export default function LoginPage() {
     authService.getCurrentUser()
       .then((res) => {
         if (active && res.success && res.user) {
-          setSuccessUser({ fullName: res.user.fullName, email: res.user.email });
-          setIsSubmitted(true);
+          navigate('/preserve-story', { replace: true });
         }
       })
       .catch(() => {
@@ -32,11 +33,12 @@ export default function LoginPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [navigate]);
 
   const handleLoginSuccess = (fullName: string, email: string) => {
     setSuccessUser({ fullName, email });
     setIsSubmitted(true);
+    navigate('/preserve-story');
   };
 
   const handleContinue = async () => {

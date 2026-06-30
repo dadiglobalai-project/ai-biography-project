@@ -51,6 +51,15 @@ export interface AuthResponse {
   };
 }
 
+export type ServiceType = 'DIY' | 'PROFESSIONAL';
+
+export interface OnboardingResponse {
+  success: boolean;
+  message: string;
+  serviceType: ServiceType;
+  onboardingStatus: string;
+}
+
 function getMessage(data: any, fallback: string) {
   return data?.error || data?.message || fallback;
 }
@@ -262,6 +271,27 @@ export const authService = {
     return {
       success: true,
       message,
+    };
+  },
+
+  async saveServiceType(serviceType: ServiceType): Promise<OnboardingResponse> {
+    const response = await fetch(apiUrl('/api/onboarding/service-type'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ serviceType }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to save service type'));
+    }
+
+    return {
+      success: true,
+      message: data.message || 'Service type saved successfully',
+      serviceType: data.serviceType || serviceType,
+      onboardingStatus: data.onboardingStatus || 'COMPLETED',
     };
   }
 };

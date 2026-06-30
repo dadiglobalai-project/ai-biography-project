@@ -5,6 +5,7 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import CheckEmailPage from './pages/CheckEmailPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import PreserveStoryPage from './pages/PreserveStoryPage';
 
 const pageTitles: Record<string, string> = {
   '/login': 'Login | Xinghuoji',
@@ -12,6 +13,7 @@ const pageTitles: Record<string, string> = {
   '/forgot-password': 'Forgot Password | Xinghuoji',
   '/check-email': 'Check Email | Xinghuoji',
   '/reset-password': 'Reset Password | Xinghuoji',
+  '/preserve-story': 'Preserve Story | Xinghuoji',
 };
 
 function PageTitle() {
@@ -35,6 +37,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/check-email" element={<CheckEmailPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/preserve-story" element={<PreserveStoryPage />} />
         
                 
         {/* Fallback pattern to map root or custom routes directly to /register */}
