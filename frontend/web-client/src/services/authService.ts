@@ -4,6 +4,7 @@ import { getEmailValidationError } from '../utils/emailValidation';
 const DEFAULT_API_PORT = '8080';
 const AUTH_TOKEN_STORAGE_KEY = 'token';
 const AUTH_USER_STORAGE_KEY = 'authUser';
+const KNOWN_AUTH_USERS_STORAGE_KEY = 'knownAuthUsers';
 
 function getApiBaseUrl() {
   const configuredApiUrl = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -46,7 +47,7 @@ export interface AuthResponse {
   token?: string | null;
   resetToken?: string | null;
   user?: {
-    fullName: string;
+    fullName?: string;
     email: string;
   };
 }
@@ -69,6 +70,7 @@ function storeAuthSession(token: string, user?: AuthResponse['user']) {
 
   if (user) {
     localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(user));
+    rememberKnownUser(user);
   }
 }
 
@@ -91,6 +93,41 @@ function readStoredUser(): AuthResponse['user'] | undefined {
   }
 }
 
+function readKnownUsers(): Record<string, string> {
+  const storedKnownUsers = localStorage.getItem(KNOWN_AUTH_USERS_STORAGE_KEY);
+  if (!storedKnownUsers) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(storedKnownUsers);
+  } catch {
+    localStorage.removeItem(KNOWN_AUTH_USERS_STORAGE_KEY);
+    return {};
+  }
+}
+
+function rememberKnownUser(user?: AuthResponse['user']) {
+  const email = user?.email?.trim().toLowerCase();
+  const fullName = user?.fullName?.trim();
+
+  if (!email || !fullName) {
+    return;
+  }
+
+  localStorage.setItem(
+    KNOWN_AUTH_USERS_STORAGE_KEY,
+    JSON.stringify({
+      ...readKnownUsers(),
+      [email]: fullName,
+    })
+  );
+}
+
+function getKnownFullName(email: string) {
+  return readKnownUsers()[email.trim().toLowerCase()] || '';
+}
+
 function getSessionFromJwt(token: string) {
   try {
     const [, payload] = token.split('.');
@@ -98,12 +135,20 @@ function getSessionFromJwt(token: string) {
     const decoded = JSON.parse(atob(normalizedPayload));
     const email = typeof decoded.email === 'string' ? decoded.email : '';
     const expiresAt = typeof decoded.exp === 'number' ? decoded.exp * 1000 : 0;
+    const firstName = typeof decoded.firstName === 'string' ? decoded.firstName : '';
+    const lastName = typeof decoded.lastName === 'string' ? decoded.lastName : '';
+    const fullName =
+      typeof decoded.fullName === 'string'
+        ? decoded.fullName
+        : typeof decoded.name === 'string'
+          ? decoded.name
+          : `${firstName} ${lastName}`.trim();
 
     if (!email || (expiresAt && expiresAt <= Date.now())) {
       return null;
     }
 
-    return { email };
+    return { email, fullName };
   } catch {
     return null;
   }
@@ -172,7 +217,9 @@ export const authService = {
       throw new Error(getMessage(data, 'Authentication failed'));
     }
 
-    const user = data.user || { fullName: 'Archival Successor', email };
+    const tokenSession = getSessionFromJwt(data.token);
+    const fullName = data.user?.fullName || tokenSession?.fullName || getKnownFullName(email);
+    const user = { fullName, email: data.user?.email || tokenSession?.email || email };
     storeAuthSession(data.token, user);
 
     return {
@@ -202,9 +249,9 @@ export const authService = {
       success: true,
       message: 'Active session resolved',
       token,
-      user: storedUser || {
-        fullName: 'Archival Successor',
-        email: tokenSession?.email || '',
+      user: {
+        fullName: storedUser?.fullName || tokenSession.fullName || getKnownFullName(tokenSession.email),
+        email: storedUser?.email || tokenSession.email,
       },
     };
   },

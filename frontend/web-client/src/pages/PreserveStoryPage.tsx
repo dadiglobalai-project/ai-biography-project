@@ -14,7 +14,7 @@ const SERVICE_TYPE_BY_OPTION: Record<StoryOption, ServiceType> = {
 
 export default function PreserveStoryPage() {
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState<{ fullName: string; email: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ fullName?: string; email: string } | null>(null);
   const [selectedOption, setSelectedOption] = useState<StoryOption | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -38,18 +38,10 @@ export default function RegisterPage() {
   const handleRegisterSuccess = (fullName: string, email: string) => {
     setSuccessUser({ fullName, email });
     setIsSubmitted(true);
-    navigate('/preserve-story');
   };
 
-  const handleContinue = async () => {
-    try {
-      // Clear secure JWT cookie on logout/exit
-      await authService.logout();
-    } catch (err) {
-      console.error("Unable to clear secure session:", err);
-    }
-    setIsSubmitted(false);
-    setSuccessUser({ fullName: '', email: '' });
+  const handleContinue = () => {
+    navigate('/preserve-story');
   };
 
   if (isLoadingSession) {
