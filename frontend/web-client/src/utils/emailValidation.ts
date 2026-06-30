@@ -1,6 +1,26 @@
 const EMAIL_LOCAL_PART_REGEX = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+$/;
 const DOMAIN_LABEL_REGEX = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
 const TOP_LEVEL_DOMAIN_REGEX = /^[A-Za-z]{2,24}$/;
+const SUPPORTED_EMAIL_DOMAINS = new Set([
+  'gmail.com',
+  'yahoo.com',
+  'ymail.com',
+  'outlook.com',
+  'hotmail.com',
+  'live.com',
+  'msn.com',
+  'icloud.com',
+  'me.com',
+  'mac.com',
+  'aol.com',
+  'proton.me',
+  'protonmail.com',
+  'mail.com',
+  'zoho.com',
+  'gmx.com',
+  'gmx.net',
+  'tutanota.com',
+]);
 
 export function getEmailValidationError(email: string) {
   const value = email.trim();
@@ -18,7 +38,8 @@ export function getEmailValidationError(email: string) {
     return 'Please enter a valid email address';
   }
 
-  const [localPart, domain] = parts;
+  const [localPart, domainPart] = parts;
+  const domain = domainPart.toLowerCase();
   if (
     !localPart ||
     localPart.length > 64 ||
@@ -46,6 +67,10 @@ export function getEmailValidationError(email: string) {
     )
   ) {
     return 'Please enter a valid email address';
+  }
+
+  if (!SUPPORTED_EMAIL_DOMAINS.has(domain)) {
+    return 'Please use a supported email provider';
   }
 
   return null;
