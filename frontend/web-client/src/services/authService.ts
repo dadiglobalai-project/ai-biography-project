@@ -128,6 +128,33 @@ function getKnownFullName(email: string) {
   return readKnownUsers()[email.trim().toLowerCase()] || '';
 }
 
+function joinNameParts(firstName?: unknown, lastName?: unknown) {
+  return [
+    typeof firstName === 'string' ? firstName.trim() : '',
+    typeof lastName === 'string' ? lastName.trim() : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function getFullNameFromData(data: any) {
+  return (
+    (typeof data?.fullName === 'string' && data.fullName.trim()) ||
+    (typeof data?.name === 'string' && data.name.trim()) ||
+    joinNameParts(data?.firstName, data?.lastName) ||
+    (typeof data?.user?.fullName === 'string' && data.user.fullName.trim()) ||
+    (typeof data?.user?.name === 'string' && data.user.name.trim()) ||
+    joinNameParts(data?.user?.firstName, data?.user?.lastName) ||
+    (typeof data?.profile?.fullName === 'string' && data.profile.fullName.trim()) ||
+    (typeof data?.profile?.name === 'string' && data.profile.name.trim()) ||
+    joinNameParts(data?.profile?.firstName, data?.profile?.lastName) ||
+    (typeof data?.userProfile?.fullName === 'string' && data.userProfile.fullName.trim()) ||
+    (typeof data?.userProfile?.name === 'string' && data.userProfile.name.trim()) ||
+    joinNameParts(data?.userProfile?.firstName, data?.userProfile?.lastName) ||
+    ''
+  );
+}
+
 function getSessionFromJwt(token: string) {
   try {
     const [, payload] = token.split('.');
@@ -135,14 +162,12 @@ function getSessionFromJwt(token: string) {
     const decoded = JSON.parse(atob(normalizedPayload));
     const email = typeof decoded.email === 'string' ? decoded.email : '';
     const expiresAt = typeof decoded.exp === 'number' ? decoded.exp * 1000 : 0;
-    const firstName = typeof decoded.firstName === 'string' ? decoded.firstName : '';
-    const lastName = typeof decoded.lastName === 'string' ? decoded.lastName : '';
     const fullName =
       typeof decoded.fullName === 'string'
-        ? decoded.fullName
+        ? decoded.fullName.trim()
         : typeof decoded.name === 'string'
-          ? decoded.name
-          : `${firstName} ${lastName}`.trim();
+          ? decoded.name.trim()
+          : joinNameParts(decoded.firstName, decoded.lastName);
 
     if (!email || (expiresAt && expiresAt <= Date.now())) {
       return null;
@@ -218,7 +243,7 @@ export const authService = {
     }
 
     const tokenSession = getSessionFromJwt(data.token);
-    const fullName = data.user?.fullName || tokenSession?.fullName || getKnownFullName(email);
+    const fullName = getFullNameFromData(data) || tokenSession?.fullName || getKnownFullName(email);
     const user = { fullName, email: data.user?.email || tokenSession?.email || email };
     storeAuthSession(data.token, user);
 

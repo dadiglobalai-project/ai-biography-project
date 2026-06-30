@@ -102,10 +102,10 @@ export default function PreserveStoryPage() {
           </nav>
 
           <div className="flex items-center gap-3">
-            {currentUser && (
+            {currentUser?.fullName && (
               <div className="hidden sm:flex items-center max-w-[190px] rounded-full border border-slate-100 bg-white/70 px-3 py-2 text-xs text-slate-500 shadow-sm">
                 <span className="truncate font-medium text-slate-700">
-                  {currentUser.fullName || currentUser.email}
+                  {currentUser.fullName}
                 </span>
               </div>
             )}
