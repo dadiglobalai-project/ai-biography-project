@@ -5,6 +5,7 @@ import { User, Mail, Lock, Eye, EyeOff, Check, AlertCircle, Sparkles } from 'luc
 import { authService } from '../../services/authService';
 import { RegisterFormState, FormErrors, LegalDocument } from '../../types';
 import { TERMS_OF_SERVICE, PRIVACY_POLICY, AFTERLIFE_PROTOCOLS } from '../../data';
+import { getEmailValidationError } from '../../utils/emailValidation';
 import LegalModal from '../LegalModal';
 import BrandLogo from '../BrandLogo';
 
@@ -48,10 +49,9 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
       newErrors.fullName = 'Full Name must be at least 3 characters long';
     }
 
-    // Email check using a clean regex
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (form.email.length > 0 && !emailRegex.test(form.email)) {
-      newErrors.email = 'Please select a valid email address';
+    const emailError = form.email.length > 0 ? getEmailValidationError(form.email) : null;
+    if (emailError) {
+      newErrors.email = emailError;
     }
 
     // Password complex criteria
@@ -131,11 +131,9 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
       finalErrors.fullName = 'Full Name must be at least 3 characters';
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!form.email) {
-      finalErrors.email = 'Email address is required';
-    } else if (!emailRegex.test(form.email)) {
-      finalErrors.email = 'Please enter a valid email';
+    const emailError = getEmailValidationError(form.email);
+    if (emailError) {
+      finalErrors.email = emailError;
     }
 
     if (!form.password) {
@@ -158,7 +156,7 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
     if (Object.keys(finalErrors).length === 0) {
       setIsSubmitting(true);
       try {
-        const response = await authService.register(form);
+        await authService.register(form);
         onSuccess(form.fullName, form.email);
       } catch (err: any) {
         setApiError(err.message || 'Unable to connect to the archival nodes. Check connection.');

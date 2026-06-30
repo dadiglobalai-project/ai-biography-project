@@ -10,28 +10,6 @@ const RESET_TOKEN_STORAGE_KEY = 'passwordResetToken';
 export default function ResetPasswordPage() {
   const location = useLocation();
 
-  // Retrieve email from:
-  // 1. router location state (passed if coming directly from forgot password pages)
-  // 2. URL query parameters (?email=test@example.com)
-  // 3. Session storage from the forgot-password flow
-  const getEmailAddress = (): string => {
-    if (location.state && (location.state as any).email) {
-      return String((location.state as any).email).trim();
-    }
-    const params = new URLSearchParams(location.search);
-    const queryEmail = params.get('email');
-    if (queryEmail) {
-      return queryEmail.trim();
-    }
-    const storedEmail = sessionStorage.getItem(RESET_EMAIL_STORAGE_KEY);
-    if (storedEmail) {
-      return storedEmail.trim();
-    }
-    return '';
-  };
-
-  const email = getEmailAddress();
-
   const getResetToken = (): string => {
     if (location.state && (location.state as any).token) {
       return String((location.state as any).token).trim();
@@ -47,13 +25,10 @@ export default function ResetPasswordPage() {
   const resetToken = getResetToken();
 
   useEffect(() => {
-    if (email) {
-      sessionStorage.setItem(RESET_EMAIL_STORAGE_KEY, email);
-    }
     if (resetToken) {
       sessionStorage.setItem(RESET_TOKEN_STORAGE_KEY, resetToken);
     }
-  }, [email, resetToken]);
+  }, [resetToken]);
 
   // State Management
   const [password, setPassword] = useState('');
@@ -168,14 +143,6 @@ export default function ResetPasswordPage() {
                 <p className="text-sm text-slate-500 leading-relaxed font-sans">
                   Please enter a strong password to secure your digital legacy and preserve your life's narratives.
                 </p>
-              </div>
-
-              {/* Target Email Banner for User Context */}
-              <div className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-between gap-3 text-xs text-slate-500 font-mono">
-                <span className="shrink-0">Account Email:</span>
-                <span className={`font-semibold text-right break-all ${email ? 'text-slate-700' : 'text-rose-500'}`}>
-                  {email || 'Use the reset link to continue'}
-                </span>
               </div>
 
               {/* Error Handling Banner */}

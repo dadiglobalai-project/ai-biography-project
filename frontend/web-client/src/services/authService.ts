@@ -1,4 +1,5 @@
 import { RegisterFormState } from '../types';
+import { getEmailValidationError } from '../utils/emailValidation';
 
 const DEFAULT_API_PORT = '8080';
 const AUTH_TOKEN_STORAGE_KEY = 'token';
@@ -105,6 +106,11 @@ function extractResetToken(message?: string) {
 
 export const authService = {
   async register(form: RegisterFormState): Promise<AuthResponse> {
+    const emailValidationError = getEmailValidationError(form.email);
+    if (emailValidationError) {
+      throw new Error(emailValidationError);
+    }
+
     const user = {
       fullName: form.fullName.trim(),
       email: form.email.trim(),
