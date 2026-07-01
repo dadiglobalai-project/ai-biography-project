@@ -61,6 +61,14 @@ export interface OnboardingResponse {
   onboardingStatus: string;
 }
 
+export interface DashboardResponse {
+  success: boolean;
+  message?: string;
+  user?: AuthResponse['user'];
+  serviceType?: ServiceType;
+  onboardingStatus?: string;
+}
+
 function getMessage(data: any, fallback: string) {
   return data?.error || data?.message || fallback;
 }
@@ -151,6 +159,16 @@ function getFullNameFromData(data: any) {
     (typeof data?.userProfile?.fullName === 'string' && data.userProfile.fullName.trim()) ||
     (typeof data?.userProfile?.name === 'string' && data.userProfile.name.trim()) ||
     joinNameParts(data?.userProfile?.firstName, data?.userProfile?.lastName) ||
+    ''
+  );
+}
+
+function getEmailFromData(data: any) {
+  return (
+    (typeof data?.email === 'string' && data.email.trim()) ||
+    (typeof data?.user?.email === 'string' && data.user.email.trim()) ||
+    (typeof data?.profile?.email === 'string' && data.profile.email.trim()) ||
+    (typeof data?.userProfile?.email === 'string' && data.userProfile.email.trim()) ||
     ''
   );
 }
@@ -364,6 +382,32 @@ export const authService = {
       message: data.message || 'Service type saved successfully',
       serviceType: data.serviceType || serviceType,
       onboardingStatus: data.onboardingStatus || 'COMPLETED',
+    };
+  },
+
+  async getDashboard(): Promise<DashboardResponse> {
+    const response = await fetch(apiUrl('/api/dashboard'), {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to load dashboard'));
+    }
+
+    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    const tokenSession = token ? getSessionFromJwt(token) : null;
+    const email = getEmailFromData(data) || tokenSession?.email || '';
+    const fullName = getFullNameFromData(data) || tokenSession?.fullName || getKnownFullName(email);
+
+    return {
+      success: true,
+      message: data.message,
+      user: email ? { fullName, email } : undefined,
+      serviceType: data.serviceType,
+      onboardingStatus: data.onboardingStatus,
     };
   }
 };

@@ -57,6 +57,11 @@ export default function PreserveStoryPage() {
 
     try {
       const response = await authService.saveServiceType(SERVICE_TYPE_BY_OPTION[selectedOption]);
+      if (selectedOption === 'diy') {
+        navigate('/diy-dashboard');
+        return;
+      }
+
       setSuccessMessage(response.message);
     } catch (err: any) {
       setError(err?.message || 'Unable to save your service type. Please try again.');
