@@ -13,14 +13,25 @@ import {
   BookOpen,
   Award,
   PenTool,
+  Eye,
   Compass,
   Star,
   AlertCircle
 } from 'lucide-react';
-import { authService } from '../services/authService';
+import { authService, BiographyWebsite, SubjectType } from '../services/authService';
 import BrandLogo from '../components/BrandLogo';
+import lifeJourneyPreviewImage from '../Templates/LifeJourney/assets/images/life-journey-thumbnail.png';
 
 type RelationType = 'Myself' | 'Parent' | 'Grandparent' | 'Child' | 'Spouse' | 'Loved One';
+
+const SUBJECT_TYPE_BY_RELATION: Record<RelationType, SubjectType> = {
+  Myself: 'SELF',
+  Parent: 'PARENT',
+  Grandparent: 'GRANDPARENT',
+  Child: 'CHILD',
+  Spouse: 'SPOUSE',
+  'Loved One': 'LOVED_ONE',
+};
 
 interface Template {
   id: string;
@@ -29,6 +40,8 @@ interface Template {
   description: string;
   imageUrl: string;
   tag: string;
+  previewPath?: string;
+  editPath?: string;
 }
 
 export default function DIYDashboard() {
@@ -38,9 +51,34 @@ export default function DIYDashboard() {
   const [hoveredTemplate, setHoveredTemplate] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [biographies, setBiographies] = useState<BiographyWebsite[]>([]);
+  const [isLoadingBiographies, setIsLoadingBiographies] = useState(false);
+  const [biographyError, setBiographyError] = useState<string | null>(null);
+  const [creatingTemplateId, setCreatingTemplateId] = useState<string | null>(null);
+  const [openingWebsiteId, setOpeningWebsiteId] = useState<string | null>(null);
   
   // Custom dialog or modal states
   const [modalContent, setModalContent] = useState<{ title: string; desc: string } | null>(null);
+
+  const loadBiographies = React.useCallback(async () => {
+    setIsLoadingBiographies(true);
+    setBiographyError(null);
+
+    try {
+      const websites = await authService.getBiographyWebsites();
+      setBiographies(websites);
+    } catch (err: any) {
+      const message = err?.message || 'Unable to load biographies.';
+      if (/unauthorized|forbidden|session|token/i.test(message)) {
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      setBiographyError(message);
+    } finally {
+      setIsLoadingBiographies(false);
+    }
+  }, [navigate]);
 
   React.useEffect(() => {
     let active = true;
@@ -89,6 +127,8 @@ export default function DIYDashboard() {
 
         setDashboardError(message);
       }
+
+      await loadBiographies();
     };
 
     loadDashboard();
@@ -96,7 +136,7 @@ export default function DIYDashboard() {
     return () => {
       active = false;
     };
-  }, [navigate]);
+  }, [loadBiographies, navigate]);
 
   const relations: RelationType[] = ['Myself', 'Parent', 'Grandparent', 'Child', 'Spouse', 'Loved One'];
 
@@ -121,6 +161,7 @@ export default function DIYDashboard() {
 
   const recommended = getRecommendation(selectedRelation);
   const displayName = currentUser?.fullName || 'User';
+  const selectedSubjectType = SUBJECT_TYPE_BY_RELATION[selectedRelation];
 
   const templates: Template[] = [
     {
@@ -136,8 +177,10 @@ export default function DIYDashboard() {
       title: 'Life Journey',
       subtitle: 'A journey through the land',
       description: 'Complete autobiography template emphasizing chronologies, personal milestones, and wisdom gathered.',
-      imageUrl: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=800',
-      tag: 'Classic Memoir'
+      imageUrl: lifeJourneyPreviewImage,
+      tag: 'Classic Memoir',
+      previewPath: '/diy-dashboard/templates/life-journey/preview',
+      editPath: '/diy-dashboard/templates/life-journey/edit'
     },
     {
       id: 'entrepreneur-story',
@@ -182,17 +225,122 @@ export default function DIYDashboard() {
     });
   };
 
-  const handleCreateNew = () => {
+  const handlePreviewTemplate = (template: Template) => {
+    if (template.previewPath) {
+      navigate(template.previewPath);
+      return;
+    }
+
     setModalContent({
-      title: "Create New Biography",
-      desc: "Starting a blank canvas project. Our AI guide will help structure your custom chapters as you write."
+      title: `${template.title} Preview`,
+      desc: 'This template preview is not wired yet. Life Journey is available now.'
     });
   };
 
-  const handleContinueDraft = () => {
+  const getDraftTitle = (template: Template) => {
+    const owner = currentUser?.fullName?.trim();
+    return owner ? `${owner}'s ${template.title}` : template.title;
+  };
+
+  const getEditorPath = (templateId: string) => {
+    return templates.find((template) => template.id === templateId)?.editPath || '';
+  };
+
+  const handleOpenBiography = async (website: BiographyWebsite) => {
+    if (!website.id) {
+      setModalContent({
+        title: 'Unable to Open Biography',
+        desc: 'This biography does not have a website id from the backend yet.'
+      });
+      return;
+    }
+
+    setOpeningWebsiteId(website.id);
+
+    try {
+      const loadedWebsite = await authService.getBiographyWebsite(website.id);
+      const editPath = getEditorPath(loadedWebsite.templateId);
+
+      if (!editPath) {
+        setModalContent({
+          title: loadedWebsite.title,
+          desc: 'This biography was loaded, but its template editor is not wired yet.'
+        });
+        return;
+      }
+
+      navigate(editPath, { state: { website: loadedWebsite } });
+    } catch (err: any) {
+      const message = err?.message || 'Unable to open biography.';
+      if (/unauthorized|forbidden|session|token/i.test(message)) {
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      setModalContent({
+        title: 'Unable to Open Biography',
+        desc: message
+      });
+    } finally {
+      setOpeningWebsiteId(null);
+    }
+  };
+
+  const handleEditTemplate = async (template: Template) => {
+    if (!template.editPath) {
+      setModalContent({
+        title: `${template.title} Editor`,
+        desc: 'This template editor is not wired yet. Life Journey is available now.'
+      });
+      return;
+    }
+
+    setSelectedTemplateId(template.id);
+    setCreatingTemplateId(template.id);
+
+    try {
+      const website = await authService.createBiographyWebsite({
+        title: getDraftTitle(template),
+        templateId: template.id,
+        subjectType: selectedSubjectType,
+      });
+
+      await loadBiographies();
+      navigate(template.editPath, { state: { website } });
+    } catch (err: any) {
+      const message = err?.message || 'Unable to create biography website.';
+      if (/unauthorized|forbidden|session|token/i.test(message)) {
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      setModalContent({
+        title: 'Unable to Create Biography',
+        desc: message
+      });
+    } finally {
+      setCreatingTemplateId(null);
+    }
+  };
+
+  const handleCreateNew = async () => {
+    const defaultTemplate = templates.find((template) => template.id === 'life-journey');
+    if (defaultTemplate) {
+      await handleEditTemplate(defaultTemplate);
+    }
+  };
+
+  const handleContinueDraft = async () => {
+    const draft = biographies.find((website) => website.status.toUpperCase() === 'DRAFT') || biographies[0];
+
+    if (draft) {
+      await handleOpenBiography(draft);
+      return;
+    }
+
     setModalContent({
-      title: "Continue Draft",
-      desc: "Loading your last saved auto-draft from the cloud repository. All media files are synchronized."
+      title: "No Drafts Yet",
+      desc: "Create a biography first, then your draft will appear here."
     });
   };
 
@@ -270,15 +418,17 @@ export default function DIYDashboard() {
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={handleCreateNew}
-              className="px-6 py-3 bg-black hover:bg-slate-900 active:scale-[0.98] text-white rounded-xl text-xs font-bold tracking-wide transition-all duration-150 shadow-sm cursor-pointer"
+              disabled={Boolean(creatingTemplateId)}
+              className="px-6 py-3 bg-black hover:bg-slate-900 active:scale-[0.98] text-white rounded-xl text-xs font-bold tracking-wide transition-all duration-150 shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Create New Biography
+              {creatingTemplateId ? 'Creating Draft...' : 'Create New Biography'}
             </button>
             <button
               onClick={handleContinueDraft}
-              className="px-6 py-3 bg-white border border-slate-200 hover:border-slate-800 active:scale-[0.98] text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold tracking-wide transition-all duration-150 shadow-sm cursor-pointer"
+              disabled={isLoadingBiographies || Boolean(openingWebsiteId)}
+              className="px-6 py-3 bg-white border border-slate-200 hover:border-slate-800 active:scale-[0.98] text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold tracking-wide transition-all duration-150 shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Continue Draft
+              {openingWebsiteId ? 'Opening Draft...' : 'Continue Draft'}
             </button>
           </div>
         </div>
@@ -289,6 +439,79 @@ export default function DIYDashboard() {
             <span>{dashboardError}</span>
           </div>
         )}
+
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+            <div className="space-y-1">
+              <h2 className="font-serif-display text-2xl md:text-3xl font-semibold text-[#0A1128] tracking-tight">
+                My Biographies
+              </h2>
+              <p className="text-slate-500 text-sm">
+                Your saved biography website drafts from the backend.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={loadBiographies}
+              disabled={isLoadingBiographies}
+              className="self-start sm:self-auto rounded-lg border border-slate-200 bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-900 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isLoadingBiographies ? 'Refreshing...' : 'Refresh List'}
+            </button>
+          </div>
+
+          {biographyError && (
+            <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex items-start gap-3">
+              <AlertCircle className="w-4.5 h-4.5 shrink-0 mt-0.5" />
+              <span>{biographyError}</span>
+            </div>
+          )}
+
+          {isLoadingBiographies && biographies.length === 0 ? (
+            <div className="rounded-xl border border-slate-100 bg-white px-5 py-5 text-sm text-slate-500 shadow-sm">
+              Loading biographies...
+            </div>
+          ) : biographies.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {biographies.map((website) => {
+                const isOpening = openingWebsiteId === website.id;
+                return (
+                  <button
+                    key={website.id || `${website.templateId}-${website.title}`}
+                    type="button"
+                    onClick={() => handleOpenBiography(website)}
+                    disabled={isOpening}
+                    className="group rounded-xl border border-slate-100 bg-white p-5 text-left shadow-sm transition hover:border-[#FED362] hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 space-y-2">
+                        <div className="flex items-center gap-2 text-[#B18625]">
+                          <BookOpen className="w-4 h-4 shrink-0" />
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider">
+                            {website.templateId || 'Template'}
+                          </span>
+                        </div>
+                        <h3 className="font-serif-display text-xl font-semibold text-[#0A1128] truncate">
+                          {website.title}
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          {website.subjectType} · {website.subdomain || 'No subdomain yet'}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-slate-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                        {isOpening ? 'Opening' : website.status}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-200 bg-white px-5 py-6 text-sm text-slate-500">
+              No biographies yet. Start with a template below to create your first draft.
+            </div>
+          )}
+        </section>
 
         {/* Interactive "Let AI Recommend a Template" Dark Card */}
         <motion.div 
@@ -445,12 +668,40 @@ export default function DIYDashboard() {
                       {template.description}
                     </p>
 
-                    <div className="pt-3 border-t border-slate-50 flex items-center justify-between">
-                      <span className="text-[11px] font-mono font-bold tracking-wide text-[#B18625] uppercase">
-                        {isSelected ? 'Selected Active' : 'Select Theme'}
-                      </span>
-                      <div className="w-7 h-7 rounded-lg bg-slate-50 text-slate-700 flex items-center justify-center border border-slate-100 group-hover:bg-[#FED362] group-hover:text-slate-900 transition-colors">
-                        <ChevronRight className="w-4 h-4" />
+                    <div className="pt-3 border-t border-slate-50 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono font-bold tracking-wide text-[#B18625] uppercase">
+                          {isSelected ? 'Selected Active' : 'Select Theme'}
+                        </span>
+                        <div className="w-7 h-7 rounded-lg bg-slate-50 text-slate-700 flex items-center justify-center border border-slate-100 group-hover:bg-[#FED362] group-hover:text-slate-900 transition-colors">
+                          <ChevronRight className="w-4 h-4" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handlePreviewTemplate(template);
+                          }}
+                          className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Preview
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleEditTemplate(template);
+                          }}
+                          disabled={creatingTemplateId === template.id}
+                          className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-black px-3 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-slate-900 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          <PenTool className="w-3.5 h-3.5" />
+                          {creatingTemplateId === template.id ? 'Creating' : 'Edit'}
+                        </button>
                       </div>
                     </div>
                   </div>

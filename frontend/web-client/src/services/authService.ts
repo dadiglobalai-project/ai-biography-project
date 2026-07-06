@@ -69,6 +69,25 @@ export interface DashboardResponse {
   onboardingStatus?: string;
 }
 
+export type SubjectType = 'SELF' | 'PARENT' | 'GRANDPARENT' | 'CHILD' | 'SPOUSE' | 'LOVED_ONE';
+
+export interface BiographyWebsite {
+  id: string;
+  title: string;
+  templateId: string;
+  subjectType: SubjectType | string;
+  status: string;
+  subdomain?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateBiographyWebsitePayload {
+  title: string;
+  templateId: string;
+  subjectType: SubjectType;
+}
+
 function getMessage(data: any, fallback: string) {
   return data?.error || data?.message || fallback;
 }
@@ -171,6 +190,47 @@ function getEmailFromData(data: any) {
     (typeof data?.userProfile?.email === 'string' && data.userProfile.email.trim()) ||
     ''
   );
+}
+
+function getWebsiteId(data: any) {
+  return String(data?.id || data?.websiteId || data?.biographyWebsiteId || data?.uuid || '');
+}
+
+function normalizeBiographyWebsite(data: any): BiographyWebsite {
+  return {
+    id: getWebsiteId(data),
+    title: String(data?.title || 'Untitled Biography'),
+    templateId: String(data?.templateId || ''),
+    subjectType: String(data?.subjectType || 'SELF'),
+    status: String(data?.status || 'DRAFT'),
+    subdomain: typeof data?.subdomain === 'string' ? data.subdomain : undefined,
+    createdAt: typeof data?.createdAt === 'string' ? data.createdAt : undefined,
+    updatedAt: typeof data?.updatedAt === 'string' ? data.updatedAt : undefined,
+  };
+}
+
+function getWebsiteFromResponse(data: any) {
+  return data?.website || data?.biographyWebsite || data?.data || data;
+}
+
+function getWebsitesFromResponse(data: any) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.websites)) {
+    return data.websites;
+  }
+
+  if (Array.isArray(data?.biographyWebsites)) {
+    return data.biographyWebsites;
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data;
+  }
+
+  return [];
 }
 
 function getSessionFromJwt(token: string) {
@@ -409,5 +469,51 @@ export const authService = {
       serviceType: data.serviceType,
       onboardingStatus: data.onboardingStatus,
     };
+  },
+
+  async createBiographyWebsite(payload: CreateBiographyWebsitePayload): Promise<BiographyWebsite> {
+    const response = await fetch(apiUrl('/api/websites'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to create biography website'));
+    }
+
+    return normalizeBiographyWebsite(getWebsiteFromResponse(data));
+  },
+
+  async getBiographyWebsites(): Promise<BiographyWebsite[]> {
+    const response = await fetch(apiUrl('/api/websites'), {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to load biography websites'));
+    }
+
+    return getWebsitesFromResponse(data).map(normalizeBiographyWebsite);
+  },
+
+  async getBiographyWebsite(websiteId: string): Promise<BiographyWebsite> {
+    const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}`), {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to load biography website'));
+    }
+
+    return normalizeBiographyWebsite(getWebsiteFromResponse(data));
   }
 };

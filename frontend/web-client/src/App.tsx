@@ -7,6 +7,8 @@ import CheckEmailPage from './pages/CheckEmailPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PreserveStoryPage from './pages/PreserveStoryPage';
 import DIYDashboard from './pages/DIYDashboard';
+import LifeJourneyPreviewPage from './pages/LifeJourneyPreviewPage';
+import LifeJourneyEditPage from './pages/LifeJourneyEditPage';
 
 const pageTitles: Record<string, string> = {
   '/login': 'Login | Xinghuoji',
@@ -16,6 +18,8 @@ const pageTitles: Record<string, string> = {
   '/reset-password': 'Reset Password | Xinghuoji',
   '/preserve-story': 'Preserve Story | Xinghuoji',
   '/diy-dashboard': 'DIY Dashboard | Xinghuoji',
+  '/diy-dashboard/templates/life-journey/preview': 'Life Journey Preview | Xinghuoji',
+  '/diy-dashboard/templates/life-journey/edit': 'Edit Life Journey | Xinghuoji',
 };
 
 function PageTitle() {
@@ -41,6 +45,8 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/preserve-story" element={<PreserveStoryPage />} />
         <Route path="/diy-dashboard" element={<DIYDashboard />} />
+        <Route path="/diy-dashboard/templates/life-journey/preview" element={<LifeJourneyPreviewPage />} />
+        <Route path="/diy-dashboard/templates/life-journey/edit" element={<LifeJourneyEditPage />} />
         
                 
         {/* Fallback pattern to map root or custom routes directly to /register */}
