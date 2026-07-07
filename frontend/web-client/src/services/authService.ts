@@ -5,6 +5,7 @@ const DEFAULT_API_PORT = '8080';
 const AUTH_TOKEN_STORAGE_KEY = 'token';
 const AUTH_USER_STORAGE_KEY = 'authUser';
 const KNOWN_AUTH_USERS_STORAGE_KEY = 'knownAuthUsers';
+const LOCAL_BIOGRAPHY_WEBSITES_STORAGE_KEY = 'localBiographyWebsites';
 
 function getApiBaseUrl() {
   const configuredApiUrl = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -86,6 +87,20 @@ export interface CreateBiographyWebsitePayload {
   title: string;
   templateId: string;
   subjectType: SubjectType;
+}
+
+export interface UpdateBiographyWebsitePayload {
+  title?: string;
+  templateId?: string;
+  subjectType?: SubjectType;
+  status?: string;
+}
+
+interface LocalBiographyWebsitePayload {
+  title?: string;
+  templateId?: string;
+  subjectType?: SubjectType | string;
+  status?: string;
 }
 
 function getMessage(data: any, fallback: string) {
@@ -207,6 +222,93 @@ function normalizeBiographyWebsite(data: any): BiographyWebsite {
     createdAt: typeof data?.createdAt === 'string' ? data.createdAt : undefined,
     updatedAt: typeof data?.updatedAt === 'string' ? data.updatedAt : undefined,
   };
+}
+
+function getLocalBiographyWebsitesStorageKey() {
+  const user = readStoredUser();
+  const email = user?.email?.trim().toLowerCase() || 'anonymous';
+  return `${LOCAL_BIOGRAPHY_WEBSITES_STORAGE_KEY}:${email}`;
+}
+
+function readLocalBiographyWebsites(): BiographyWebsite[] {
+  const storedWebsites = localStorage.getItem(getLocalBiographyWebsitesStorageKey());
+  if (!storedWebsites) {
+    return [];
+  }
+
+  try {
+    return (JSON.parse(storedWebsites) as any[])
+      .map(normalizeBiographyWebsite)
+      .filter((website) => Boolean(website.id));
+  } catch {
+    localStorage.removeItem(getLocalBiographyWebsitesStorageKey());
+    return [];
+  }
+}
+
+function writeLocalBiographyWebsites(websites: BiographyWebsite[]) {
+  localStorage.setItem(getLocalBiographyWebsitesStorageKey(), JSON.stringify(websites));
+}
+
+function mergeBiographyWebsites(
+  primaryWebsites: BiographyWebsite[],
+  localWebsites: BiographyWebsite[]
+) {
+  const websitesById = new Map<string, BiographyWebsite>();
+
+  primaryWebsites.forEach((website) => websitesById.set(website.id, website));
+  localWebsites.forEach((website) => websitesById.set(website.id, website));
+
+  return Array.from(websitesById.values()).sort((a, b) => {
+    const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+    return dateB - dateA;
+  });
+}
+
+function slugifyBiographyTitle(title: string) {
+  const slug = title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return slug || 'biography';
+}
+
+function createLocalBiographyWebsite(
+  payload: LocalBiographyWebsitePayload,
+  websiteId?: string
+): BiographyWebsite {
+  const websites = readLocalBiographyWebsites();
+  const existingWebsite = websiteId
+    ? websites.find((website) => website.id === websiteId)
+    : undefined;
+  const now = new Date().toISOString();
+  const title = payload.title?.trim() || existingWebsite?.title || 'Untitled Biography';
+  const id = existingWebsite?.id || websiteId || `local-${crypto.randomUUID()}`;
+
+  const website: BiographyWebsite = {
+    id,
+    title,
+    templateId: payload.templateId || existingWebsite?.templateId || 'life-journey',
+    subjectType: payload.subjectType || existingWebsite?.subjectType || 'SELF',
+    status: payload.status || existingWebsite?.status || 'DRAFT',
+    subdomain: existingWebsite?.subdomain || slugifyBiographyTitle(title),
+    createdAt: existingWebsite?.createdAt || now,
+    updatedAt: now,
+  };
+
+  writeLocalBiographyWebsites([
+    website,
+    ...websites.filter((storedWebsite) => storedWebsite.id !== id),
+  ]);
+
+  return website;
+}
+
+function getLocalBiographyWebsite(websiteId: string) {
+  return readLocalBiographyWebsites().find((website) => website.id === websiteId);
 }
 
 function getWebsiteFromResponse(data: any) {
@@ -472,48 +574,95 @@ export const authService = {
   },
 
   async createBiographyWebsite(payload: CreateBiographyWebsitePayload): Promise<BiographyWebsite> {
-    const response = await fetch(apiUrl('/api/websites'), {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(payload),
-    });
+    try {
+      const response = await fetch(apiUrl('/api/websites'), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(getMessage(data, 'Unable to create biography website'));
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to create biography website'));
+      }
+
+      return normalizeBiographyWebsite(getWebsiteFromResponse(data));
+    } catch {
+      return createLocalBiographyWebsite(payload);
     }
-
-    return normalizeBiographyWebsite(getWebsiteFromResponse(data));
   },
 
   async getBiographyWebsites(): Promise<BiographyWebsite[]> {
-    const response = await fetch(apiUrl('/api/websites'), {
-      method: 'GET',
-      headers: getAuthHeaders(),
-    });
+    try {
+      const response = await fetch(apiUrl('/api/websites'), {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(getMessage(data, 'Unable to load biography websites'));
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to load biography websites'));
+      }
+
+      return mergeBiographyWebsites(
+        getWebsitesFromResponse(data).map(normalizeBiographyWebsite),
+        readLocalBiographyWebsites()
+      );
+    } catch {
+      return readLocalBiographyWebsites();
     }
-
-    return getWebsitesFromResponse(data).map(normalizeBiographyWebsite);
   },
 
   async getBiographyWebsite(websiteId: string): Promise<BiographyWebsite> {
-    const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}`), {
-      method: 'GET',
-      headers: getAuthHeaders(),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(getMessage(data, 'Unable to load biography website'));
+    const localWebsite = getLocalBiographyWebsite(websiteId);
+    if (localWebsite) {
+      return localWebsite;
     }
 
-    return normalizeBiographyWebsite(getWebsiteFromResponse(data));
+    try {
+      const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}`), {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to load biography website'));
+      }
+
+      return normalizeBiographyWebsite(getWebsiteFromResponse(data));
+    } catch {
+      throw new Error('Unable to load biography website');
+    }
+  },
+
+  async updateBiographyWebsite(
+    websiteId: string,
+    payload: UpdateBiographyWebsitePayload
+  ): Promise<BiographyWebsite> {
+    if (getLocalBiographyWebsite(websiteId)) {
+      return createLocalBiographyWebsite(payload, websiteId);
+    }
+
+    try {
+      const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}`), {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to update biography website'));
+      }
+
+      return normalizeBiographyWebsite(getWebsiteFromResponse(data));
+    } catch {
+      return createLocalBiographyWebsite(payload, websiteId);
+    }
   }
 };

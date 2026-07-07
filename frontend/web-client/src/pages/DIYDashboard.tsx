@@ -23,6 +23,7 @@ import BrandLogo from '../components/BrandLogo';
 import lifeJourneyPreviewImage from '../Templates/LifeJourney/assets/images/life-journey-thumbnail.png';
 
 type RelationType = 'Myself' | 'Parent' | 'Grandparent' | 'Child' | 'Spouse' | 'Loved One';
+const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
 
 const SUBJECT_TYPE_BY_RELATION: Record<RelationType, SubjectType> = {
   Myself: 'SELF',
@@ -138,6 +139,26 @@ export default function DIYDashboard() {
     };
   }, [loadBiographies, navigate]);
 
+  React.useEffect(() => {
+    const refreshBiographies = () => {
+      void loadBiographies();
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === BIOGRAPHY_LIST_REFRESH_KEY) {
+        refreshBiographies();
+      }
+    };
+
+    window.addEventListener('focus', refreshBiographies);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('focus', refreshBiographies);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [loadBiographies]);
+
   const relations: RelationType[] = ['Myself', 'Parent', 'Grandparent', 'Child', 'Spouse', 'Loved One'];
 
   // Map each selected relation option to a recommended template
@@ -192,6 +213,46 @@ export default function DIYDashboard() {
     }
   ];
 
+  const buildTemplatePageUrl = (path: string, website?: BiographyWebsite) => {
+    const url = new URL(path, window.location.origin);
+    if (website?.id) {
+      url.searchParams.set('websiteId', website.id);
+    }
+
+    return url.toString();
+  };
+
+  const openBlankTemplatePage = () => {
+    const templatePage = window.open('about:blank', '_blank');
+    if (templatePage) {
+      templatePage.opener = null;
+    }
+
+    return templatePage;
+  };
+
+  const openTemplatePage = (
+    path: string,
+    website?: BiographyWebsite,
+    targetPage?: Window | null
+  ) => {
+    const pageUrl = buildTemplatePageUrl(path, website);
+
+    if (targetPage && !targetPage.closed) {
+      targetPage.location.href = pageUrl;
+      targetPage.focus();
+      return true;
+    }
+
+    return window.open(pageUrl, '_blank', 'noopener,noreferrer') !== null;
+  };
+
+  const closeTemplatePage = (targetPage?: Window | null) => {
+    if (targetPage && !targetPage.closed) {
+      targetPage.close();
+    }
+  };
+
   const handleApplyRecommendation = () => {
     const matched = templates.find(t => t.id === recommended.id);
     if (matched) {
@@ -227,7 +288,13 @@ export default function DIYDashboard() {
 
   const handlePreviewTemplate = (template: Template) => {
     if (template.previewPath) {
-      navigate(template.previewPath);
+      const opened = openTemplatePage(template.previewPath);
+      if (!opened) {
+        setModalContent({
+          title: `${template.title} Preview`,
+          desc: 'Your browser blocked the preview page. Please allow pop-ups for this site and try again.'
+        });
+      }
       return;
     }
 
@@ -255,6 +322,7 @@ export default function DIYDashboard() {
       return;
     }
 
+    const editorPage = openBlankTemplatePage();
     setOpeningWebsiteId(website.id);
 
     try {
@@ -262,6 +330,7 @@ export default function DIYDashboard() {
       const editPath = getEditorPath(loadedWebsite.templateId);
 
       if (!editPath) {
+        closeTemplatePage(editorPage);
         setModalContent({
           title: loadedWebsite.title,
           desc: 'This biography was loaded, but its template editor is not wired yet.'
@@ -269,8 +338,12 @@ export default function DIYDashboard() {
         return;
       }
 
-      navigate(editPath, { state: { website: loadedWebsite } });
+      const opened = openTemplatePage(editPath, loadedWebsite, editorPage);
+      if (!opened) {
+        navigate(editPath, { state: { website: loadedWebsite } });
+      }
     } catch (err: any) {
+      closeTemplatePage(editorPage);
       const message = err?.message || 'Unable to open biography.';
       if (/unauthorized|forbidden|session|token/i.test(message)) {
         navigate('/login', { replace: true });
@@ -295,6 +368,7 @@ export default function DIYDashboard() {
       return;
     }
 
+    const editorPage = openBlankTemplatePage();
     setSelectedTemplateId(template.id);
     setCreatingTemplateId(template.id);
 
@@ -305,9 +379,13 @@ export default function DIYDashboard() {
         subjectType: selectedSubjectType,
       });
 
-      await loadBiographies();
-      navigate(template.editPath, { state: { website } });
+      const opened = openTemplatePage(template.editPath, website, editorPage);
+      if (!opened) {
+        navigate(template.editPath, { state: { website } });
+      }
+      void loadBiographies();
     } catch (err: any) {
+      closeTemplatePage(editorPage);
       const message = err?.message || 'Unable to create biography website.';
       if (/unauthorized|forbidden|session|token/i.test(message)) {
         navigate('/login', { replace: true });

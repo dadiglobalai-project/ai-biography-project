@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Eye,
@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import LifeJourneyTemplate from '../Templates/LifeJourney/LifeJourneyTemplate';
 import { CATEGORIES_DATA } from '../Templates/LifeJourney/data';
+import { authService } from '../services/authService';
+import type { BiographyWebsite, SubjectType } from '../services/authService';
 import type {
   BiographyCategory,
   CustomizerSettings,
@@ -18,6 +20,9 @@ import type {
 } from '../Templates/LifeJourney/types';
 
 const STORAGE_KEY = 'xinghuoji.lifeJourney.templateDraft';
+const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
+const TEMPLATE_ID = 'life-journey';
+const SUBJECT_TYPES: SubjectType[] = ['SELF', 'PARENT', 'GRANDPARENT', 'CHILD', 'SPOUSE', 'LOVED_ONE'];
 
 const cloneLifeJourneyData = (): BiographyCategory =>
   JSON.parse(JSON.stringify(CATEGORIES_DATA.life)) as BiographyCategory;
@@ -71,14 +76,61 @@ const personalFields: Array<{
 const inputClass =
   'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100';
 
+const getBiographyTitle = (draft: BiographyCategory) => {
+  const name = draft.personalDetails.fullName.trim();
+  return name ? `${name}'s Life Journey` : 'Life Journey Biography';
+};
+
+const getSubjectType = (subjectType?: string): SubjectType => {
+  return SUBJECT_TYPES.includes(subjectType as SubjectType) ? (subjectType as SubjectType) : 'SELF';
+};
+
+const notifyBiographyListChanged = () => {
+  window.localStorage.setItem(BIOGRAPHY_LIST_REFRESH_KEY, String(Date.now()));
+};
+
 export default function LifeJourneyEditPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [draft, setDraft] = useState<BiographyCategory>(() => loadDraft());
+  const [website, setWebsite] = useState<BiographyWebsite | null>(null);
   const [saveMessage, setSaveMessage] = useState('Unsaved changes');
+  const [isSaving, setIsSaving] = useState(false);
+  const websiteId = searchParams.get('websiteId') || '';
 
   React.useEffect(() => {
     document.title = 'Edit Life Journey | Xinghuoji';
   }, []);
+
+  React.useEffect(() => {
+    if (!websiteId) {
+      return;
+    }
+
+    let active = true;
+
+    const loadWebsite = async () => {
+      try {
+        const loadedWebsite = await authService.getBiographyWebsite(websiteId);
+        if (!active) {
+          return;
+        }
+
+        setWebsite(loadedWebsite);
+        setSaveMessage('Loaded from My Biographies');
+      } catch (err: any) {
+        if (active) {
+          setSaveMessage(err?.message || 'Unable to load biography record');
+        }
+      }
+    };
+
+    loadWebsite();
+
+    return () => {
+      active = false;
+    };
+  }, [websiteId]);
 
   const updatePersonalDetail = (field: keyof PersonalDetails, value: string) => {
     setDraft((current) => ({
@@ -105,9 +157,37 @@ export default function LifeJourneyEditPage() {
     setSaveMessage('Unsaved changes');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-    setSaveMessage('Saved locally');
+
+    setIsSaving(true);
+    setSaveMessage('Saving...');
+
+    try {
+      const payload = {
+        title: getBiographyTitle(draft),
+        templateId: TEMPLATE_ID,
+        subjectType: getSubjectType(website?.subjectType),
+        status: 'DRAFT',
+      };
+
+      const savedWebsite = website?.id || websiteId
+        ? await authService.updateBiographyWebsite(website?.id || websiteId, payload)
+        : await authService.createBiographyWebsite({
+            title: payload.title,
+            templateId: payload.templateId,
+            subjectType: payload.subjectType,
+          });
+
+      setWebsite(savedWebsite);
+      setSearchParams({ websiteId: savedWebsite.id }, { replace: true });
+      notifyBiographyListChanged();
+      setSaveMessage('Saved to My Biographies');
+    } catch (err: any) {
+      setSaveMessage(err?.message || 'Saved locally, but My Biographies was not updated');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReset = () => {
@@ -155,10 +235,11 @@ export default function LifeJourneyEditPage() {
             <button
               type="button"
               onClick={handleSave}
-              className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-slate-900"
+              disabled={isSaving}
+              className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Save className="h-4 w-4" />
-              Save
+              {isSaving ? 'Saving' : 'Save'}
             </button>
           </div>
         </div>
