@@ -164,20 +164,17 @@ export default function LifeJourneyEditPage() {
     setSaveMessage('Saving...');
 
     try {
-      const payload = {
+      if (website?.id || websiteId) {
+        notifyBiographyListChanged();
+        setSaveMessage('Saved locally. Biography is in My Biographies');
+        return;
+      }
+
+      const savedWebsite = await authService.createBiographyWebsite({
         title: getBiographyTitle(draft),
         templateId: TEMPLATE_ID,
         subjectType: getSubjectType(website?.subjectType),
-        status: 'DRAFT',
-      };
-
-      const savedWebsite = website?.id || websiteId
-        ? await authService.updateBiographyWebsite(website?.id || websiteId, payload)
-        : await authService.createBiographyWebsite({
-            title: payload.title,
-            templateId: payload.templateId,
-            subjectType: payload.subjectType,
-          });
+      });
 
       setWebsite(savedWebsite);
       setSearchParams({ websiteId: savedWebsite.id }, { replace: true });

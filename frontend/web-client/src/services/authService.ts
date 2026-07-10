@@ -89,13 +89,6 @@ export interface CreateBiographyWebsitePayload {
   subjectType: SubjectType;
 }
 
-export interface UpdateBiographyWebsitePayload {
-  title?: string;
-  templateId?: string;
-  subjectType?: SubjectType;
-  status?: string;
-}
-
 interface LocalBiographyWebsitePayload {
   title?: string;
   templateId?: string;
@@ -636,33 +629,6 @@ export const authService = {
       return normalizeBiographyWebsite(getWebsiteFromResponse(data));
     } catch {
       throw new Error('Unable to load biography website');
-    }
-  },
-
-  async updateBiographyWebsite(
-    websiteId: string,
-    payload: UpdateBiographyWebsitePayload
-  ): Promise<BiographyWebsite> {
-    if (getLocalBiographyWebsite(websiteId)) {
-      return createLocalBiographyWebsite(payload, websiteId);
-    }
-
-    try {
-      const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}`), {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(getMessage(data, 'Unable to update biography website'));
-      }
-
-      return normalizeBiographyWebsite(getWebsiteFromResponse(data));
-    } catch {
-      return createLocalBiographyWebsite(payload, websiteId);
     }
   }
 };
