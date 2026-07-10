@@ -1,14 +1,28 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, PenTool } from 'lucide-react';
 import LifeJourneyTemplate from '../Templates/LifeJourney/LifeJourneyTemplate';
 
 export default function LifeJourneyPreviewPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   React.useEffect(() => {
     document.title = 'Life Journey Preview | Xinghuoji';
   }, []);
+
+  const openEditorPage = () => {
+    const url = new URL('/diy-dashboard/templates/life-journey/edit', window.location.origin);
+    const websiteId = searchParams.get('websiteId');
+    if (websiteId) {
+      url.searchParams.set('websiteId', websiteId);
+    }
+
+    const opened = window.open(url.toString(), '_blank', 'noopener,noreferrer');
+    if (!opened) {
+      navigate(`${url.pathname}${url.search}`);
+    }
+  };
 
   return (
     <div className="relative min-h-screen bg-[#FAF6F0]">
@@ -23,7 +37,7 @@ export default function LifeJourneyPreviewPage() {
         </button>
         <button
           type="button"
-          onClick={() => navigate('/diy-dashboard/templates/life-journey/edit')}
+          onClick={openEditorPage}
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-900 bg-stone-900 px-4 py-3 text-xs font-bold uppercase tracking-wide text-amber-50 shadow-lg transition hover:bg-stone-800"
         >
           <PenTool className="h-4 w-4" />

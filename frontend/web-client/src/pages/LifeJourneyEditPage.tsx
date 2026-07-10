@@ -102,6 +102,19 @@ export default function LifeJourneyEditPage() {
     document.title = 'Edit Life Journey | Xinghuoji';
   }, []);
 
+  const openPreviewPage = () => {
+    const url = new URL('/diy-dashboard/templates/life-journey/preview', window.location.origin);
+    const currentWebsiteId = website?.id || websiteId;
+    if (currentWebsiteId) {
+      url.searchParams.set('websiteId', currentWebsiteId);
+    }
+
+    const opened = window.open(url.toString(), '_blank', 'noopener,noreferrer');
+    if (!opened) {
+      setSaveMessage('Your browser blocked the preview tab');
+    }
+  };
+
   React.useEffect(() => {
     if (!websiteId) {
       return;
@@ -223,7 +236,7 @@ export default function LifeJourneyEditPage() {
             </span>
             <button
               type="button"
-              onClick={() => navigate('/diy-dashboard/templates/life-journey/preview')}
+              onClick={openPreviewPage}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
             >
               <Eye className="h-4 w-4" />
