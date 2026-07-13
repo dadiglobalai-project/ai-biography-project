@@ -313,7 +313,7 @@ export default function DIYDashboard() {
     return templates.find((template) => template.id === templateId)?.editPath || '';
   };
 
-  const handleOpenBiography = async (website: BiographyWebsite) => {
+  const handleOpenBiography = (website: BiographyWebsite) => {
     if (!website.id) {
       setModalContent({
         title: 'Unable to Open Biography',
@@ -322,40 +322,25 @@ export default function DIYDashboard() {
       return;
     }
 
-    const editorPage = openBlankTemplatePage();
+    const editPath = getEditorPath(website.templateId);
+
+    if (!editPath) {
+      setModalContent({
+        title: website.title,
+        desc: 'This biography was loaded, but its template editor is not wired yet.'
+      });
+      return;
+    }
+
     setOpeningWebsiteId(website.id);
+    const opened = openTemplatePage(editPath, website);
+    setOpeningWebsiteId(null);
 
-    try {
-      const loadedWebsite = await authService.getBiographyWebsite(website.id);
-      const editPath = getEditorPath(loadedWebsite.templateId);
-
-      if (!editPath) {
-        closeTemplatePage(editorPage);
-        setModalContent({
-          title: loadedWebsite.title,
-          desc: 'This biography was loaded, but its template editor is not wired yet.'
-        });
-        return;
-      }
-
-      const opened = openTemplatePage(editPath, loadedWebsite, editorPage);
-      if (!opened) {
-        navigate(editPath, { state: { website: loadedWebsite } });
-      }
-    } catch (err: any) {
-      closeTemplatePage(editorPage);
-      const message = err?.message || 'Unable to open biography.';
-      if (/unauthorized|forbidden|session|token/i.test(message)) {
-        navigate('/login', { replace: true });
-        return;
-      }
-
+    if (!opened) {
       setModalContent({
         title: 'Unable to Open Biography',
-        desc: message
+        desc: 'Your browser blocked the editor tab. Please allow pop-ups for this site and try again.'
       });
-    } finally {
-      setOpeningWebsiteId(null);
     }
   };
 
@@ -369,6 +354,14 @@ export default function DIYDashboard() {
     }
 
     const editorPage = openBlankTemplatePage();
+    if (!editorPage) {
+      setModalContent({
+        title: `${template.title} Editor`,
+        desc: 'Your browser blocked the editor tab. Please allow pop-ups for this site and try again.'
+      });
+      return;
+    }
+
     setSelectedTemplateId(template.id);
     setCreatingTemplateId(template.id);
 
@@ -381,7 +374,11 @@ export default function DIYDashboard() {
 
       const opened = openTemplatePage(template.editPath, website, editorPage);
       if (!opened) {
-        navigate(template.editPath, { state: { website } });
+        closeTemplatePage(editorPage);
+        setModalContent({
+          title: `${template.title} Editor`,
+          desc: 'Your browser blocked the editor tab. Please allow pop-ups for this site and try again.'
+        });
       }
       void loadBiographies();
     } catch (err: any) {
@@ -408,11 +405,11 @@ export default function DIYDashboard() {
     }
   };
 
-  const handleContinueDraft = async () => {
+  const handleContinueDraft = () => {
     const draft = biographies.find((website) => website.status.toUpperCase() === 'DRAFT') || biographies[0];
 
     if (draft) {
-      await handleOpenBiography(draft);
+      handleOpenBiography(draft);
       return;
     }
 
