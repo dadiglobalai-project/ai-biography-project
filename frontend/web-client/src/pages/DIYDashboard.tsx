@@ -55,7 +55,6 @@ export default function DIYDashboard() {
   const [biographies, setBiographies] = useState<BiographyWebsite[]>([]);
   const [isLoadingBiographies, setIsLoadingBiographies] = useState(false);
   const [biographyError, setBiographyError] = useState<string | null>(null);
-  const [creatingTemplateId, setCreatingTemplateId] = useState<string | null>(null);
   const [openingWebsiteId, setOpeningWebsiteId] = useState<string | null>(null);
   
   // Custom dialog or modal states
@@ -191,7 +190,9 @@ export default function DIYDashboard() {
       subtitle: 'The Visionary who changed the way WE LIVE',
       description: 'A high-contrast, bold template designed for leaders, innovators, and creators who forged new paths.',
       imageUrl: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=800',
-      tag: 'Bold & Creative'
+      tag: 'Bold & Creative',
+      previewPath: '/diy-dashboard/templates/visionary-legacy/preview',
+      editPath: '/diy-dashboard/templates/visionary-legacy/edit'
     },
     {
       id: 'life-journey',
@@ -209,48 +210,34 @@ export default function DIYDashboard() {
       subtitle: 'Document your business adventures',
       description: 'Tailored for founders, pathfinders, and industry pioneers to archive their ventures, failures, and triumphs.',
       imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=800',
-      tag: 'Professional'
+      tag: 'Professional',
+      previewPath: '/diy-dashboard/templates/entrepreneur-story/preview',
+      editPath: '/diy-dashboard/templates/entrepreneur-story/edit'
     }
   ];
 
-  const buildTemplatePageUrl = (path: string, website?: BiographyWebsite) => {
+  const buildTemplatePageUrl = (
+    path: string,
+    options: { website?: BiographyWebsite; subjectType?: SubjectType } = {}
+  ) => {
     const url = new URL(path, window.location.origin);
-    if (website?.id) {
-      url.searchParams.set('websiteId', website.id);
+    if (options.website?.id) {
+      url.searchParams.set('websiteId', options.website.id);
+    }
+    if (options.subjectType) {
+      url.searchParams.set('subjectType', options.subjectType);
     }
 
     return url.toString();
   };
 
-  const openBlankTemplatePage = () => {
-    const templatePage = window.open('about:blank', '_blank');
-    if (templatePage) {
-      templatePage.opener = null;
-    }
-
-    return templatePage;
-  };
-
   const openTemplatePage = (
     path: string,
-    website?: BiographyWebsite,
-    targetPage?: Window | null
+    options: { website?: BiographyWebsite; subjectType?: SubjectType } = {}
   ) => {
-    const pageUrl = buildTemplatePageUrl(path, website);
-
-    if (targetPage && !targetPage.closed) {
-      targetPage.location.href = pageUrl;
-      targetPage.focus();
-      return true;
-    }
+    const pageUrl = buildTemplatePageUrl(path, options);
 
     return window.open(pageUrl, '_blank', 'noopener,noreferrer') !== null;
-  };
-
-  const closeTemplatePage = (targetPage?: Window | null) => {
-    if (targetPage && !targetPage.closed) {
-      targetPage.close();
-    }
   };
 
   const handleApplyRecommendation = () => {
@@ -304,11 +291,6 @@ export default function DIYDashboard() {
     });
   };
 
-  const getDraftTitle = (template: Template) => {
-    const owner = currentUser?.fullName?.trim();
-    return owner ? `${owner}'s ${template.title}` : template.title;
-  };
-
   const getEditorPath = (templateId: string) => {
     return templates.find((template) => template.id === templateId)?.editPath || '';
   };
@@ -333,7 +315,7 @@ export default function DIYDashboard() {
     }
 
     setOpeningWebsiteId(website.id);
-    const opened = openTemplatePage(editPath, website);
+    const opened = openTemplatePage(editPath, { website });
     setOpeningWebsiteId(null);
 
     if (!opened) {
@@ -344,7 +326,7 @@ export default function DIYDashboard() {
     }
   };
 
-  const handleEditTemplate = async (template: Template) => {
+  const handleEditTemplate = (template: Template) => {
     if (!template.editPath) {
       setModalContent({
         title: `${template.title} Editor`,
@@ -353,55 +335,20 @@ export default function DIYDashboard() {
       return;
     }
 
-    const editorPage = openBlankTemplatePage();
-    if (!editorPage) {
+    setSelectedTemplateId(template.id);
+    const opened = openTemplatePage(template.editPath, { subjectType: selectedSubjectType });
+    if (!opened) {
       setModalContent({
         title: `${template.title} Editor`,
         desc: 'Your browser blocked the editor tab. Please allow pop-ups for this site and try again.'
       });
-      return;
-    }
-
-    setSelectedTemplateId(template.id);
-    setCreatingTemplateId(template.id);
-
-    try {
-      const website = await authService.createBiographyWebsite({
-        title: getDraftTitle(template),
-        templateId: template.id,
-        subjectType: selectedSubjectType,
-      });
-
-      const opened = openTemplatePage(template.editPath, website, editorPage);
-      if (!opened) {
-        closeTemplatePage(editorPage);
-        setModalContent({
-          title: `${template.title} Editor`,
-          desc: 'Your browser blocked the editor tab. Please allow pop-ups for this site and try again.'
-        });
-      }
-      void loadBiographies();
-    } catch (err: any) {
-      closeTemplatePage(editorPage);
-      const message = err?.message || 'Unable to create biography website.';
-      if (/unauthorized|forbidden|session|token/i.test(message)) {
-        navigate('/login', { replace: true });
-        return;
-      }
-
-      setModalContent({
-        title: 'Unable to Create Biography',
-        desc: message
-      });
-    } finally {
-      setCreatingTemplateId(null);
     }
   };
 
-  const handleCreateNew = async () => {
+  const handleCreateNew = () => {
     const defaultTemplate = templates.find((template) => template.id === 'life-journey');
     if (defaultTemplate) {
-      await handleEditTemplate(defaultTemplate);
+      handleEditTemplate(defaultTemplate);
     }
   };
 
@@ -493,10 +440,9 @@ export default function DIYDashboard() {
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={handleCreateNew}
-              disabled={Boolean(creatingTemplateId)}
               className="px-6 py-3 bg-black hover:bg-slate-900 active:scale-[0.98] text-white rounded-xl text-xs font-bold tracking-wide transition-all duration-150 shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {creatingTemplateId ? 'Creating Draft...' : 'Create New Biography'}
+              Create New Biography
             </button>
             <button
               onClick={handleContinueDraft}
@@ -771,11 +717,10 @@ export default function DIYDashboard() {
                             event.stopPropagation();
                             handleEditTemplate(template);
                           }}
-                          disabled={creatingTemplateId === template.id}
                           className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-black px-3 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-slate-900 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           <PenTool className="w-3.5 h-3.5" />
-                          {creatingTemplateId === template.id ? 'Creating' : 'Edit'}
+                          Edit
                         </button>
                       </div>
                     </div>

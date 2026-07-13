@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Eye,
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import LifeJourneyTemplate from '../Templates/LifeJourney/LifeJourneyTemplate';
 import { CATEGORIES_DATA } from '../Templates/LifeJourney/data';
+import { getBiographyTemplateRoute } from '../Templates/LifeJourney/templateRoutes';
 import { authService } from '../services/authService';
 import type { BiographyWebsite, SubjectType } from '../services/authService';
 import type {
@@ -19,16 +20,19 @@ import type {
   PersonalDetails,
 } from '../Templates/LifeJourney/types';
 
-const STORAGE_KEY = 'xinghuoji.lifeJourney.templateDraft';
 const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
-const TEMPLATE_ID = 'life-journey';
 const SUBJECT_TYPES: SubjectType[] = ['SELF', 'PARENT', 'GRANDPARENT', 'CHILD', 'SPOUSE', 'LOVED_ONE'];
 
-const cloneLifeJourneyData = (): BiographyCategory =>
-  JSON.parse(JSON.stringify(CATEGORIES_DATA.life)) as BiographyCategory;
+const getStorageKey = (templateId: string) => `xinghuoji.${templateId}.templateDraft`;
 
-const mergeDraft = (savedDraft: BiographyCategory): BiographyCategory => {
-  const baseline = cloneLifeJourneyData();
+const cloneTemplateData = (categoryKey: BiographyCategory['id']): BiographyCategory =>
+  JSON.parse(JSON.stringify(CATEGORIES_DATA[categoryKey])) as BiographyCategory;
+
+const mergeDraft = (
+  savedDraft: BiographyCategory,
+  categoryKey: BiographyCategory['id']
+): BiographyCategory => {
+  const baseline = cloneTemplateData(categoryKey);
 
   return {
     ...baseline,
@@ -49,12 +53,12 @@ const mergeDraft = (savedDraft: BiographyCategory): BiographyCategory => {
   };
 };
 
-const loadDraft = (): BiographyCategory => {
+const loadDraft = (templateId: string, categoryKey: BiographyCategory['id']): BiographyCategory => {
   try {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    return saved ? mergeDraft(JSON.parse(saved) as BiographyCategory) : cloneLifeJourneyData();
+    const saved = window.localStorage.getItem(getStorageKey(templateId));
+    return saved ? mergeDraft(JSON.parse(saved) as BiographyCategory, categoryKey) : cloneTemplateData(categoryKey);
   } catch {
-    return cloneLifeJourneyData();
+    return cloneTemplateData(categoryKey);
   }
 };
 
@@ -76,9 +80,9 @@ const personalFields: Array<{
 const inputClass =
   'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100';
 
-const getBiographyTitle = (draft: BiographyCategory) => {
+const getBiographyTitle = (draft: BiographyCategory, templateTitle: string) => {
   const name = draft.personalDetails.fullName.trim();
-  return name ? `${name}'s Life Journey` : 'Life Journey Biography';
+  return name ? `${name}'s ${templateTitle}` : `${templateTitle} Biography`;
 };
 
 const getSubjectType = (subjectType?: string): SubjectType => {
@@ -91,19 +95,23 @@ const notifyBiographyListChanged = () => {
 
 export default function LifeJourneyEditPage() {
   const navigate = useNavigate();
+  const { templateId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [draft, setDraft] = useState<BiographyCategory>(() => loadDraft());
+  const templateRoute = getBiographyTemplateRoute(templateId);
+  const [draft, setDraft] = useState<BiographyCategory>(() =>
+    loadDraft(templateRoute.id, templateRoute.categoryKey)
+  );
   const [website, setWebsite] = useState<BiographyWebsite | null>(null);
   const [saveMessage, setSaveMessage] = useState('Unsaved changes');
   const [isSaving, setIsSaving] = useState(false);
   const websiteId = searchParams.get('websiteId') || '';
 
   React.useEffect(() => {
-    document.title = 'Edit Life Journey | Xinghuoji';
-  }, []);
+    document.title = `Edit ${templateRoute.title} | Xinghuoji`;
+  }, [templateRoute.title]);
 
   const openPreviewPage = () => {
-    const url = new URL('/diy-dashboard/templates/life-journey/preview', window.location.origin);
+    const url = new URL(`/diy-dashboard/templates/${templateRoute.id}/preview`, window.location.origin);
     const currentWebsiteId = website?.id || websiteId;
     if (currentWebsiteId) {
       url.searchParams.set('websiteId', currentWebsiteId);
@@ -171,7 +179,7 @@ export default function LifeJourneyEditPage() {
   };
 
   const handleSave = async () => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    window.localStorage.setItem(getStorageKey(templateRoute.id), JSON.stringify(draft));
 
     setIsSaving(true);
     setSaveMessage('Saving...');
@@ -184,9 +192,9 @@ export default function LifeJourneyEditPage() {
       }
 
       const savedWebsite = await authService.createBiographyWebsite({
-        title: getBiographyTitle(draft),
-        templateId: TEMPLATE_ID,
-        subjectType: getSubjectType(website?.subjectType),
+        title: getBiographyTitle(draft, templateRoute.title),
+        templateId: templateRoute.id,
+        subjectType: getSubjectType(searchParams.get('subjectType') || website?.subjectType),
       });
 
       setWebsite(savedWebsite);
@@ -201,8 +209,8 @@ export default function LifeJourneyEditPage() {
   };
 
   const handleReset = () => {
-    const originalDraft = cloneLifeJourneyData();
-    window.localStorage.removeItem(STORAGE_KEY);
+    const originalDraft = cloneTemplateData(templateRoute.categoryKey);
+    window.localStorage.removeItem(getStorageKey(templateRoute.id));
     setDraft(originalDraft);
     setSaveMessage('Reset to original');
   };
@@ -225,7 +233,7 @@ export default function LifeJourneyEditPage() {
                 Template Editor
               </p>
               <h1 className="font-serif-display text-2xl font-semibold leading-tight text-[#0A1128]">
-                Life Journey
+                {templateRoute.title}
               </h1>
             </div>
           </div>
@@ -362,7 +370,7 @@ export default function LifeJourneyEditPage() {
             </button>
           </div>
 
-          <LifeJourneyTemplate dataOverride={draft} />
+          <LifeJourneyTemplate categoryKey={templateRoute.categoryKey} dataOverride={draft} />
         </section>
       </main>
     </div>

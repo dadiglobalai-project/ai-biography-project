@@ -48,8 +48,8 @@ export default function App() {
         <Route path="/preserve-story" element={<PreserveStoryPage />} />
         <Route path="/diy-dashboard" element={<DIYDashboard />} />
         <Route path="/professional-dashboard" element={<ProfessionalDashboard />} />
-        <Route path="/diy-dashboard/templates/life-journey/preview" element={<LifeJourneyPreviewPage />} />
-        <Route path="/diy-dashboard/templates/life-journey/edit" element={<LifeJourneyEditPage />} />
+        <Route path="/diy-dashboard/templates/:templateId/preview" element={<LifeJourneyPreviewPage />} />
+        <Route path="/diy-dashboard/templates/:templateId/edit" element={<LifeJourneyEditPage />} />
         
                 
         {/* Fallback pattern to map root or custom routes directly to /register */}

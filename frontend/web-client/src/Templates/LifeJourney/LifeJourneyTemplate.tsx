@@ -30,11 +30,14 @@ import { CATEGORIES_DATA } from './data';
 import type { BiographyCategory } from './types';
 
 interface LifeJourneyTemplateProps {
+  categoryKey?: BiographyCategory['id'];
   dataOverride?: BiographyCategory;
 }
 
-export default function LifeJourneyTemplate({ dataOverride }: LifeJourneyTemplateProps) {
-  const activeCategoryKey = 'life';
+export default function LifeJourneyTemplate({
+  categoryKey = 'life',
+  dataOverride,
+}: LifeJourneyTemplateProps) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -45,7 +48,7 @@ export default function LifeJourneyTemplate({ dataOverride }: LifeJourneyTemplat
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  const data = dataOverride ?? CATEGORIES_DATA[activeCategoryKey];
+  const data = dataOverride ?? CATEGORIES_DATA[categoryKey];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

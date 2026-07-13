@@ -1,18 +1,21 @@
 import React from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, PenTool } from 'lucide-react';
 import LifeJourneyTemplate from '../Templates/LifeJourney/LifeJourneyTemplate';
+import { getBiographyTemplateRoute } from '../Templates/LifeJourney/templateRoutes';
 
 export default function LifeJourneyPreviewPage() {
   const navigate = useNavigate();
+  const { templateId } = useParams();
   const [searchParams] = useSearchParams();
+  const templateRoute = getBiographyTemplateRoute(templateId);
 
   React.useEffect(() => {
-    document.title = 'Life Journey Preview | Xinghuoji';
-  }, []);
+    document.title = `${templateRoute.title} Preview | Xinghuoji`;
+  }, [templateRoute.title]);
 
   const openEditorPage = () => {
-    const url = new URL('/diy-dashboard/templates/life-journey/edit', window.location.origin);
+    const url = new URL(`/diy-dashboard/templates/${templateRoute.id}/edit`, window.location.origin);
     const websiteId = searchParams.get('websiteId');
     if (websiteId) {
       url.searchParams.set('websiteId', websiteId);
@@ -45,7 +48,7 @@ export default function LifeJourneyPreviewPage() {
         </button>
       </div>
 
-      <LifeJourneyTemplate />
+      <LifeJourneyTemplate categoryKey={templateRoute.categoryKey} />
     </div>
   );
 }
