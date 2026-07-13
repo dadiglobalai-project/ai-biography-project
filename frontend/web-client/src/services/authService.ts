@@ -6,6 +6,7 @@ const AUTH_TOKEN_STORAGE_KEY = 'token';
 const AUTH_USER_STORAGE_KEY = 'authUser';
 const KNOWN_AUTH_USERS_STORAGE_KEY = 'knownAuthUsers';
 const LOCAL_BIOGRAPHY_WEBSITES_STORAGE_KEY = 'localBiographyWebsites';
+const SELECTED_SERVICE_TYPE_STORAGE_KEY = 'selectedServiceType';
 
 function getApiBaseUrl() {
   const configuredApiUrl = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -112,6 +113,22 @@ function storeAuthSession(token: string, user?: AuthResponse['user']) {
 function clearAuthSession() {
   localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
   localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+  localStorage.removeItem(SELECTED_SERVICE_TYPE_STORAGE_KEY);
+}
+
+function normalizeServiceType(serviceType?: unknown): ServiceType | undefined {
+  const normalizedServiceType = typeof serviceType === 'string' ? serviceType.toUpperCase() : '';
+  return normalizedServiceType === 'DIY' || normalizedServiceType === 'PROFESSIONAL'
+    ? normalizedServiceType
+    : undefined;
+}
+
+function storeSelectedServiceType(serviceType: ServiceType) {
+  localStorage.setItem(SELECTED_SERVICE_TYPE_STORAGE_KEY, serviceType);
+}
+
+function readSelectedServiceType(): ServiceType | undefined {
+  return normalizeServiceType(localStorage.getItem(SELECTED_SERVICE_TYPE_STORAGE_KEY));
 }
 
 function readStoredUser(): AuthResponse['user'] | undefined {
@@ -532,10 +549,13 @@ export const authService = {
       throw new Error(getMessage(data, 'Unable to save service type'));
     }
 
+    const savedServiceType = normalizeServiceType(data.serviceType) || serviceType;
+    storeSelectedServiceType(savedServiceType);
+
     return {
       success: true,
       message: data.message || 'Service type saved successfully',
-      serviceType: data.serviceType || serviceType,
+      serviceType: savedServiceType,
       onboardingStatus: data.onboardingStatus || 'COMPLETED',
     };
   },
@@ -557,11 +577,16 @@ export const authService = {
     const email = getEmailFromData(data) || tokenSession?.email || '';
     const fullName = getFullNameFromData(data) || tokenSession?.fullName || getKnownFullName(email);
 
+    const serviceType = normalizeServiceType(data.serviceType) || readSelectedServiceType();
+    if (serviceType) {
+      storeSelectedServiceType(serviceType);
+    }
+
     return {
       success: true,
       message: data.message,
       user: email ? { fullName, email } : undefined,
-      serviceType: data.serviceType,
+      serviceType,
       onboardingStatus: data.onboardingStatus,
     };
   },

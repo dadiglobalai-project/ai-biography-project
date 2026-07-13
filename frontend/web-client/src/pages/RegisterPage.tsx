@@ -5,6 +5,16 @@ import AuthLayout from '../components/auth/AuthLayout';
 import RegisterForm from '../components/auth/RegisterForm';
 import SuccessView from '../components/SuccessView';
 import { authService } from '../services/authService';
+import { getDashboardPath } from '../utils/dashboardRouting';
+
+async function getPostLoginPath() {
+  try {
+    const dashboard = await authService.getDashboard();
+    return getDashboardPath(dashboard.serviceType);
+  } catch {
+    return '/preserve-story';
+  }
+}
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -16,9 +26,12 @@ export default function RegisterPage() {
   useEffect(() => {
     let active = true;
     authService.getCurrentUser()
-      .then((res) => {
+      .then(async (res) => {
         if (active && res.success && res.user) {
-          navigate('/preserve-story', { replace: true });
+          const path = await getPostLoginPath();
+          if (active) {
+            navigate(path, { replace: true });
+          }
         }
       })
       .catch(() => {

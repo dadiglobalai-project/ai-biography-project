@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { Check, Star, ArrowRight, PenTool, LogOut, Award, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { authService, ServiceType } from '../services/authService';
 import BrandLogo from '../components/BrandLogo';
+import { getDashboardPath } from '../utils/dashboardRouting';
 
 type StoryOption = 'diy' | 'pro';
 
@@ -57,12 +58,7 @@ export default function PreserveStoryPage() {
 
     try {
       const response = await authService.saveServiceType(SERVICE_TYPE_BY_OPTION[selectedOption]);
-      if (selectedOption === 'diy') {
-        navigate('/diy-dashboard');
-        return;
-      }
-
-      setSuccessMessage(response.message);
+      navigate(getDashboardPath(response.serviceType), { replace: true });
     } catch (err: any) {
       setError(err?.message || 'Unable to save your service type. Please try again.');
       if (/unauthorized|forbidden|session|token/i.test(err?.message || '')) {

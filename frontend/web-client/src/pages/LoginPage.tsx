@@ -5,6 +5,16 @@ import AuthLayout from '../components/auth/AuthLayout';
 import LoginForm from '../components/auth/LoginForm';
 import SuccessView from '../components/SuccessView';
 import { authService } from '../services/authService';
+import { getDashboardPath } from '../utils/dashboardRouting';
+
+async function getPostLoginPath() {
+  try {
+    const dashboard = await authService.getDashboard();
+    return getDashboardPath(dashboard.serviceType);
+  } catch {
+    return '/preserve-story';
+  }
+}
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -16,9 +26,12 @@ export default function LoginPage() {
   useEffect(() => {
     let active = true;
     authService.getCurrentUser()
-      .then((res) => {
+      .then(async (res) => {
         if (active && res.success && res.user) {
-          navigate('/preserve-story', { replace: true });
+          const path = await getPostLoginPath();
+          if (active) {
+            navigate(path, { replace: true });
+          }
         }
       })
       .catch(() => {
@@ -35,10 +48,10 @@ export default function LoginPage() {
     };
   }, [navigate]);
 
-  const handleLoginSuccess = (fullName: string, email: string) => {
+  const handleLoginSuccess = async (fullName: string, email: string) => {
     setSuccessUser({ fullName, email });
     setIsSubmitted(true);
-    navigate('/preserve-story');
+    navigate(await getPostLoginPath(), { replace: true });
   };
 
   const handleContinue = async () => {
