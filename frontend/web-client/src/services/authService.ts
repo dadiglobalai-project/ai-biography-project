@@ -7,6 +7,7 @@ const AUTH_USER_STORAGE_KEY = 'authUser';
 const KNOWN_AUTH_USERS_STORAGE_KEY = 'knownAuthUsers';
 const LOCAL_BIOGRAPHY_WEBSITES_STORAGE_KEY = 'localBiographyWebsites';
 const SELECTED_SERVICE_TYPE_STORAGE_KEY = 'selectedServiceType';
+const SELECTED_SERVICE_TYPE_BY_USER_STORAGE_KEY = 'selectedServiceTypeByUser';
 
 function getApiBaseUrl() {
   const configuredApiUrl = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -110,12 +111,6 @@ function storeAuthSession(token: string, user?: AuthResponse['user']) {
   }
 }
 
-function clearAuthSession() {
-  localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-  localStorage.removeItem(AUTH_USER_STORAGE_KEY);
-  localStorage.removeItem(SELECTED_SERVICE_TYPE_STORAGE_KEY);
-}
-
 function normalizeServiceType(serviceType?: unknown): ServiceType | undefined {
   const normalizedServiceType = typeof serviceType === 'string' ? serviceType.toUpperCase() : '';
   return normalizedServiceType === 'DIY' || normalizedServiceType === 'PROFESSIONAL'
@@ -123,12 +118,86 @@ function normalizeServiceType(serviceType?: unknown): ServiceType | undefined {
     : undefined;
 }
 
-function storeSelectedServiceType(serviceType: ServiceType) {
+function normalizeEmailAddress(email?: unknown) {
+  return typeof email === 'string' ? email.trim().toLowerCase() : '';
+}
+
+function getCurrentStoredEmail() {
+  const storedUserEmail = normalizeEmailAddress(readStoredUser()?.email);
+  if (storedUserEmail) {
+    return storedUserEmail;
+  }
+
+  const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+  return token ? normalizeEmailAddress(getSessionFromJwt(token)?.email) : '';
+}
+
+function readSelectedServiceTypesByUser(): Record<string, ServiceType> {
+  const storedServiceTypes = localStorage.getItem(SELECTED_SERVICE_TYPE_BY_USER_STORAGE_KEY);
+  if (!storedServiceTypes) {
+    return {};
+  }
+
+  try {
+    return Object.entries(JSON.parse(storedServiceTypes) as Record<string, unknown>).reduce<
+      Record<string, ServiceType>
+    >((serviceTypes, [email, serviceType]) => {
+      const normalizedEmail = normalizeEmailAddress(email);
+      const normalizedServiceType = normalizeServiceType(serviceType);
+
+      if (normalizedEmail && normalizedServiceType) {
+        serviceTypes[normalizedEmail] = normalizedServiceType;
+      }
+
+      return serviceTypes;
+    }, {});
+  } catch {
+    localStorage.removeItem(SELECTED_SERVICE_TYPE_BY_USER_STORAGE_KEY);
+    return {};
+  }
+}
+
+function writeSelectedServiceTypesByUser(serviceTypes: Record<string, ServiceType>) {
+  localStorage.setItem(SELECTED_SERVICE_TYPE_BY_USER_STORAGE_KEY, JSON.stringify(serviceTypes));
+}
+
+function storeSelectedServiceType(serviceType: ServiceType, email?: string) {
+  const normalizedEmail = normalizeEmailAddress(email) || getCurrentStoredEmail();
+  if (normalizedEmail) {
+    writeSelectedServiceTypesByUser({
+      ...readSelectedServiceTypesByUser(),
+      [normalizedEmail]: serviceType,
+    });
+  }
+
   localStorage.setItem(SELECTED_SERVICE_TYPE_STORAGE_KEY, serviceType);
 }
 
-function readSelectedServiceType(): ServiceType | undefined {
+function readSelectedServiceType(email?: string): ServiceType | undefined {
+  const requestedEmail = normalizeEmailAddress(email);
+  const normalizedEmail = requestedEmail || getCurrentStoredEmail();
+  const serviceTypesByUser = readSelectedServiceTypesByUser();
+
+  if (normalizedEmail && serviceTypesByUser[normalizedEmail]) {
+    return serviceTypesByUser[normalizedEmail];
+  }
+
+  if (requestedEmail) {
+    return undefined;
+  }
+
   return normalizeServiceType(localStorage.getItem(SELECTED_SERVICE_TYPE_STORAGE_KEY));
+}
+
+function clearAuthSession() {
+  const selectedServiceType = readSelectedServiceType();
+  if (selectedServiceType) {
+    storeSelectedServiceType(selectedServiceType);
+  }
+
+  localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+  localStorage.removeItem(SELECTED_SERVICE_TYPE_STORAGE_KEY);
 }
 
 function readStoredUser(): AuthResponse['user'] | undefined {
@@ -577,9 +646,9 @@ export const authService = {
     const email = getEmailFromData(data) || tokenSession?.email || '';
     const fullName = getFullNameFromData(data) || tokenSession?.fullName || getKnownFullName(email);
 
-    const serviceType = normalizeServiceType(data.serviceType) || readSelectedServiceType();
+    const serviceType = normalizeServiceType(data.serviceType) || readSelectedServiceType(email);
     if (serviceType) {
-      storeSelectedServiceType(serviceType);
+      storeSelectedServiceType(serviceType, email);
     }
 
     return {
