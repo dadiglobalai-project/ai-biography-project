@@ -18,10 +18,13 @@ import {
 import LifeJourneyTemplate from '../Templates/LifeJourney/LifeJourneyTemplate';
 import { CATEGORIES_DATA } from '../Templates/LifeJourney/data';
 import { getBiographyTemplateRoute } from '../Templates/LifeJourney/templateRoutes';
+import { getSectionCopy } from '../Templates/LifeJourney/sectionCopy';
 import { authService } from '../services/authService';
 import type { BiographyWebsite, SubjectType } from '../services/authService';
 import type {
   BiographyCategory,
+  EditableSectionCopy,
+  EditableSectionCopyKey,
   CustomizerSettings,
   EditableTemplateSection,
   GalleryItem,
@@ -62,6 +65,10 @@ const mergeDraft = (
     timeline: savedDraft.timeline ?? baseline.timeline,
     gallery: savedDraft.gallery ?? baseline.gallery,
     stories: savedDraft.stories ?? baseline.stories,
+    sectionCopy: {
+      ...baseline.sectionCopy,
+      ...savedDraft.sectionCopy,
+    },
   };
 };
 
@@ -153,10 +160,7 @@ const personalFieldsBySection: Record<
     { field: 'bioFull', label: 'Biography summary', multiline: true, rows: 7 },
     { field: 'signatureQuote', label: 'Signature quote', multiline: true, rows: 4 },
   ],
-  timeline: [
-    { field: 'birthDetails', label: 'Childhood / birth details' },
-    { field: 'location', label: 'Present day location' },
-  ],
+  timeline: [],
   contact: [
     { field: 'contactEmail', label: 'Email' },
     { field: 'instagramHandle', label: 'Instagram' },
@@ -321,6 +325,29 @@ export default function LifeJourneyEditPage() {
     setSaveMessage('Unsaved changes');
   };
 
+  const updateSectionCopy = (
+    section: EditableSectionCopyKey,
+    field: keyof EditableSectionCopy,
+    value: string
+  ) => {
+    setDraft((current) => {
+      const sectionCopy = getSectionCopy(current.sectionCopy);
+
+      return {
+        ...current,
+        sectionCopy: {
+          ...current.sectionCopy,
+          [section]: {
+            ...sectionCopy[section],
+            ...current.sectionCopy?.[section],
+            [field]: value,
+          },
+        },
+      };
+    });
+    setSaveMessage('Unsaved changes');
+  };
+
   const updateSettings = <K extends keyof CustomizerSettings>(
     field: K,
     value: CustomizerSettings[K],
@@ -367,20 +394,50 @@ export default function LifeJourneyEditPage() {
 
   const renderPersonalFields = (
     section: Extract<EditableTemplateSection, 'hero' | 'about' | 'timeline' | 'contact'>
-  ) => (
-    <div className="space-y-4">
-      {personalFieldsBySection[section].map((item) =>
-        renderTextField({
-          label: item.label,
-          value: String(draft.personalDetails[item.field] || ''),
-          multiline: item.multiline,
-          rows: item.rows,
+  ) => {
+    const fields = personalFieldsBySection[section];
+    if (fields.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="space-y-4">
+        {fields.map((item) =>
+          renderTextField({
+            label: item.label,
+            value: String(draft.personalDetails[item.field] || ''),
+            multiline: item.multiline,
+            rows: item.rows,
+            section,
+            onChange: (value) => updatePersonalDetail(item.field, value),
+          })
+        )}
+      </div>
+    );
+  };
+
+  const renderSectionCopyFields = (section: EditableSectionCopyKey) => {
+    const sectionCopy = getSectionCopy(draft.sectionCopy)[section];
+
+    return (
+      <div className="space-y-4 rounded-xl border border-[#FED362]/40 bg-[#FED362]/10 p-4">
+        {renderTextField({
+          label: 'Section title',
+          value: sectionCopy.title,
           section,
-          onChange: (value) => updatePersonalDetail(item.field, value),
-        })
-      )}
-    </div>
-  );
+          onChange: (value) => updateSectionCopy(section, 'title', value),
+        })}
+        {renderTextField({
+          label: 'Section description',
+          value: sectionCopy.description,
+          multiline: true,
+          rows: 3,
+          section,
+          onChange: (value) => updateSectionCopy(section, 'description', value),
+        })}
+      </div>
+    );
+  };
 
   const renderSectionEditor = () => {
     switch (activeEditorSection) {
@@ -390,6 +447,7 @@ export default function LifeJourneyEditPage() {
       case 'about':
         return (
           <div className="space-y-6">
+            {renderSectionCopyFields('about')}
             {renderPersonalFields('about')}
 
             <div className="space-y-3 border-t border-slate-100 pt-5">
@@ -449,7 +507,7 @@ export default function LifeJourneyEditPage() {
       case 'timeline':
         return (
           <div className="space-y-6">
-            {renderPersonalFields('timeline')}
+            {renderSectionCopyFields('timeline')}
 
             <div className="space-y-3 border-t border-slate-100 pt-5">
               <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700">
@@ -502,6 +560,7 @@ export default function LifeJourneyEditPage() {
       case 'gallery':
         return (
           <div className="space-y-4">
+            {renderSectionCopyFields('gallery')}
             {draft.gallery.map((item, index) => (
               <div key={item.id} className="space-y-3 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
                 {renderTextField({
@@ -555,6 +614,7 @@ export default function LifeJourneyEditPage() {
       case 'stories':
         return (
           <div className="space-y-4">
+            {renderSectionCopyFields('stories')}
             {draft.stories.map((item, index) => (
               <div key={item.id} className="space-y-3 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
                 {renderTextField({
@@ -600,7 +660,12 @@ export default function LifeJourneyEditPage() {
         );
 
       case 'contact':
-        return renderPersonalFields('contact');
+        return (
+          <div className="space-y-6">
+            {renderSectionCopyFields('contact')}
+            {renderPersonalFields('contact')}
+          </div>
+        );
 
       case 'style':
         return (

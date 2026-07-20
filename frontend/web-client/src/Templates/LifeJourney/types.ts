@@ -80,6 +80,13 @@ export type EditableTemplateSection =
   | 'contact'
   | 'style';
 
+export type EditableSectionCopyKey = 'about' | 'timeline' | 'gallery' | 'stories' | 'contact';
+
+export interface EditableSectionCopy {
+  title: string;
+  description: string;
+}
+
 export interface BiographyCategory {
   id: 'life' | 'visionary' | 'entrepreneur';
   title: string;
@@ -93,4 +100,5 @@ export interface BiographyCategory {
   timeline: TimelineMilestone[];
   gallery: GalleryItem[];
   stories: MemoryStory[];
+  sectionCopy?: Partial<Record<EditableSectionCopyKey, EditableSectionCopy>>;
 }
