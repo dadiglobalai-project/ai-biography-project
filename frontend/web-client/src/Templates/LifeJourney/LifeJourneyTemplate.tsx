@@ -164,6 +164,21 @@ export default function LifeJourneyTemplate({
     return 'relative rounded-[2rem] outline outline-4 outline-offset-8 outline-[#FED362] shadow-[0_0_0_8px_rgba(254,211,98,0.16),0_18px_45px_rgba(177,134,37,0.16)] transition-all duration-300';
   };
 
+  const getSectionInteractionProps = (section: EditableTemplateSection) => ({
+    onClick: (event: React.MouseEvent<HTMLElement>) => {
+      if (!isInlineEditable) {
+        return;
+      }
+
+      const target = event.target as HTMLElement;
+      if (target.closest('a, button, input, textarea, select')) {
+        return;
+      }
+
+      onEditSectionChange?.(section);
+    },
+  });
+
   type EditableTextTag = 'span' | 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'div';
 
   const updatePersonalDetail = (field: keyof PersonalDetails, value: string) => {
@@ -385,7 +400,11 @@ export default function LifeJourneyTemplate({
         {/* ========================================================= */}
         {/* 1. HERO SECTION (Split Layout - No Dead Space)            */}
         {/* ========================================================= */}
-        <section className={`grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center ${getEditHighlightClass('hero')}`} id="hero-section">
+        <section
+          className={`grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center ${getEditHighlightClass('hero')}`}
+          id="hero-section"
+          {...getSectionInteractionProps('hero')}
+        >
           
           {/* Left Column: Portrait */}
           <div className="lg:col-span-5">
@@ -475,7 +494,11 @@ export default function LifeJourneyTemplate({
         {/* ========================================================= */}
         {/* 2. CHRONICLE OVERVIEW & VALUES (Bento Grid)              */}
         {/* ========================================================= */}
-        <section className={`space-y-12 ${getEditHighlightClass('about')}`} id="about-section">
+        <section
+          className={`space-y-12 ${getEditHighlightClass('about')}`}
+          id="about-section"
+          {...getSectionInteractionProps('about')}
+        >
           
           {/* Section Header */}
           <div className="text-left max-w-2xl">
@@ -627,7 +650,11 @@ export default function LifeJourneyTemplate({
         {/* ========================================================= */}
         {/* 3. CHRONOLOGICAL TIMELINE (With Integrated Media Cards)   */}
         {/* ========================================================= */}
-        <section className={`space-y-6 ${getEditHighlightClass('timeline')}`} id="timeline-section">
+        <section
+          className={`space-y-6 ${getEditHighlightClass('timeline')}`}
+          id="timeline-section"
+          {...getSectionInteractionProps('timeline')}
+        >
           
           {/* Section Header */}
           <div className="text-left max-w-2xl">
@@ -748,7 +775,11 @@ export default function LifeJourneyTemplate({
         {/* ========================================================= */}
         {/* 4. MULTIMEDIA GALLERY (Dense 6-Item Aesthetic Polaroid Grid)*/}
         {/* ========================================================= */}
-        <section className={`space-y-12 ${getEditHighlightClass('gallery')}`} id="gallery-section">
+        <section
+          className={`space-y-12 ${getEditHighlightClass('gallery')}`}
+          id="gallery-section"
+          {...getSectionInteractionProps('gallery')}
+        >
           
           {/* Section Header */}
           <div className="text-left max-w-2xl">
@@ -824,7 +855,11 @@ export default function LifeJourneyTemplate({
         {/* ========================================================= */}
         {/* 5. NARRATIVES & MEMORIES (Detailed Stories Trilogy)       */}
         {/* ========================================================= */}
-        <section className={`space-y-12 animate-fade-in ${getEditHighlightClass('stories')}`} id="stories-section">
+        <section
+          className={`space-y-12 animate-fade-in ${getEditHighlightClass('stories')}`}
+          id="stories-section"
+          {...getSectionInteractionProps('stories')}
+        >
           
           {/* Section Header */}
           <div className="text-left max-w-2xl">
@@ -918,7 +953,11 @@ export default function LifeJourneyTemplate({
         {/* ========================================================= */}
         {/* 6. CONTACT SECTION (Rustic Oregon Cabin Postbox Theme)    */}
         {/* ========================================================= */}
-        <section className={`rounded-3xl border p-8 md:p-12 ${theme.card} ${getEditHighlightClass('contact')}`} id="contact-section">
+        <section
+          className={`rounded-3xl border p-8 md:p-12 ${theme.card} ${getEditHighlightClass('contact')}`}
+          id="contact-section"
+          {...getSectionInteractionProps('contact')}
+        >
           
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-stretch text-left">
             

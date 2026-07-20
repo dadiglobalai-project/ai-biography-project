@@ -193,7 +193,7 @@ export default function LifeJourneyEditPage() {
   const [website, setWebsite] = useState<BiographyWebsite | null>(null);
   const [saveMessage, setSaveMessage] = useState('Unsaved changes');
   const [isSaving, setIsSaving] = useState(false);
-  const [activeEditorSection, setActiveEditorSection] = useState<EditableTemplateSection>('hero');
+  const [activeEditorSection, setActiveEditorSection] = useState<EditableTemplateSection | null>(null);
   const websiteId = searchParams.get('websiteId') || '';
 
   const focusPreviewSection = (section: EditableTemplateSection) => {
@@ -341,7 +341,7 @@ export default function LifeJourneyEditPage() {
     onChange,
     multiline = false,
     rows = 3,
-    section = activeEditorSection,
+    section = activeEditorSection ?? 'hero',
   }: TextFieldConfig) => (
     <label className="block space-y-1.5">
       <span className="text-xs font-bold text-slate-500">{label}</span>
@@ -754,64 +754,69 @@ export default function LifeJourneyEditPage() {
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <Sparkles className="h-4 w-4 text-[#B18625]" />
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900">Template Sections</h2>
+                  <h2 className="text-sm font-bold text-slate-900">Section Editor</h2>
                   <p className="text-[11px] text-slate-500">
-                    Select the section you want to edit.
+                    Click any section in the live preview to edit it here.
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-2">
-                {editorSections.map((section) => {
-                  const Icon = section.icon;
-                  const isActive = activeEditorSection === section.key;
+              {activeEditorSection ? (
+                <div className="space-y-5">
+                  {(() => {
+                    const selectedSection = editorSections.find((section) => section.key === activeEditorSection);
+                    const Icon = selectedSection?.icon || Sparkles;
 
-                  return (
-                    <button
-                      key={section.key}
-                      type="button"
-                      aria-pressed={isActive}
-                      onClick={() => focusPreviewSection(section.key)}
-                      className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${
-                        isActive
-                          ? 'border-[#FED362] bg-[#FED362]/15 text-slate-950 shadow-sm'
-                          : 'border-slate-100 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
-                      }`}
-                    >
-                      <span
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
-                          isActive
-                            ? 'border-[#FED362] bg-white text-[#B18625]'
-                            : 'border-slate-100 bg-slate-50 text-slate-500'
-                        }`}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-xs font-bold uppercase tracking-wide">
-                          {section.label}
+                    return (
+                      <div className="flex items-center gap-3 rounded-xl border border-[#FED362] bg-[#FED362]/15 px-3 py-3 text-left text-slate-950 shadow-sm">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#FED362] bg-white text-[#B18625]">
+                          <Icon className="h-4 w-4" />
                         </span>
-                        <span className="block truncate text-[11px] text-slate-500">
-                          {section.description}
+                        <span className="min-w-0">
+                          <span className="block text-xs font-bold uppercase tracking-wide">
+                            {selectedSection?.label}
+                          </span>
+                          <span className="block truncate text-[11px] text-slate-500">
+                            {selectedSection?.description}
+                          </span>
                         </span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                      </div>
+                    );
+                  })()}
 
-              <div className="border-t border-slate-100 pt-5">
-                <div className="mb-4">
-                  <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
-                    Editing
-                  </p>
-                  <h3 className="text-lg font-bold text-slate-950">
-                    {editorSections.find((section) => section.key === activeEditorSection)?.label}
+                  <div className="border-t border-slate-100 pt-5">
+                    <div className="mb-4">
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
+                        Editing
+                      </p>
+                      <h3 className="text-lg font-bold text-slate-950">
+                        {editorSections.find((section) => section.key === activeEditorSection)?.label}
+                      </h3>
+                    </div>
+
+                    {renderSectionEditor()}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+                  <Sparkles className="mx-auto h-5 w-5 text-[#B18625]" />
+                  <h3 className="mt-3 text-sm font-bold text-slate-900">
+                    No Section Selected
                   </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    Click the Hero, About, Life Journey, Gallery, Stories, or Contact area in the live preview.
+                  </p>
                 </div>
+              )}
 
-                {renderSectionEditor()}
-              </div>
+              <button
+                type="button"
+                onClick={() => setActiveEditorSection('style')}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-700 transition hover:border-[#FED362] hover:text-slate-950"
+              >
+                <Palette className="h-4 w-4 text-[#B18625]" />
+                Edit Template Style
+              </button>
             </section>
           </div>
         </aside>
