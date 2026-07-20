@@ -2,12 +2,18 @@ import React, { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  BookOpen,
+  Clock3,
   Eye,
+  Image as ImageIcon,
+  Mail,
+  MessageSquare,
   Palette,
   RotateCcw,
   Save,
   Sparkles,
   Type,
+  UserRound,
 } from 'lucide-react';
 import LifeJourneyTemplate from '../Templates/LifeJourney/LifeJourneyTemplate';
 import { CATEGORIES_DATA } from '../Templates/LifeJourney/data';
@@ -18,7 +24,12 @@ import type {
   BiographyCategory,
   CustomizerSettings,
   EditableTemplateSection,
+  GalleryItem,
+  HobbyItem,
+  MemoryStory,
   PersonalDetails,
+  TimelineMilestone,
+  ValueItem,
 } from '../Templates/LifeJourney/types';
 
 const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
@@ -63,21 +74,97 @@ const loadDraft = (templateId: string, categoryKey: BiographyCategory['id']): Bi
   }
 };
 
-const personalFields: Array<{
-  field: keyof PersonalDetails;
+type TextFieldConfig = {
   label: string;
+  value: string;
+  onChange: (value: string) => void;
   multiline?: boolean;
-  section: EditableTemplateSection;
+  rows?: number;
+  section?: EditableTemplateSection;
+};
+
+const editorSections: Array<{
+  key: EditableTemplateSection;
+  label: string;
+  description: string;
+  icon: React.ElementType;
 }> = [
-  { field: 'fullName', label: 'Full name', section: 'hero' },
-  { field: 'occupation', label: 'Occupation', section: 'hero' },
-  { field: 'tagline', label: 'Tagline', multiline: true, section: 'hero' },
-  { field: 'birthDetails', label: 'Birth details', section: 'timeline' },
-  { field: 'location', label: 'Location', section: 'timeline' },
-  { field: 'shortIntro', label: 'Short intro', multiline: true, section: 'hero' },
-  { field: 'bioFull', label: 'Biography', multiline: true, section: 'about' },
-  { field: 'signatureQuote', label: 'Signature quote', multiline: true, section: 'about' },
+  {
+    key: 'hero',
+    label: 'Hero',
+    description: 'Name, tagline, image, intro',
+    icon: UserRound,
+  },
+  {
+    key: 'about',
+    label: 'About',
+    description: 'Biography, values, interests',
+    icon: BookOpen,
+  },
+  {
+    key: 'timeline',
+    label: 'Life Journey',
+    description: 'Timeline and life chapters',
+    icon: Clock3,
+  },
+  {
+    key: 'gallery',
+    label: 'Gallery',
+    description: 'Images, media cards',
+    icon: ImageIcon,
+  },
+  {
+    key: 'stories',
+    label: 'Stories',
+    description: 'Memory story cards',
+    icon: MessageSquare,
+  },
+  {
+    key: 'contact',
+    label: 'Contact',
+    description: 'Email and social links',
+    icon: Mail,
+  },
+  {
+    key: 'style',
+    label: 'Style',
+    description: 'Theme, fonts, spacing',
+    icon: Palette,
+  },
 ];
+
+const personalFieldsBySection: Record<
+  Extract<EditableTemplateSection, 'hero' | 'about' | 'timeline' | 'contact'>,
+  Array<{
+    field: keyof PersonalDetails;
+    label: string;
+    multiline?: boolean;
+    rows?: number;
+  }>
+> = {
+  hero: [
+    { field: 'fullName', label: 'Full name' },
+    { field: 'occupation', label: 'Occupation' },
+    { field: 'tagline', label: 'Short tagline', multiline: true },
+    { field: 'profileImageUrl', label: 'Profile image URL' },
+    { field: 'shortIntro', label: 'Short introduction', multiline: true, rows: 4 },
+  ],
+  about: [
+    { field: 'bioFull', label: 'Biography summary', multiline: true, rows: 7 },
+    { field: 'signatureQuote', label: 'Signature quote', multiline: true, rows: 4 },
+  ],
+  timeline: [
+    { field: 'birthDetails', label: 'Childhood / birth details' },
+    { field: 'location', label: 'Present day location' },
+  ],
+  contact: [
+    { field: 'contactEmail', label: 'Email' },
+    { field: 'instagramHandle', label: 'Instagram' },
+    { field: 'twitterHandle', label: 'Twitter / X' },
+    { field: 'facebookLabel', label: 'Facebook' },
+    { field: 'linkedinLabel', label: 'LinkedIn' },
+  ],
+};
 
 const inputClass =
   'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100';
@@ -106,11 +193,11 @@ export default function LifeJourneyEditPage() {
   const [website, setWebsite] = useState<BiographyWebsite | null>(null);
   const [saveMessage, setSaveMessage] = useState('Unsaved changes');
   const [isSaving, setIsSaving] = useState(false);
-  const [activeEditSection, setActiveEditSection] = useState<EditableTemplateSection | null>(null);
+  const [activeEditorSection, setActiveEditorSection] = useState<EditableTemplateSection>('hero');
   const websiteId = searchParams.get('websiteId') || '';
 
   const focusPreviewSection = (section: EditableTemplateSection) => {
-    setActiveEditSection(section);
+    setActiveEditorSection(section);
     window.requestAnimationFrame(() => {
       const previewSection = document.getElementById(`${section}-section`);
       previewSection?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -175,6 +262,56 @@ export default function LifeJourneyEditPage() {
     setSaveMessage('Unsaved changes');
   };
 
+  const updateValueItem = (index: number, field: keyof ValueItem, value: string) => {
+    setDraft((current) => ({
+      ...current,
+      values: current.values.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item
+      ),
+    }));
+    setSaveMessage('Unsaved changes');
+  };
+
+  const updateHobbyItem = (index: number, field: keyof HobbyItem, value: string) => {
+    setDraft((current) => ({
+      ...current,
+      hobbies: current.hobbies.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item
+      ),
+    }));
+    setSaveMessage('Unsaved changes');
+  };
+
+  const updateTimelineItem = (index: number, updates: Partial<TimelineMilestone>) => {
+    setDraft((current) => ({
+      ...current,
+      timeline: current.timeline.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...updates } : item
+      ),
+    }));
+    setSaveMessage('Unsaved changes');
+  };
+
+  const updateGalleryItem = (index: number, updates: Partial<GalleryItem>) => {
+    setDraft((current) => ({
+      ...current,
+      gallery: current.gallery.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...updates } : item
+      ),
+    }));
+    setSaveMessage('Unsaved changes');
+  };
+
+  const updateStoryItem = (index: number, field: keyof MemoryStory, value: string) => {
+    setDraft((current) => ({
+      ...current,
+      stories: current.stories.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item
+      ),
+    }));
+    setSaveMessage('Unsaved changes');
+  };
+
   const updateSettings = <K extends keyof CustomizerSettings>(
     field: K,
     value: CustomizerSettings[K],
@@ -187,6 +324,333 @@ export default function LifeJourneyEditPage() {
       },
     }));
     setSaveMessage('Unsaved changes');
+  };
+
+  const renderTextField = ({
+    label,
+    value,
+    onChange,
+    multiline = false,
+    rows = 3,
+    section = activeEditorSection,
+  }: TextFieldConfig) => (
+    <label className="block space-y-1.5">
+      <span className="text-xs font-bold text-slate-500">{label}</span>
+      {multiline ? (
+        <textarea
+          rows={rows}
+          value={value}
+          onFocus={() => focusPreviewSection(section)}
+          onChange={(event) => onChange(event.target.value)}
+          className={`${inputClass} resize-y leading-relaxed`}
+        />
+      ) : (
+        <input
+          type="text"
+          value={value}
+          onFocus={() => focusPreviewSection(section)}
+          onChange={(event) => onChange(event.target.value)}
+          className={inputClass}
+        />
+      )}
+    </label>
+  );
+
+  const renderPersonalFields = (
+    section: Extract<EditableTemplateSection, 'hero' | 'about' | 'timeline' | 'contact'>
+  ) => (
+    <div className="space-y-4">
+      {personalFieldsBySection[section].map((item) =>
+        renderTextField({
+          label: item.label,
+          value: String(draft.personalDetails[item.field] || ''),
+          multiline: item.multiline,
+          rows: item.rows,
+          section,
+          onChange: (value) => updatePersonalDetail(item.field, value),
+        })
+      )}
+    </div>
+  );
+
+  const renderSectionEditor = () => {
+    switch (activeEditorSection) {
+      case 'hero':
+        return renderPersonalFields('hero');
+
+      case 'about':
+        return (
+          <div className="space-y-6">
+            {renderPersonalFields('about')}
+
+            <div className="space-y-3 border-t border-slate-100 pt-5">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700">
+                Personal Values
+              </h3>
+              {draft.values.map((item, index) => (
+                <div key={item.id} className="space-y-3 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                  {renderTextField({
+                    label: `Value ${index + 1} title`,
+                    value: item.title,
+                    section: 'about',
+                    onChange: (value) => updateValueItem(index, 'title', value),
+                  })}
+                  {renderTextField({
+                    label: `Value ${index + 1} description`,
+                    value: item.description,
+                    multiline: true,
+                    section: 'about',
+                    onChange: (value) => updateValueItem(index, 'description', value),
+                  })}
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-3 border-t border-slate-100 pt-5">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700">
+                Hobbies / Interests
+              </h3>
+              {draft.hobbies.map((item, index) => (
+                <div key={item.id} className="space-y-3 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                  {renderTextField({
+                    label: `Interest ${index + 1} title`,
+                    value: item.title,
+                    section: 'about',
+                    onChange: (value) => updateHobbyItem(index, 'title', value),
+                  })}
+                  {renderTextField({
+                    label: `Interest ${index + 1} description`,
+                    value: item.description,
+                    multiline: true,
+                    section: 'about',
+                    onChange: (value) => updateHobbyItem(index, 'description', value),
+                  })}
+                  {renderTextField({
+                    label: `Interest ${index + 1} image URL`,
+                    value: item.imageUrl,
+                    section: 'about',
+                    onChange: (value) => updateHobbyItem(index, 'imageUrl', value),
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'timeline':
+        return (
+          <div className="space-y-6">
+            {renderPersonalFields('timeline')}
+
+            <div className="space-y-3 border-t border-slate-100 pt-5">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700">
+                Timeline Layout
+              </h3>
+              {draft.timeline.map((item, index) => (
+                <div key={item.id} className="space-y-3 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                  {renderTextField({
+                    label: `Milestone ${index + 1} year`,
+                    value: item.year,
+                    section: 'timeline',
+                    onChange: (value) => updateTimelineItem(index, { year: value }),
+                  })}
+                  {renderTextField({
+                    label: `Milestone ${index + 1} title`,
+                    value: item.title,
+                    section: 'timeline',
+                    onChange: (value) => updateTimelineItem(index, { title: value }),
+                  })}
+                  {renderTextField({
+                    label: `Milestone ${index + 1} location`,
+                    value: item.location,
+                    section: 'timeline',
+                    onChange: (value) => updateTimelineItem(index, { location: value }),
+                  })}
+                  {renderTextField({
+                    label: `Milestone ${index + 1} description`,
+                    value: item.description,
+                    multiline: true,
+                    section: 'timeline',
+                    onChange: (value) => updateTimelineItem(index, { description: value }),
+                  })}
+                  {renderTextField({
+                    label: `Milestone ${index + 1} details`,
+                    value: item.details.join('\n'),
+                    multiline: true,
+                    rows: 4,
+                    section: 'timeline',
+                    onChange: (value) =>
+                      updateTimelineItem(index, {
+                        details: value.split('\n').map((detail) => detail.trim()).filter(Boolean),
+                      }),
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'gallery':
+        return (
+          <div className="space-y-4">
+            {draft.gallery.map((item, index) => (
+              <div key={item.id} className="space-y-3 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                {renderTextField({
+                  label: `Gallery item ${index + 1} title`,
+                  value: item.title,
+                  section: 'gallery',
+                  onChange: (value) => updateGalleryItem(index, { title: value }),
+                })}
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-bold text-slate-500">Category</span>
+                  <select
+                    value={item.category}
+                    onFocus={() => focusPreviewSection('gallery')}
+                    onChange={(event) =>
+                      updateGalleryItem(index, {
+                        category: event.target.value as GalleryItem['category'],
+                      })
+                    }
+                    className={inputClass}
+                  >
+                    <option value="family">Family</option>
+                    <option value="career">Career</option>
+                    <option value="travel">Travel</option>
+                    <option value="creative">Creative</option>
+                  </select>
+                </label>
+                {renderTextField({
+                  label: `Gallery item ${index + 1} year`,
+                  value: item.year || '',
+                  section: 'gallery',
+                  onChange: (value) => updateGalleryItem(index, { year: value }),
+                })}
+                {renderTextField({
+                  label: `Gallery item ${index + 1} image / video URL`,
+                  value: item.imageUrl,
+                  section: 'gallery',
+                  onChange: (value) => updateGalleryItem(index, { imageUrl: value }),
+                })}
+                {renderTextField({
+                  label: `Gallery item ${index + 1} caption`,
+                  value: item.caption,
+                  multiline: true,
+                  section: 'gallery',
+                  onChange: (value) => updateGalleryItem(index, { caption: value }),
+                })}
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'stories':
+        return (
+          <div className="space-y-4">
+            {draft.stories.map((item, index) => (
+              <div key={item.id} className="space-y-3 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                {renderTextField({
+                  label: `Story ${index + 1} title`,
+                  value: item.title,
+                  section: 'stories',
+                  onChange: (value) => updateStoryItem(index, 'title', value),
+                })}
+                {renderTextField({
+                  label: `Story ${index + 1} date`,
+                  value: item.date,
+                  section: 'stories',
+                  onChange: (value) => updateStoryItem(index, 'date', value),
+                })}
+                {renderTextField({
+                  label: `Story ${index + 1} read time`,
+                  value: item.readTime,
+                  section: 'stories',
+                  onChange: (value) => updateStoryItem(index, 'readTime', value),
+                })}
+                {renderTextField({
+                  label: `Story ${index + 1} category`,
+                  value: item.category,
+                  section: 'stories',
+                  onChange: (value) => updateStoryItem(index, 'category', value),
+                })}
+                {renderTextField({
+                  label: `Story ${index + 1} image URL`,
+                  value: item.imageUrl,
+                  section: 'stories',
+                  onChange: (value) => updateStoryItem(index, 'imageUrl', value),
+                })}
+                {renderTextField({
+                  label: `Story ${index + 1} short description`,
+                  value: item.shortDescription,
+                  multiline: true,
+                  section: 'stories',
+                  onChange: (value) => updateStoryItem(index, 'shortDescription', value),
+                })}
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'contact':
+        return renderPersonalFields('contact');
+
+      case 'style':
+        return (
+          <div className="space-y-4">
+            <label className="block space-y-1.5">
+              <span className="text-xs font-bold text-slate-500">Theme</span>
+              <select
+                value={draft.settings.theme}
+                onFocus={() => focusPreviewSection('style')}
+                onChange={(event) =>
+                  updateSettings('theme', event.target.value as CustomizerSettings['theme'])
+                }
+                className={inputClass}
+              >
+                <option value="cream">Cream memoir</option>
+                <option value="sage">Sage archive</option>
+                <option value="charcoal">Charcoal legacy</option>
+              </select>
+            </label>
+
+            <label className="block space-y-1.5">
+              <span className="text-xs font-bold text-slate-500">Typography</span>
+              <select
+                value={draft.settings.fontPairing}
+                onFocus={() => focusPreviewSection('style')}
+                onChange={(event) =>
+                  updateSettings(
+                    'fontPairing',
+                    event.target.value as CustomizerSettings['fontPairing'],
+                  )
+                }
+                className={inputClass}
+              >
+                <option value="classic">Classic serif</option>
+                <option value="modern">Modern sans</option>
+                <option value="editorial">Editorial italic</option>
+              </select>
+            </label>
+
+            <label className="block space-y-1.5">
+              <span className="text-xs font-bold text-slate-500">Spacing</span>
+              <select
+                value={draft.settings.spacing}
+                onFocus={() => focusPreviewSection('style')}
+                onChange={(event) =>
+                  updateSettings('spacing', event.target.value as CustomizerSettings['spacing'])
+                }
+                className={inputClass}
+              >
+                <option value="spacious">Spacious</option>
+                <option value="compact">Compact</option>
+              </select>
+            </label>
+          </div>
+        );
+
+      default:
+        return null;
+    }
   };
 
   const handleSave = async () => {
@@ -276,94 +740,69 @@ export default function LifeJourneyEditPage() {
 
       <main className="grid lg:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="border-r border-slate-200 bg-white">
-          <div className="space-y-8 p-5 lg:sticky lg:top-[73px] lg:max-h-[calc(100vh-73px)] lg:overflow-y-auto lg:p-6">
-            <section className="space-y-4">
+          <div className="p-5 lg:sticky lg:top-[73px] lg:max-h-[calc(100vh-73px)] lg:overflow-y-auto lg:p-6">
+            <section className="space-y-5">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <Sparkles className="h-4 w-4 text-[#B18625]" />
-                <h2 className="text-sm font-bold text-slate-900">Identity</h2>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">Template Sections</h2>
+                  <p className="text-[11px] text-slate-500">
+                    Select the section you want to edit.
+                  </p>
+                </div>
               </div>
 
-              <div className="space-y-4">
-                {personalFields.map((item) => (
-                  <label key={item.field} className="block space-y-1.5">
-                    <span className="text-xs font-bold text-slate-500">{item.label}</span>
-                    {item.multiline ? (
-                      <textarea
-                        rows={item.field === 'bioFull' ? 7 : 3}
-                        value={draft.personalDetails[item.field]}
-                        onFocus={() => focusPreviewSection(item.section)}
-                        onChange={(event) => updatePersonalDetail(item.field, event.target.value)}
-                        className={`${inputClass} resize-y leading-relaxed`}
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        value={draft.personalDetails[item.field]}
-                        onFocus={() => focusPreviewSection(item.section)}
-                        onChange={(event) => updatePersonalDetail(item.field, event.target.value)}
-                        className={inputClass}
-                      />
-                    )}
-                  </label>
-                ))}
+              <div className="grid grid-cols-1 gap-2">
+                {editorSections.map((section) => {
+                  const Icon = section.icon;
+                  const isActive = activeEditorSection === section.key;
+
+                  return (
+                    <button
+                      key={section.key}
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() => focusPreviewSection(section.key)}
+                      className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${
+                        isActive
+                          ? 'border-[#FED362] bg-[#FED362]/15 text-slate-950 shadow-sm'
+                          : 'border-slate-100 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                      }`}
+                    >
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
+                          isActive
+                            ? 'border-[#FED362] bg-white text-[#B18625]'
+                            : 'border-slate-100 bg-slate-50 text-slate-500'
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-xs font-bold uppercase tracking-wide">
+                          {section.label}
+                        </span>
+                        <span className="block truncate text-[11px] text-slate-500">
+                          {section.description}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-            </section>
 
-            <section className="space-y-4">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                <Palette className="h-4 w-4 text-[#B18625]" />
-                <h2 className="text-sm font-bold text-slate-900">Style</h2>
+              <div className="border-t border-slate-100 pt-5">
+                <div className="mb-4">
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
+                    Editing
+                  </p>
+                  <h3 className="text-lg font-bold text-slate-950">
+                    {editorSections.find((section) => section.key === activeEditorSection)?.label}
+                  </h3>
+                </div>
+
+                {renderSectionEditor()}
               </div>
-
-              <label className="block space-y-1.5">
-                <span className="text-xs font-bold text-slate-500">Theme</span>
-                <select
-                  value={draft.settings.theme}
-                  onFocus={() => setActiveEditSection('style')}
-                  onChange={(event) =>
-                    updateSettings('theme', event.target.value as CustomizerSettings['theme'])
-                  }
-                  className={inputClass}
-                >
-                  <option value="cream">Cream memoir</option>
-                  <option value="sage">Sage archive</option>
-                  <option value="charcoal">Charcoal legacy</option>
-                </select>
-              </label>
-
-              <label className="block space-y-1.5">
-                <span className="text-xs font-bold text-slate-500">Typography</span>
-                <select
-                  value={draft.settings.fontPairing}
-                  onFocus={() => setActiveEditSection('style')}
-                  onChange={(event) =>
-                    updateSettings(
-                      'fontPairing',
-                      event.target.value as CustomizerSettings['fontPairing'],
-                    )
-                  }
-                  className={inputClass}
-                >
-                  <option value="classic">Classic serif</option>
-                  <option value="modern">Modern sans</option>
-                  <option value="editorial">Editorial italic</option>
-                </select>
-              </label>
-
-              <label className="block space-y-1.5">
-                <span className="text-xs font-bold text-slate-500">Spacing</span>
-                <select
-                  value={draft.settings.spacing}
-                  onFocus={() => setActiveEditSection('style')}
-                  onChange={(event) =>
-                    updateSettings('spacing', event.target.value as CustomizerSettings['spacing'])
-                  }
-                  className={inputClass}
-                >
-                  <option value="spacious">Spacious</option>
-                  <option value="compact">Compact</option>
-                </select>
-              </label>
             </section>
           </div>
         </aside>
@@ -389,7 +828,7 @@ export default function LifeJourneyEditPage() {
           <LifeJourneyTemplate
             categoryKey={templateRoute.categoryKey}
             dataOverride={draft}
-            activeEditSection={activeEditSection}
+            activeEditSection={activeEditorSection}
           />
         </section>
       </main>

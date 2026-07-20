@@ -54,6 +54,7 @@ export interface CustomizerSettings {
 export interface PersonalDetails {
   fullName: string;
   tagline: string;
+  profileImageUrl?: string;
   birthDetails: string;
   location: string;
   shortIntro: string;
@@ -63,6 +64,11 @@ export interface PersonalDetails {
   coordinates: string;
   coordsLabel: string;
   coordsSub: string;
+  contactEmail?: string;
+  instagramHandle?: string;
+  twitterHandle?: string;
+  facebookLabel?: string;
+  linkedinLabel?: string;
 }
 
 export type EditableTemplateSection =

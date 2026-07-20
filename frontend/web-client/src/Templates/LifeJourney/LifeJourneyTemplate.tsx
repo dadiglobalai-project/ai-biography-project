@@ -168,6 +168,13 @@ export default function LifeJourneyTemplate({
     return 'https://images.unsplash.com/photo-1463453091185-61582044d556?auto=format&fit=crop&q=80&w=800'; // Bearded master carpenter in workshop
   };
 
+  const profileImageUrl = data.personalDetails.profileImageUrl || getCategoryPortrait();
+  const contactEmail = data.personalDetails.contactEmail || 'julian.vance@cannonbeachwood.org';
+  const instagramHandle = data.personalDetails.instagramHandle || '@JulianVanceWood';
+  const twitterHandle = data.personalDetails.twitterHandle || '@VanceShipwrights';
+  const facebookLabel = data.personalDetails.facebookLabel || 'Cabin Studio';
+  const linkedinLabel = data.personalDetails.linkedinLabel || 'Julian Vance Forestry';
+
   return (
     <div className={`min-h-screen ${theme.bg} selection:bg-amber-200 selection:text-amber-900 transition-colors duration-500 font-sans antialiased flex flex-col justify-between ${
       activeEditSection === 'style' ? 'ring-4 ring-inset ring-[#FED362]' : ''
@@ -271,7 +278,7 @@ export default function LifeJourneyTemplate({
               
               <div className="aspect-[4/5] rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-stone-150 relative">
                 <img 
-                  src={getCategoryPortrait()} 
+                  src={profileImageUrl} 
                   alt={data.personalDetails.fullName} 
                   className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-700 filter brightness-95 contrast-[1.02]"
                   referrerPolicy="no-referrer"
@@ -714,7 +721,7 @@ export default function LifeJourneyTemplate({
                   <div>
                     <span className="font-mono text-[8px] text-stone-400 block font-bold">CABIN MAILBOX</span>
                     <span className="font-sans text-xs font-bold text-stone-850 hover:underline cursor-pointer">
-                      julian.vance@cannonbeachwood.org
+                      {contactEmail}
                     </span>
                   </div>
                 </div>
@@ -728,22 +735,22 @@ export default function LifeJourneyTemplate({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <span className={`p-3 rounded-xl border flex items-center gap-2.5 text-stone-600 transition-all duration-300 hover:border-amber-500/50 hover:text-stone-900 cursor-pointer ${theme.innerCard}`}>
                     <Instagram className="w-4 h-4 text-stone-500" />
-                    <span className="font-sans text-xs font-semibold">@JulianVanceWood</span>
+                    <span className="font-sans text-xs font-semibold">{instagramHandle}</span>
                   </span>
                   
                   <span className={`p-3 rounded-xl border flex items-center gap-2.5 text-stone-600 transition-all duration-300 hover:border-amber-500/50 hover:text-stone-900 cursor-pointer ${theme.innerCard}`}>
                     <Twitter className="w-4 h-4 text-stone-500" />
-                    <span className="font-sans text-xs font-semibold">@VanceShipwrights</span>
+                    <span className="font-sans text-xs font-semibold">{twitterHandle}</span>
                   </span>
 
                   <span className={`p-3 rounded-xl border flex items-center gap-2.5 text-stone-600 transition-all duration-300 hover:border-amber-500/50 hover:text-stone-900 cursor-pointer ${theme.innerCard}`}>
                     <Facebook className="w-4 h-4 text-stone-500" />
-                    <span className="font-sans text-xs font-semibold">Cabin Studio</span>
+                    <span className="font-sans text-xs font-semibold">{facebookLabel}</span>
                   </span>
 
                   <span className={`p-3 rounded-xl border flex items-center gap-2.5 text-stone-600 transition-all duration-300 hover:border-amber-500/50 hover:text-stone-900 cursor-pointer ${theme.innerCard}`}>
                     <Linkedin className="w-4 h-4 text-stone-500" />
-                    <span className="font-sans text-xs font-semibold">Julian Vance Forestry</span>
+                    <span className="font-sans text-xs font-semibold">{linkedinLabel}</span>
                   </span>
                 </div>
               </div>
