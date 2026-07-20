@@ -443,6 +443,10 @@ function extractResetToken(message?: string) {
 }
 
 export const authService = {
+  getSavedServiceType(email?: string): ServiceType | undefined {
+    return readSelectedServiceType(email);
+  },
+
   async register(form: RegisterFormState): Promise<AuthResponse> {
     const emailValidationError = getEmailValidationError(form.email);
     if (emailValidationError) {

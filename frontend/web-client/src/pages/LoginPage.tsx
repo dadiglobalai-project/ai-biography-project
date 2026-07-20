@@ -7,12 +7,18 @@ import SuccessView from '../components/SuccessView';
 import { authService } from '../services/authService';
 import { getDashboardPath } from '../utils/dashboardRouting';
 
-async function getPostLoginPath() {
+function getSavedPostLoginPath(email?: string) {
+  return getDashboardPath(authService.getSavedServiceType(email));
+}
+
+async function getPostLoginPath(email?: string) {
   try {
     const dashboard = await authService.getDashboard();
-    return getDashboardPath(dashboard.serviceType);
+    return getDashboardPath(
+      dashboard.serviceType || authService.getSavedServiceType(email || dashboard.user?.email)
+    );
   } catch {
-    return '/preserve-story';
+    return getSavedPostLoginPath(email);
   }
 }
 
@@ -28,7 +34,7 @@ export default function LoginPage() {
     authService.getCurrentUser()
       .then(async (res) => {
         if (active && res.success && res.user) {
-          const path = await getPostLoginPath();
+          const path = await getPostLoginPath(res.user.email);
           if (active) {
             navigate(path, { replace: true });
           }
@@ -51,7 +57,7 @@ export default function LoginPage() {
   const handleLoginSuccess = async (fullName: string, email: string) => {
     setSuccessUser({ fullName, email });
     setIsSubmitted(true);
-    navigate(await getPostLoginPath(), { replace: true });
+    navigate(await getPostLoginPath(email), { replace: true });
   };
 
   const handleContinue = async () => {
