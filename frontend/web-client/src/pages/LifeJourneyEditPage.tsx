@@ -17,6 +17,7 @@ import type { BiographyWebsite, SubjectType } from '../services/authService';
 import type {
   BiographyCategory,
   CustomizerSettings,
+  EditableTemplateSection,
   PersonalDetails,
 } from '../Templates/LifeJourney/types';
 
@@ -66,15 +67,16 @@ const personalFields: Array<{
   field: keyof PersonalDetails;
   label: string;
   multiline?: boolean;
+  section: EditableTemplateSection;
 }> = [
-  { field: 'fullName', label: 'Full name' },
-  { field: 'occupation', label: 'Occupation' },
-  { field: 'tagline', label: 'Tagline', multiline: true },
-  { field: 'birthDetails', label: 'Birth details' },
-  { field: 'location', label: 'Location' },
-  { field: 'shortIntro', label: 'Short intro', multiline: true },
-  { field: 'bioFull', label: 'Biography', multiline: true },
-  { field: 'signatureQuote', label: 'Signature quote', multiline: true },
+  { field: 'fullName', label: 'Full name', section: 'hero' },
+  { field: 'occupation', label: 'Occupation', section: 'hero' },
+  { field: 'tagline', label: 'Tagline', multiline: true, section: 'hero' },
+  { field: 'birthDetails', label: 'Birth details', section: 'timeline' },
+  { field: 'location', label: 'Location', section: 'timeline' },
+  { field: 'shortIntro', label: 'Short intro', multiline: true, section: 'hero' },
+  { field: 'bioFull', label: 'Biography', multiline: true, section: 'about' },
+  { field: 'signatureQuote', label: 'Signature quote', multiline: true, section: 'about' },
 ];
 
 const inputClass =
@@ -104,7 +106,16 @@ export default function LifeJourneyEditPage() {
   const [website, setWebsite] = useState<BiographyWebsite | null>(null);
   const [saveMessage, setSaveMessage] = useState('Unsaved changes');
   const [isSaving, setIsSaving] = useState(false);
+  const [activeEditSection, setActiveEditSection] = useState<EditableTemplateSection | null>(null);
   const websiteId = searchParams.get('websiteId') || '';
+
+  const focusPreviewSection = (section: EditableTemplateSection) => {
+    setActiveEditSection(section);
+    window.requestAnimationFrame(() => {
+      const previewSection = document.getElementById(`${section}-section`);
+      previewSection?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  };
 
   React.useEffect(() => {
     document.title = `Edit ${templateRoute.title} | Xinghuoji`;
@@ -280,6 +291,7 @@ export default function LifeJourneyEditPage() {
                       <textarea
                         rows={item.field === 'bioFull' ? 7 : 3}
                         value={draft.personalDetails[item.field]}
+                        onFocus={() => focusPreviewSection(item.section)}
                         onChange={(event) => updatePersonalDetail(item.field, event.target.value)}
                         className={`${inputClass} resize-y leading-relaxed`}
                       />
@@ -287,6 +299,7 @@ export default function LifeJourneyEditPage() {
                       <input
                         type="text"
                         value={draft.personalDetails[item.field]}
+                        onFocus={() => focusPreviewSection(item.section)}
                         onChange={(event) => updatePersonalDetail(item.field, event.target.value)}
                         className={inputClass}
                       />
@@ -306,6 +319,7 @@ export default function LifeJourneyEditPage() {
                 <span className="text-xs font-bold text-slate-500">Theme</span>
                 <select
                   value={draft.settings.theme}
+                  onFocus={() => setActiveEditSection('style')}
                   onChange={(event) =>
                     updateSettings('theme', event.target.value as CustomizerSettings['theme'])
                   }
@@ -321,6 +335,7 @@ export default function LifeJourneyEditPage() {
                 <span className="text-xs font-bold text-slate-500">Typography</span>
                 <select
                   value={draft.settings.fontPairing}
+                  onFocus={() => setActiveEditSection('style')}
                   onChange={(event) =>
                     updateSettings(
                       'fontPairing',
@@ -339,6 +354,7 @@ export default function LifeJourneyEditPage() {
                 <span className="text-xs font-bold text-slate-500">Spacing</span>
                 <select
                   value={draft.settings.spacing}
+                  onFocus={() => setActiveEditSection('style')}
                   onChange={(event) =>
                     updateSettings('spacing', event.target.value as CustomizerSettings['spacing'])
                   }
@@ -370,7 +386,11 @@ export default function LifeJourneyEditPage() {
             </button>
           </div>
 
-          <LifeJourneyTemplate categoryKey={templateRoute.categoryKey} dataOverride={draft} />
+          <LifeJourneyTemplate
+            categoryKey={templateRoute.categoryKey}
+            dataOverride={draft}
+            activeEditSection={activeEditSection}
+          />
         </section>
       </main>
     </div>

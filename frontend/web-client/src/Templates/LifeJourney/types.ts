@@ -65,6 +65,15 @@ export interface PersonalDetails {
   coordsSub: string;
 }
 
+export type EditableTemplateSection =
+  | 'hero'
+  | 'about'
+  | 'timeline'
+  | 'gallery'
+  | 'stories'
+  | 'contact'
+  | 'style';
+
 export interface BiographyCategory {
   id: 'life' | 'visionary' | 'entrepreneur';
   title: string;
@@ -79,4 +88,3 @@ export interface BiographyCategory {
   gallery: GalleryItem[];
   stories: MemoryStory[];
 }
-
