@@ -204,6 +204,15 @@ export default function LifeJourneyEditPage() {
     });
   };
 
+  const handleDraftChange: React.Dispatch<React.SetStateAction<BiographyCategory>> = (nextDraft) => {
+    setDraft((current) =>
+      typeof nextDraft === 'function'
+        ? (nextDraft as (current: BiographyCategory) => BiographyCategory)(current)
+        : nextDraft
+    );
+    setSaveMessage('Unsaved changes');
+  };
+
   React.useEffect(() => {
     document.title = `Edit ${templateRoute.title} | Xinghuoji`;
   }, [templateRoute.title]);
@@ -829,6 +838,8 @@ export default function LifeJourneyEditPage() {
             categoryKey={templateRoute.categoryKey}
             dataOverride={draft}
             activeEditSection={activeEditorSection}
+            onDataChange={handleDraftChange}
+            onEditSectionChange={setActiveEditorSection}
           />
         </section>
       </main>

@@ -27,18 +27,31 @@ import {
   Mountain
 } from 'lucide-react';
 import { CATEGORIES_DATA } from './data';
-import type { BiographyCategory, EditableTemplateSection } from './types';
+import type {
+  BiographyCategory,
+  EditableTemplateSection,
+  GalleryItem,
+  HobbyItem,
+  MemoryStory,
+  PersonalDetails,
+  TimelineMilestone,
+  ValueItem,
+} from './types';
 
 interface LifeJourneyTemplateProps {
   categoryKey?: BiographyCategory['id'];
   dataOverride?: BiographyCategory;
   activeEditSection?: EditableTemplateSection | null;
+  onDataChange?: React.Dispatch<React.SetStateAction<BiographyCategory>>;
+  onEditSectionChange?: (section: EditableTemplateSection) => void;
 }
 
 export default function LifeJourneyTemplate({
   categoryKey = 'life',
   dataOverride,
   activeEditSection = null,
+  onDataChange,
+  onEditSectionChange,
 }: LifeJourneyTemplateProps) {
   const [formData, setFormData] = useState({
     name: '',
@@ -51,6 +64,7 @@ export default function LifeJourneyTemplate({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const data = dataOverride ?? CATEGORIES_DATA[categoryKey];
+  const isInlineEditable = Boolean(onDataChange);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +162,108 @@ export default function LifeJourneyTemplate({
     }
 
     return 'relative rounded-[2rem] outline outline-4 outline-offset-8 outline-[#FED362] shadow-[0_0_0_8px_rgba(254,211,98,0.16),0_18px_45px_rgba(177,134,37,0.16)] transition-all duration-300';
+  };
+
+  type EditableTextTag = 'span' | 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'div';
+
+  const updatePersonalDetail = (field: keyof PersonalDetails, value: string) => {
+    onDataChange?.((current) => ({
+      ...current,
+      personalDetails: {
+        ...current.personalDetails,
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateValueItem = (index: number, field: keyof ValueItem, value: string) => {
+    onDataChange?.((current) => ({
+      ...current,
+      values: current.values.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item
+      ),
+    }));
+  };
+
+  const updateHobbyItem = (index: number, field: keyof HobbyItem, value: string) => {
+    onDataChange?.((current) => ({
+      ...current,
+      hobbies: current.hobbies.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item
+      ),
+    }));
+  };
+
+  const updateTimelineItem = (index: number, updates: Partial<TimelineMilestone>) => {
+    onDataChange?.((current) => ({
+      ...current,
+      timeline: current.timeline.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...updates } : item
+      ),
+    }));
+  };
+
+  const updateGalleryItem = (index: number, updates: Partial<GalleryItem>) => {
+    onDataChange?.((current) => ({
+      ...current,
+      gallery: current.gallery.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...updates } : item
+      ),
+    }));
+  };
+
+  const updateStoryItem = (index: number, field: keyof MemoryStory, value: string) => {
+    onDataChange?.((current) => ({
+      ...current,
+      stories: current.stories.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item
+      ),
+    }));
+  };
+
+  const editableTextClass = isInlineEditable
+    ? 'cursor-text rounded-md outline-none transition hover:bg-[#FED362]/20 focus:bg-[#FED362]/25 focus:ring-2 focus:ring-[#FED362]/80 focus:ring-offset-2 focus:ring-offset-white'
+    : '';
+
+  const renderEditableText = ({
+    as: Component = 'span',
+    value,
+    className = '',
+    section,
+    multiline = false,
+    onChange,
+  }: {
+    as?: EditableTextTag;
+    value: string;
+    className?: string;
+    section: EditableTemplateSection;
+    multiline?: boolean;
+    onChange: (value: string) => void;
+  }) => {
+    const handleBlur = (event: React.FocusEvent<HTMLElement>) => {
+      const nextValue = event.currentTarget.innerText.replace(/\u00a0/g, ' ').trim();
+      if (nextValue !== value) {
+        onChange(nextValue);
+      }
+    };
+
+    return (
+      <Component
+        className={`${className} ${editableTextClass}`}
+        contentEditable={isInlineEditable}
+        suppressContentEditableWarning
+        onFocus={() => onEditSectionChange?.(section)}
+        onBlur={isInlineEditable ? handleBlur : undefined}
+        onKeyDown={(event) => {
+          if (!multiline && event.key === 'Enter') {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }
+        }}
+      >
+        {value}
+      </Component>
+    );
   };
 
   // Font class bindings
@@ -307,21 +423,35 @@ export default function LifeJourneyTemplate({
                 {data.quote}
               </span>
               
-              <h1 className={`${getHeadingFont()} text-4xl sm:text-5xl md:text-6xl font-black leading-tight text-stone-900 tracking-tight`}>
-                {data.personalDetails.fullName}
-              </h1>
+              {renderEditableText({
+                as: 'h1',
+                value: data.personalDetails.fullName,
+                section: 'hero',
+                className: `${getHeadingFont()} text-4xl sm:text-5xl md:text-6xl font-black leading-tight text-stone-900 tracking-tight`,
+                onChange: (value) => updatePersonalDetail('fullName', value),
+              })}
               
-              <p className={`font-sans font-bold text-lg sm:text-xl leading-snug ${theme.highlight}`}>
-                {data.personalDetails.tagline}
-              </p>
+              {renderEditableText({
+                as: 'p',
+                value: data.personalDetails.tagline,
+                section: 'hero',
+                multiline: true,
+                className: `font-sans font-bold text-lg sm:text-xl leading-snug ${theme.highlight}`,
+                onChange: (value) => updatePersonalDetail('tagline', value),
+              })}
             </div>
 
             <div className={`h-px w-24 ${theme.divider}`} />
 
             {/* Introduction Narrative */}
-            <p className="font-sans text-[14px] md:text-[15px] opacity-90 leading-relaxed font-normal">
-              {data.personalDetails.shortIntro}
-            </p>
+            {renderEditableText({
+              as: 'p',
+              value: data.personalDetails.shortIntro,
+              section: 'hero',
+              multiline: true,
+              className: 'font-sans text-[14px] md:text-[15px] opacity-90 leading-relaxed font-normal',
+              onChange: (value) => updatePersonalDetail('shortIntro', value),
+            })}
 
             <div className="pt-2 flex flex-wrap gap-4">
               <a 
@@ -376,8 +506,20 @@ export default function LifeJourneyTemplate({
                   The Journey of My Hands
                 </h3>
                 <div className="font-sans text-[14px] opacity-95 leading-relaxed space-y-4">
-                  {data.personalDetails.bioFull.split('\n\n').map((paragraph, index) => (
-                    <p key={index}>{paragraph}</p>
+                  {data.personalDetails.bioFull.split('\n\n').map((paragraph, index, paragraphs) => (
+                    <React.Fragment key={index}>
+                      {renderEditableText({
+                        as: 'p',
+                        value: paragraph,
+                        section: 'about',
+                        multiline: true,
+                        onChange: (value) => {
+                          const updatedParagraphs = [...paragraphs];
+                          updatedParagraphs[index] = value;
+                          updatePersonalDetail('bioFull', updatedParagraphs.join('\n\n'));
+                        },
+                      })}
+                    </React.Fragment>
                   ))}
                 </div>
               </div>
@@ -385,9 +527,14 @@ export default function LifeJourneyTemplate({
               {/* Decorative blockquote */}
               <div className="bg-[#FFFDF9] border border-amber-200/50 rounded-2xl p-5 italic text-sm text-stone-700 leading-relaxed font-serif relative mt-2">
                 <span className="text-amber-500 font-bold block mb-1 text-2xl leading-none">“</span>
-                <p className="-mt-2 pl-4">
-                  {data.personalDetails.signatureQuote}
-                </p>
+                {renderEditableText({
+                  as: 'p',
+                  value: data.personalDetails.signatureQuote,
+                  section: 'about',
+                  multiline: true,
+                  className: '-mt-2 pl-4',
+                  onChange: (value) => updatePersonalDetail('signatureQuote', value),
+                })}
               </div>
             </div>
 
@@ -402,18 +549,27 @@ export default function LifeJourneyTemplate({
                 </div>
                 
                 <ul className="space-y-6">
-                  {data.values.map((val) => (
+                  {data.values.map((val, index) => (
                     <li key={val.id} className="flex gap-4 items-start group">
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border mt-0.5 transition-colors bg-orange-50 border-orange-100 text-orange-700">
                         {renderIcon(val.icon, "w-4.5 h-4.5")}
                       </div>
                       <div>
-                        <h5 className="font-serif text-[14px] font-bold text-stone-900">
-                          {val.title}
-                        </h5>
-                        <p className="font-sans text-[11.5px] text-stone-500 leading-relaxed mt-1">
-                          {val.description}
-                        </p>
+                        {renderEditableText({
+                          as: 'h5',
+                          value: val.title,
+                          section: 'about',
+                          className: 'font-serif text-[14px] font-bold text-stone-900',
+                          onChange: (value) => updateValueItem(index, 'title', value),
+                        })}
+                        {renderEditableText({
+                          as: 'p',
+                          value: val.description,
+                          section: 'about',
+                          multiline: true,
+                          className: 'font-sans text-[11.5px] text-stone-500 leading-relaxed mt-1',
+                          onChange: (value) => updateValueItem(index, 'description', value),
+                        })}
                       </div>
                     </li>
                   ))}
@@ -433,7 +589,7 @@ export default function LifeJourneyTemplate({
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-1">
-              {data.hobbies.map((hob) => (
+              {data.hobbies.map((hob, index) => (
                 <div key={hob.id} className="text-left space-y-2 group">
                   <div className="aspect-video rounded-2xl overflow-hidden bg-stone-100 relative border border-stone-200/40 shadow-xs">
                     <img 
@@ -447,12 +603,21 @@ export default function LifeJourneyTemplate({
                       {renderIcon(hob.icon, "w-3.5 h-3.5 text-amber-400")}
                     </div>
                   </div>
-                  <h5 className="font-serif text-xs font-black text-stone-900 pt-1 group-hover:text-amber-700 transition-colors">
-                    {hob.title}
-                  </h5>
-                  <p className="font-sans text-[11px] text-stone-500 leading-relaxed line-clamp-3">
-                    {hob.description}
-                  </p>
+                  {renderEditableText({
+                    as: 'h5',
+                    value: hob.title,
+                    section: 'about',
+                    className: 'font-serif text-xs font-black text-stone-900 pt-1 group-hover:text-amber-700 transition-colors',
+                    onChange: (value) => updateHobbyItem(index, 'title', value),
+                  })}
+                  {renderEditableText({
+                    as: 'p',
+                    value: hob.description,
+                    section: 'about',
+                    multiline: true,
+                    className: 'font-sans text-[11px] text-stone-500 leading-relaxed line-clamp-3',
+                    onChange: (value) => updateHobbyItem(index, 'description', value),
+                  })}
                 </div>
               ))}
             </div>
@@ -493,15 +658,26 @@ export default function LifeJourneyTemplate({
                   
                   {/* Left block of Milestone Card */}
                   <div className={`${milestone.imageUrl ? 'lg:col-span-4' : 'lg:col-span-3'} space-y-2`}>
-                    <span className="px-2.5 py-1 bg-stone-900 text-amber-50 text-[9px] font-mono font-black tracking-widest rounded-md block w-fit">
-                      {milestone.year}
-                    </span>
-                    <h3 className="font-serif text-lg md:text-xl font-bold text-stone-900 leading-tight">
-                      {milestone.title}
-                    </h3>
+                    {renderEditableText({
+                      value: milestone.year,
+                      section: 'timeline',
+                      className: 'px-2.5 py-1 bg-stone-900 text-amber-50 text-[9px] font-mono font-black tracking-widest rounded-md block w-fit',
+                      onChange: (value) => updateTimelineItem(idx, { year: value }),
+                    })}
+                    {renderEditableText({
+                      as: 'h3',
+                      value: milestone.title,
+                      section: 'timeline',
+                      className: 'font-serif text-lg md:text-xl font-bold text-stone-900 leading-tight',
+                      onChange: (value) => updateTimelineItem(idx, { title: value }),
+                    })}
                     <div className="flex items-center gap-1 opacity-70 text-[10px] font-mono uppercase tracking-widest">
                       <MapPin className="w-3.5 h-3.5 shrink-0 text-amber-600" />
-                      <span>{milestone.location}</span>
+                      {renderEditableText({
+                        value: milestone.location,
+                        section: 'timeline',
+                        onChange: (value) => updateTimelineItem(idx, { location: value }),
+                      })}
                     </div>
 
                     {/* Integrated Historical Image (if provided) */}
@@ -515,20 +691,28 @@ export default function LifeJourneyTemplate({
                             referrerPolicy="no-referrer"
                           />
                         </div>
-                        {milestone.imageCaption && (
-                          <p className="font-mono text-[8px] text-stone-400 mt-1 leading-normal italic">
-                            {milestone.imageCaption}
-                          </p>
-                        )}
+                        {milestone.imageCaption && renderEditableText({
+                            as: 'p',
+                            value: milestone.imageCaption,
+                            section: 'timeline',
+                            multiline: true,
+                            className: 'font-mono text-[8px] text-stone-400 mt-1 leading-normal italic',
+                            onChange: (value) => updateTimelineItem(idx, { imageCaption: value }),
+                          })}
                       </div>
                     )}
                   </div>
 
                   {/* Right block of Milestone Card */}
                   <div className={`${milestone.imageUrl ? 'lg:col-span-8' : 'lg:col-span-9'} text-sm leading-relaxed text-stone-600 border-t lg:border-t-0 lg:border-l border-stone-200/40 pt-4 lg:pt-0 lg:pl-6 flex flex-col justify-start lg:justify-between space-y-3 lg:space-y-0 lg:h-full`}>
-                    <p className="italic text-stone-800">
-                      "{milestone.description}"
-                    </p>
+                    {renderEditableText({
+                      as: 'p',
+                      value: milestone.description,
+                      section: 'timeline',
+                      multiline: true,
+                      className: 'italic text-stone-800',
+                      onChange: (value) => updateTimelineItem(idx, { description: value }),
+                    })}
                     
                     <div className="space-y-2 bg-[#FAF8F5]/40 rounded-xl p-4 border border-stone-100/50">
                       <h4 className="font-mono text-[9px] font-extrabold tracking-widest text-stone-450 uppercase">
@@ -538,7 +722,16 @@ export default function LifeJourneyTemplate({
                         {milestone.details.map((detail, dIdx) => (
                           <li key={dIdx} className="flex gap-2 items-start text-stone-700">
                             <span className="text-amber-600 font-bold shrink-0 mt-0.5">▪</span>
-                            <span>{detail}</span>
+                            {renderEditableText({
+                              value: detail,
+                              section: 'timeline',
+                              multiline: true,
+                              onChange: (value) => {
+                                const nextDetails = [...milestone.details];
+                                nextDetails[dIdx] = value;
+                                updateTimelineItem(idx, { details: nextDetails });
+                              },
+                            })}
                           </li>
                         ))}
                       </ul>
@@ -596,19 +789,33 @@ export default function LifeJourneyTemplate({
                     </span>
                     {item.year && (
                       <span className="font-mono text-[9px] text-stone-400 font-bold">
-                        EST. {item.year}
+                        EST.{' '}
+                        {renderEditableText({
+                          value: item.year,
+                          section: 'gallery',
+                          onChange: (value) => updateGalleryItem(idx, { year: value }),
+                        })}
                       </span>
                     )}
                   </div>
                   
-                  <h4 className="font-serif text-base font-bold text-stone-900">
-                    {item.title}
-                  </h4>
+                  {renderEditableText({
+                    as: 'h4',
+                    value: item.title,
+                    section: 'gallery',
+                    className: 'font-serif text-base font-bold text-stone-900',
+                    onChange: (value) => updateGalleryItem(idx, { title: value }),
+                  })}
                 </div>
                 
-                <p className="font-sans text-[11px] text-stone-500 mt-1 leading-relaxed border-t border-stone-100/50 pt-2.5 mt-3">
-                  {item.caption}
-                </p>
+                {renderEditableText({
+                  as: 'p',
+                  value: item.caption,
+                  section: 'gallery',
+                  multiline: true,
+                  className: 'font-sans text-[11px] text-stone-500 mt-1 leading-relaxed border-t border-stone-100/50 pt-2.5 mt-3',
+                  onChange: (value) => updateGalleryItem(idx, { caption: value }),
+                })}
               </div>
             ))}
           </div>
@@ -634,7 +841,7 @@ export default function LifeJourneyTemplate({
 
           {/* Stories Blog Cards Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {data.stories.map((story) => (
+            {data.stories.map((story, index) => (
               <article 
                 key={story.id} 
                 className={`rounded-3xl overflow-hidden border flex flex-col justify-between text-left group transition-all duration-300 ${theme.card} ${theme.accentHover} hover:shadow-md`}
@@ -648,29 +855,46 @@ export default function LifeJourneyTemplate({
                       className="w-full h-full object-cover group-hover:scale-101 transition-transform duration-500"
                       referrerPolicy="no-referrer"
                     />
-                    <div className="absolute top-3 left-3 bg-stone-900/80 backdrop-blur-xs px-2.5 py-1 text-[8px] font-mono text-amber-200 rounded-md tracking-wider uppercase font-black">
-                      {story.category}
-                    </div>
+                    {renderEditableText({
+                      value: story.category,
+                      section: 'stories',
+                      className: 'absolute top-3 left-3 bg-stone-900/80 backdrop-blur-xs px-2.5 py-1 text-[8px] font-mono text-amber-200 rounded-md tracking-wider uppercase font-black',
+                      onChange: (value) => updateStoryItem(index, 'category', value),
+                    })}
                   </div>
 
                   {/* Text content area */}
                   <div className="p-6 space-y-3">
                     <div className="flex items-center justify-between text-[9px] font-mono text-stone-400">
-                      <span className="font-bold uppercase tracking-wider text-orange-600">
-                        {story.readTime}
-                      </span>
-                      <span>
-                        {story.date}
-                      </span>
+                      {renderEditableText({
+                        value: story.readTime,
+                        section: 'stories',
+                        className: 'font-bold uppercase tracking-wider text-orange-600',
+                        onChange: (value) => updateStoryItem(index, 'readTime', value),
+                      })}
+                      {renderEditableText({
+                        value: story.date,
+                        section: 'stories',
+                        onChange: (value) => updateStoryItem(index, 'date', value),
+                      })}
                     </div>
 
-                    <h3 className="font-serif text-lg font-bold text-stone-950 leading-tight group-hover:text-amber-800 transition-colors">
-                      {story.title}
-                    </h3>
+                    {renderEditableText({
+                      as: 'h3',
+                      value: story.title,
+                      section: 'stories',
+                      className: 'font-serif text-lg font-bold text-stone-950 leading-tight group-hover:text-amber-800 transition-colors',
+                      onChange: (value) => updateStoryItem(index, 'title', value),
+                    })}
 
-                    <p className="font-sans text-stone-600 text-xs leading-relaxed line-clamp-4">
-                      {story.shortDescription}
-                    </p>
+                    {renderEditableText({
+                      as: 'p',
+                      value: story.shortDescription,
+                      section: 'stories',
+                      multiline: true,
+                      className: 'font-sans text-stone-600 text-xs leading-relaxed line-clamp-4',
+                      onChange: (value) => updateStoryItem(index, 'shortDescription', value),
+                    })}
                   </div>
                 </div>
 
@@ -720,9 +944,12 @@ export default function LifeJourneyTemplate({
                   </div>
                   <div>
                     <span className="font-mono text-[8px] text-stone-400 block font-bold">CABIN MAILBOX</span>
-                    <span className="font-sans text-xs font-bold text-stone-850 hover:underline cursor-pointer">
-                      {contactEmail}
-                    </span>
+                    {renderEditableText({
+                      value: contactEmail,
+                      section: 'contact',
+                      className: 'font-sans text-xs font-bold text-stone-850 hover:underline cursor-pointer',
+                      onChange: (value) => updatePersonalDetail('contactEmail', value),
+                    })}
                   </div>
                 </div>
               </div>
@@ -735,22 +962,42 @@ export default function LifeJourneyTemplate({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <span className={`p-3 rounded-xl border flex items-center gap-2.5 text-stone-600 transition-all duration-300 hover:border-amber-500/50 hover:text-stone-900 cursor-pointer ${theme.innerCard}`}>
                     <Instagram className="w-4 h-4 text-stone-500" />
-                    <span className="font-sans text-xs font-semibold">{instagramHandle}</span>
+                    {renderEditableText({
+                      value: instagramHandle,
+                      section: 'contact',
+                      className: 'font-sans text-xs font-semibold',
+                      onChange: (value) => updatePersonalDetail('instagramHandle', value),
+                    })}
                   </span>
                   
                   <span className={`p-3 rounded-xl border flex items-center gap-2.5 text-stone-600 transition-all duration-300 hover:border-amber-500/50 hover:text-stone-900 cursor-pointer ${theme.innerCard}`}>
                     <Twitter className="w-4 h-4 text-stone-500" />
-                    <span className="font-sans text-xs font-semibold">{twitterHandle}</span>
+                    {renderEditableText({
+                      value: twitterHandle,
+                      section: 'contact',
+                      className: 'font-sans text-xs font-semibold',
+                      onChange: (value) => updatePersonalDetail('twitterHandle', value),
+                    })}
                   </span>
 
                   <span className={`p-3 rounded-xl border flex items-center gap-2.5 text-stone-600 transition-all duration-300 hover:border-amber-500/50 hover:text-stone-900 cursor-pointer ${theme.innerCard}`}>
                     <Facebook className="w-4 h-4 text-stone-500" />
-                    <span className="font-sans text-xs font-semibold">{facebookLabel}</span>
+                    {renderEditableText({
+                      value: facebookLabel,
+                      section: 'contact',
+                      className: 'font-sans text-xs font-semibold',
+                      onChange: (value) => updatePersonalDetail('facebookLabel', value),
+                    })}
                   </span>
 
                   <span className={`p-3 rounded-xl border flex items-center gap-2.5 text-stone-600 transition-all duration-300 hover:border-amber-500/50 hover:text-stone-900 cursor-pointer ${theme.innerCard}`}>
                     <Linkedin className="w-4 h-4 text-stone-500" />
-                    <span className="font-sans text-xs font-semibold">{linkedinLabel}</span>
+                    {renderEditableText({
+                      value: linkedinLabel,
+                      section: 'contact',
+                      className: 'font-sans text-xs font-semibold',
+                      onChange: (value) => updatePersonalDetail('linkedinLabel', value),
+                    })}
                   </span>
                 </div>
               </div>
