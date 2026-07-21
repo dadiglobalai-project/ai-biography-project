@@ -28,11 +28,16 @@ export const DEFAULT_SECTION_COPY: Record<EditableSectionCopyKey, EditableSectio
 };
 
 export function getSectionCopy(sectionCopy?: Partial<Record<EditableSectionCopyKey, EditableSectionCopy>>) {
+  const mergeCopy = (section: EditableSectionCopyKey): EditableSectionCopy => ({
+    title: DEFAULT_SECTION_COPY[section].title,
+    description: sectionCopy?.[section]?.description ?? DEFAULT_SECTION_COPY[section].description,
+  });
+
   return {
-    about: { ...DEFAULT_SECTION_COPY.about, ...sectionCopy?.about },
-    timeline: { ...DEFAULT_SECTION_COPY.timeline, ...sectionCopy?.timeline },
-    gallery: { ...DEFAULT_SECTION_COPY.gallery, ...sectionCopy?.gallery },
-    stories: { ...DEFAULT_SECTION_COPY.stories, ...sectionCopy?.stories },
-    contact: { ...DEFAULT_SECTION_COPY.contact, ...sectionCopy?.contact },
+    about: mergeCopy('about'),
+    timeline: mergeCopy('timeline'),
+    gallery: mergeCopy('gallery'),
+    stories: mergeCopy('stories'),
+    contact: mergeCopy('contact'),
   };
 }

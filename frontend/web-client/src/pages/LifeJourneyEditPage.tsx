@@ -6,9 +6,11 @@ import {
   Clock3,
   Eye,
   Image as ImageIcon,
+  Lock,
   Mail,
   MessageSquare,
   Palette,
+  PencilLine,
   RotateCcw,
   Save,
   Sparkles,
@@ -16,14 +18,19 @@ import {
   UserRound,
 } from 'lucide-react';
 import LifeJourneyTemplate from '../Templates/LifeJourney/LifeJourneyTemplate';
-import { CATEGORIES_DATA } from '../Templates/LifeJourney/data';
+import {
+  cloneTemplateData,
+  loadDraft,
+  removeDraft,
+  removeTemplateDraft,
+  saveDraft,
+} from '../Templates/LifeJourney/draftStorage';
 import { getBiographyTemplateRoute } from '../Templates/LifeJourney/templateRoutes';
 import { getSectionCopy } from '../Templates/LifeJourney/sectionCopy';
 import { authService } from '../services/authService';
 import type { BiographyWebsite, SubjectType } from '../services/authService';
 import type {
   BiographyCategory,
-  EditableSectionCopy,
   EditableSectionCopyKey,
   CustomizerSettings,
   EditableTemplateSection,
@@ -38,49 +45,6 @@ import type {
 const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
 const SUBJECT_TYPES: SubjectType[] = ['SELF', 'PARENT', 'GRANDPARENT', 'CHILD', 'SPOUSE', 'LOVED_ONE'];
 
-const getStorageKey = (templateId: string) => `xinghuoji.${templateId}.templateDraft`;
-
-const cloneTemplateData = (categoryKey: BiographyCategory['id']): BiographyCategory =>
-  JSON.parse(JSON.stringify(CATEGORIES_DATA[categoryKey])) as BiographyCategory;
-
-const mergeDraft = (
-  savedDraft: BiographyCategory,
-  categoryKey: BiographyCategory['id']
-): BiographyCategory => {
-  const baseline = cloneTemplateData(categoryKey);
-
-  return {
-    ...baseline,
-    ...savedDraft,
-    settings: {
-      ...baseline.settings,
-      ...savedDraft.settings,
-    },
-    personalDetails: {
-      ...baseline.personalDetails,
-      ...savedDraft.personalDetails,
-    },
-    values: savedDraft.values ?? baseline.values,
-    hobbies: savedDraft.hobbies ?? baseline.hobbies,
-    timeline: savedDraft.timeline ?? baseline.timeline,
-    gallery: savedDraft.gallery ?? baseline.gallery,
-    stories: savedDraft.stories ?? baseline.stories,
-    sectionCopy: {
-      ...baseline.sectionCopy,
-      ...savedDraft.sectionCopy,
-    },
-  };
-};
-
-const loadDraft = (templateId: string, categoryKey: BiographyCategory['id']): BiographyCategory => {
-  try {
-    const saved = window.localStorage.getItem(getStorageKey(templateId));
-    return saved ? mergeDraft(JSON.parse(saved) as BiographyCategory, categoryKey) : cloneTemplateData(categoryKey);
-  } catch {
-    return cloneTemplateData(categoryKey);
-  }
-};
-
 type TextFieldConfig = {
   label: string;
   value: string;
@@ -89,6 +53,8 @@ type TextFieldConfig = {
   rows?: number;
   section?: EditableTemplateSection;
 };
+
+type EditorMode = 'edit' | 'preview';
 
 const editorSections: Array<{
   key: EditableTemplateSection;
@@ -191,14 +157,17 @@ export default function LifeJourneyEditPage() {
   const { templateId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const templateRoute = getBiographyTemplateRoute(templateId);
+  const websiteId = searchParams.get('websiteId') || '';
+  const backendTemplateId = searchParams.get('apiTemplateId') || '';
   const [draft, setDraft] = useState<BiographyCategory>(() =>
-    loadDraft(templateRoute.id, templateRoute.categoryKey)
+    loadDraft(templateRoute.id, templateRoute.categoryKey, websiteId)
   );
   const [website, setWebsite] = useState<BiographyWebsite | null>(null);
   const [saveMessage, setSaveMessage] = useState('Unsaved changes');
   const [isSaving, setIsSaving] = useState(false);
+  const [editorMode, setEditorMode] = useState<EditorMode>('edit');
   const [activeEditorSection, setActiveEditorSection] = useState<EditableTemplateSection | null>(null);
-  const websiteId = searchParams.get('websiteId') || '';
+  const isEditMode = editorMode === 'edit';
 
   const focusPreviewSection = (section: EditableTemplateSection) => {
     setActiveEditorSection(section);
@@ -222,10 +191,15 @@ export default function LifeJourneyEditPage() {
   }, [templateRoute.title]);
 
   const openPreviewPage = () => {
+    saveDraft(templateRoute.id, draft, website?.id || websiteId);
+
     const url = new URL(`/diy-dashboard/templates/${templateRoute.id}/preview`, window.location.origin);
     const currentWebsiteId = website?.id || websiteId;
     if (currentWebsiteId) {
       url.searchParams.set('websiteId', currentWebsiteId);
+    }
+    if (backendTemplateId) {
+      url.searchParams.set('apiTemplateId', backendTemplateId);
     }
 
     const opened = window.open(url.toString(), '_blank', 'noopener,noreferrer');
@@ -325,11 +299,7 @@ export default function LifeJourneyEditPage() {
     setSaveMessage('Unsaved changes');
   };
 
-  const updateSectionCopy = (
-    section: EditableSectionCopyKey,
-    field: keyof EditableSectionCopy,
-    value: string
-  ) => {
+  const updateSectionDescription = (section: EditableSectionCopyKey, value: string) => {
     setDraft((current) => {
       const sectionCopy = getSectionCopy(current.sectionCopy);
 
@@ -338,9 +308,8 @@ export default function LifeJourneyEditPage() {
         sectionCopy: {
           ...current.sectionCopy,
           [section]: {
-            ...sectionCopy[section],
-            ...current.sectionCopy?.[section],
-            [field]: value,
+            title: sectionCopy[section].title,
+            description: value,
           },
         },
       };
@@ -421,20 +390,27 @@ export default function LifeJourneyEditPage() {
 
     return (
       <div className="space-y-4 rounded-xl border border-[#FED362]/40 bg-[#FED362]/10 p-4">
-        {renderTextField({
-          label: 'Section title',
-          value: sectionCopy.title,
-          section,
-          onChange: (value) => updateSectionCopy(section, 'title', value),
-        })}
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500">Section title</span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              <Lock className="h-3 w-3" />
+              Fixed
+            </span>
+          </div>
+          <p className="mt-1 text-sm font-semibold text-slate-950">{sectionCopy.title}</p>
+        </div>
         {renderTextField({
           label: 'Section description',
           value: sectionCopy.description,
           multiline: true,
           rows: 3,
           section,
-          onChange: (value) => updateSectionCopy(section, 'description', value),
+          onChange: (value) => updateSectionDescription(section, value),
         })}
+        <p className="text-[11px] leading-relaxed text-slate-500">
+          This description appears below the fixed section title in the template.
+        </p>
       </div>
     );
   };
@@ -728,13 +704,14 @@ export default function LifeJourneyEditPage() {
   };
 
   const handleSave = async () => {
-    window.localStorage.setItem(getStorageKey(templateRoute.id), JSON.stringify(draft));
+    const currentWebsiteId = website?.id || websiteId;
+    saveDraft(templateRoute.id, draft, currentWebsiteId);
 
     setIsSaving(true);
     setSaveMessage('Saving...');
 
     try {
-      if (website?.id || websiteId) {
+      if (currentWebsiteId) {
         notifyBiographyListChanged();
         setSaveMessage('Saved locally. Biography is in My Biographies');
         return;
@@ -742,12 +719,14 @@ export default function LifeJourneyEditPage() {
 
       const savedWebsite = await authService.createBiographyWebsite({
         title: getBiographyTitle(draft, templateRoute.title),
-        templateId: templateRoute.id,
+        templateId: backendTemplateId || templateRoute.id,
         subjectType: getSubjectType(searchParams.get('subjectType') || website?.subjectType),
       });
 
       setWebsite(savedWebsite);
       setSearchParams({ websiteId: savedWebsite.id }, { replace: true });
+      saveDraft(templateRoute.id, draft, savedWebsite.id);
+      removeTemplateDraft(templateRoute.id);
       notifyBiographyListChanged();
       setSaveMessage('Saved to My Biographies');
     } catch (err: any) {
@@ -759,7 +738,7 @@ export default function LifeJourneyEditPage() {
 
   const handleReset = () => {
     const originalDraft = cloneTemplateData(templateRoute.categoryKey);
-    window.localStorage.removeItem(getStorageKey(templateRoute.id));
+    removeDraft(templateRoute.id, website?.id || websiteId);
     setDraft(originalDraft);
     setSaveMessage('Reset to original');
   };
@@ -788,6 +767,32 @@ export default function LifeJourneyEditPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => setEditorMode('edit')}
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
+                  isEditMode
+                    ? 'bg-white text-slate-950 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <PencilLine className="h-4 w-4" />
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditorMode('preview')}
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
+                  !isEditMode
+                    ? 'bg-white text-slate-950 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <Eye className="h-4 w-4" />
+                Preview
+              </button>
+            </div>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
               {saveMessage}
             </span>
@@ -797,7 +802,7 @@ export default function LifeJourneyEditPage() {
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
             >
               <Eye className="h-4 w-4" />
-              Preview
+              Open Preview
             </button>
             <button
               type="button"
@@ -812,7 +817,8 @@ export default function LifeJourneyEditPage() {
         </div>
       </header>
 
-      <main className="grid lg:grid-cols-[360px_minmax(0,1fr)]">
+      <main className={isEditMode ? 'grid lg:grid-cols-[360px_minmax(0,1fr)]' : 'grid'}>
+        {isEditMode && (
         <aside className="border-r border-slate-200 bg-white">
           <div className="p-5 lg:sticky lg:top-[73px] lg:max-h-[calc(100vh-73px)] lg:overflow-y-auto lg:p-6">
             <section className="space-y-5">
@@ -885,31 +891,45 @@ export default function LifeJourneyEditPage() {
             </section>
           </div>
         </aside>
+        )}
 
         <section className="min-w-0 bg-slate-100">
           <div className="sticky top-[73px] z-30 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-100/95 px-4 py-3 backdrop-blur-md lg:px-6">
             <div className="flex items-center gap-2">
-              <Type className="h-4 w-4 text-slate-500" />
-              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                Live Preview
-              </span>
+              {isEditMode ? (
+                <Type className="h-4 w-4 text-slate-500" />
+              ) : (
+                <Eye className="h-4 w-4 text-slate-500" />
+              )}
+              <div>
+                <span className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+                  {isEditMode ? 'Live Preview' : 'Preview Mode'}
+                </span>
+                {!isEditMode && (
+                  <span className="block text-[11px] text-slate-500">
+                    Editing highlights and inline controls are hidden.
+                  </span>
+                )}
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={handleReset}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 transition hover:border-rose-300 hover:text-rose-600"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Reset
-            </button>
+            {isEditMode && (
+              <button
+                type="button"
+                onClick={handleReset}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 transition hover:border-rose-300 hover:text-rose-600"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset
+              </button>
+            )}
           </div>
 
           <LifeJourneyTemplate
             categoryKey={templateRoute.categoryKey}
             dataOverride={draft}
-            activeEditSection={activeEditorSection}
-            onDataChange={handleDraftChange}
-            onEditSectionChange={setActiveEditorSection}
+            activeEditSection={isEditMode ? activeEditorSection : null}
+            onDataChange={isEditMode ? handleDraftChange : undefined}
+            onEditSectionChange={isEditMode ? setActiveEditorSection : undefined}
           />
         </section>
       </main>

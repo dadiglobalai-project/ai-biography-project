@@ -91,6 +91,16 @@ export interface CreateBiographyWebsitePayload {
   subjectType: SubjectType;
 }
 
+export interface BiographyTemplate {
+  templateId: string;
+  name: string;
+  description: string;
+  thumbnailUrl?: string;
+  layoutKey: string;
+  category?: string;
+  premium: boolean;
+}
+
 interface LocalBiographyWebsitePayload {
   title?: string;
   templateId?: string;
@@ -303,6 +313,18 @@ function normalizeBiographyWebsite(data: any): BiographyWebsite {
   };
 }
 
+function normalizeBiographyTemplate(data: any): BiographyTemplate {
+  return {
+    templateId: String(data?.templateId || data?.id || ''),
+    name: String(data?.name || data?.title || 'Untitled Template'),
+    description: String(data?.description || ''),
+    thumbnailUrl: typeof data?.thumbnailUrl === 'string' ? data.thumbnailUrl : undefined,
+    layoutKey: String(data?.layoutKey || data?.templateId || data?.id || ''),
+    category: typeof data?.category === 'string' ? data.category : undefined,
+    premium: Boolean(data?.premium),
+  };
+}
+
 function getLocalBiographyWebsitesStorageKey() {
   const user = readStoredUser();
   const email = user?.email?.trim().toLowerCase() || 'anonymous';
@@ -405,6 +427,22 @@ function getWebsitesFromResponse(data: any) {
 
   if (Array.isArray(data?.biographyWebsites)) {
     return data.biographyWebsites;
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data;
+  }
+
+  return [];
+}
+
+function getTemplatesFromResponse(data: any) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.templates)) {
+    return data.templates;
   }
 
   if (Array.isArray(data?.data)) {
@@ -681,6 +719,25 @@ export const authService = {
       return normalizeBiographyWebsite(getWebsiteFromResponse(data));
     } catch {
       return createLocalBiographyWebsite(payload);
+    }
+  },
+
+  async getBiographyTemplates(): Promise<BiographyTemplate[]> {
+    try {
+      const response = await fetch(apiUrl('/api/templates'), {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to load biography templates'));
+      }
+
+      return getTemplatesFromResponse(data).map(normalizeBiographyTemplate);
+    } catch {
+      return [];
     }
   },
 

@@ -30,7 +30,6 @@ import { CATEGORIES_DATA } from './data';
 import { getSectionCopy } from './sectionCopy';
 import type {
   BiographyCategory,
-  EditableSectionCopy,
   EditableSectionCopyKey,
   EditableTemplateSection,
   GalleryItem,
@@ -239,19 +238,14 @@ export default function LifeJourneyTemplate({
     }));
   };
 
-  const updateSectionCopy = (
-    section: EditableSectionCopyKey,
-    field: keyof EditableSectionCopy,
-    value: string
-  ) => {
+  const updateSectionDescription = (section: EditableSectionCopyKey, value: string) => {
     onDataChange?.((current) => ({
       ...current,
       sectionCopy: {
         ...current.sectionCopy,
         [section]: {
-          ...sectionCopy[section],
-          ...current.sectionCopy?.[section],
-          [field]: value,
+          title: sectionCopy[section].title,
+          description: value,
         },
       },
     }));
@@ -527,20 +521,16 @@ export default function LifeJourneyTemplate({
             <span className="px-2.5 py-0.5 bg-orange-100 text-orange-800 font-mono text-[9px] tracking-widest font-black uppercase rounded-sm inline-block mb-3">
               02 / THE ARCHIVAL ESSENCE
             </span>
-            {renderEditableText({
-              as: 'h2',
-              value: sectionCopy.about.title,
-              section: 'about',
-              className: `${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight text-stone-900`,
-              onChange: (value) => updateSectionCopy('about', 'title', value),
-            })}
+            <h2 className={`${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight text-stone-900`}>
+              {sectionCopy.about.title}
+            </h2>
             {renderEditableText({
               as: 'p',
               value: sectionCopy.about.description,
               section: 'about',
               multiline: true,
               className: 'font-sans text-xs md:text-sm text-stone-500 mt-1.5',
-              onChange: (value) => updateSectionCopy('about', 'description', value),
+              onChange: (value) => updateSectionDescription('about', value),
             })}
           </div>
 
@@ -692,20 +682,16 @@ export default function LifeJourneyTemplate({
             <span className="px-2.5 py-0.5 bg-indigo-100 text-indigo-800 font-mono text-[9px] tracking-widest font-black uppercase rounded-sm inline-block mb-3">
               03 / CHRONOLOGY OF ERAS
             </span>
-            {renderEditableText({
-              as: 'h2',
-              value: sectionCopy.timeline.title,
-              section: 'timeline',
-              className: `${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight text-stone-900`,
-              onChange: (value) => updateSectionCopy('timeline', 'title', value),
-            })}
+            <h2 className={`${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight text-stone-900`}>
+              {sectionCopy.timeline.title}
+            </h2>
             {renderEditableText({
               as: 'p',
               value: sectionCopy.timeline.description,
               section: 'timeline',
               multiline: true,
               className: 'font-sans text-xs md:text-sm text-stone-500 mt-1.5',
-              onChange: (value) => updateSectionCopy('timeline', 'description', value),
+              onChange: (value) => updateSectionDescription('timeline', value),
             })}
           </div>
 
@@ -826,20 +812,16 @@ export default function LifeJourneyTemplate({
             <span className="px-2.5 py-0.5 bg-orange-100 text-orange-800 font-mono text-[9px] tracking-widest font-black uppercase rounded-sm inline-block mb-3">
               04 / MULTIMEDIA ARCHIVES
             </span>
-            {renderEditableText({
-              as: 'h2',
-              value: sectionCopy.gallery.title,
-              section: 'gallery',
-              className: `${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight text-stone-900`,
-              onChange: (value) => updateSectionCopy('gallery', 'title', value),
-            })}
+            <h2 className={`${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight text-stone-900`}>
+              {sectionCopy.gallery.title}
+            </h2>
             {renderEditableText({
               as: 'p',
               value: sectionCopy.gallery.description,
               section: 'gallery',
               multiline: true,
               className: 'font-sans text-xs md:text-sm text-stone-500 mt-1.5',
-              onChange: (value) => updateSectionCopy('gallery', 'description', value),
+              onChange: (value) => updateSectionDescription('gallery', value),
             })}
           </div>
 
@@ -915,20 +897,16 @@ export default function LifeJourneyTemplate({
             <span className="px-2.5 py-0.5 bg-indigo-100 text-indigo-800 font-mono text-[9px] tracking-widest font-black uppercase rounded-sm inline-block mb-3">
               05 / CHRONICLE NARRATIVES
             </span>
-            {renderEditableText({
-              as: 'h2',
-              value: sectionCopy.stories.title,
-              section: 'stories',
-              className: `${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight text-stone-900`,
-              onChange: (value) => updateSectionCopy('stories', 'title', value),
-            })}
+            <h2 className={`${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight text-stone-900`}>
+              {sectionCopy.stories.title}
+            </h2>
             {renderEditableText({
               as: 'p',
               value: sectionCopy.stories.description,
               section: 'stories',
               multiline: true,
               className: 'font-sans text-xs md:text-sm text-stone-500 mt-1.5',
-              onChange: (value) => updateSectionCopy('stories', 'description', value),
+              onChange: (value) => updateSectionDescription('stories', value),
             })}
           </div>
 
@@ -1026,20 +1004,16 @@ export default function LifeJourneyTemplate({
                   <span className="px-2.5 py-0.5 bg-indigo-100 text-indigo-800 font-mono text-[9px] tracking-widest font-black uppercase rounded-sm inline-block">
                     06 / REACH OUT
                   </span>
-                  {renderEditableText({
-                    as: 'h2',
-                    value: sectionCopy.contact.title,
-                    section: 'contact',
-                    className: `${getHeadingFont()} text-3xl font-black text-stone-900`,
-                    onChange: (value) => updateSectionCopy('contact', 'title', value),
-                  })}
+                  <h2 className={`${getHeadingFont()} text-3xl font-black text-stone-900`}>
+                    {sectionCopy.contact.title}
+                  </h2>
                   {renderEditableText({
                     as: 'p',
                     value: sectionCopy.contact.description,
                     section: 'contact',
                     multiline: true,
                     className: 'font-sans text-xs text-stone-500 leading-relaxed',
-                    onChange: (value) => updateSectionCopy('contact', 'description', value),
+                    onChange: (value) => updateSectionDescription('contact', value),
                   })}
                 </div>
 

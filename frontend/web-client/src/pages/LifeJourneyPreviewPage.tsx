@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, PenTool } from 'lucide-react';
 import LifeJourneyTemplate from '../Templates/LifeJourney/LifeJourneyTemplate';
+import { loadDraft } from '../Templates/LifeJourney/draftStorage';
 import { getBiographyTemplateRoute } from '../Templates/LifeJourney/templateRoutes';
 
 export default function LifeJourneyPreviewPage() {
@@ -9,6 +10,8 @@ export default function LifeJourneyPreviewPage() {
   const { templateId } = useParams();
   const [searchParams] = useSearchParams();
   const templateRoute = getBiographyTemplateRoute(templateId);
+  const websiteId = searchParams.get('websiteId') || '';
+  const previewDraft = loadDraft(templateRoute.id, templateRoute.categoryKey, websiteId);
 
   React.useEffect(() => {
     document.title = `${templateRoute.title} Preview | Xinghuoji`;
@@ -19,6 +22,10 @@ export default function LifeJourneyPreviewPage() {
     const websiteId = searchParams.get('websiteId');
     if (websiteId) {
       url.searchParams.set('websiteId', websiteId);
+    }
+    const backendTemplateId = searchParams.get('apiTemplateId');
+    if (backendTemplateId) {
+      url.searchParams.set('apiTemplateId', backendTemplateId);
     }
 
     const opened = window.open(url.toString(), '_blank', 'noopener,noreferrer');
@@ -48,7 +55,7 @@ export default function LifeJourneyPreviewPage() {
         </button>
       </div>
 
-      <LifeJourneyTemplate categoryKey={templateRoute.categoryKey} />
+      <LifeJourneyTemplate categoryKey={templateRoute.categoryKey} dataOverride={previewDraft} />
     </div>
   );
 }

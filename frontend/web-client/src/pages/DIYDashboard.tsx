@@ -18,7 +18,7 @@ import {
   Star,
   AlertCircle
 } from 'lucide-react';
-import { authService, BiographyWebsite, SubjectType } from '../services/authService';
+import { authService, BiographyTemplate, BiographyWebsite, SubjectType } from '../services/authService';
 import BrandLogo from '../components/BrandLogo';
 import lifeJourneyPreviewImage from '../Templates/LifeJourney/assets/images/life-journey-thumbnail.png';
 
@@ -36,6 +36,7 @@ const SUBJECT_TYPE_BY_RELATION: Record<RelationType, SubjectType> = {
 
 interface Template {
   id: string;
+  backendTemplateId?: string;
   title: string;
   subtitle: string;
   description: string;
@@ -52,6 +53,7 @@ export default function DIYDashboard() {
   const [hoveredTemplate, setHoveredTemplate] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [backendTemplates, setBackendTemplates] = useState<BiographyTemplate[]>([]);
   const [biographies, setBiographies] = useState<BiographyWebsite[]>([]);
   const [isLoadingBiographies, setIsLoadingBiographies] = useState(false);
   const [biographyError, setBiographyError] = useState<string | null>(null);
@@ -59,6 +61,11 @@ export default function DIYDashboard() {
   
   // Custom dialog or modal states
   const [modalContent, setModalContent] = useState<{ title: string; desc: string } | null>(null);
+
+  const loadTemplates = React.useCallback(async () => {
+    const templates = await authService.getBiographyTemplates();
+    setBackendTemplates(templates);
+  }, []);
 
   const loadBiographies = React.useCallback(async () => {
     setIsLoadingBiographies(true);
@@ -128,6 +135,7 @@ export default function DIYDashboard() {
         setDashboardError(message);
       }
 
+      await loadTemplates();
       await loadBiographies();
     };
 
@@ -136,7 +144,7 @@ export default function DIYDashboard() {
     return () => {
       active = false;
     };
-  }, [loadBiographies, navigate]);
+  }, [loadBiographies, loadTemplates, navigate]);
 
   React.useEffect(() => {
     const refreshBiographies = () => {
@@ -183,7 +191,7 @@ export default function DIYDashboard() {
   const displayName = currentUser?.fullName || 'User';
   const selectedSubjectType = SUBJECT_TYPE_BY_RELATION[selectedRelation];
 
-  const templates: Template[] = [
+  const baseTemplates: Template[] = [
     {
       id: 'visionary-legacy',
       title: 'Visionary Legacy',
@@ -216,9 +224,30 @@ export default function DIYDashboard() {
     }
   ];
 
+  const templates = React.useMemo(() => {
+    return baseTemplates.map((template) => {
+      const backendTemplate = backendTemplates.find(
+        (item) => item.layoutKey === template.id || item.templateId === template.id
+      );
+
+      if (!backendTemplate) {
+        return template;
+      }
+
+      return {
+        ...template,
+        backendTemplateId: backendTemplate.templateId,
+        title: backendTemplate.name || template.title,
+        description: backendTemplate.description || template.description,
+        imageUrl: backendTemplate.thumbnailUrl || template.imageUrl,
+        tag: backendTemplate.category || template.tag,
+      };
+    });
+  }, [backendTemplates]);
+
   const buildTemplatePageUrl = (
     path: string,
-    options: { website?: BiographyWebsite; subjectType?: SubjectType } = {}
+    options: { website?: BiographyWebsite; subjectType?: SubjectType; template?: Template } = {}
   ) => {
     const url = new URL(path, window.location.origin);
     if (options.website?.id) {
@@ -227,13 +256,16 @@ export default function DIYDashboard() {
     if (options.subjectType) {
       url.searchParams.set('subjectType', options.subjectType);
     }
+    if (options.template?.backendTemplateId) {
+      url.searchParams.set('apiTemplateId', options.template.backendTemplateId);
+    }
 
     return url.toString();
   };
 
   const openTemplatePage = (
     path: string,
-    options: { website?: BiographyWebsite; subjectType?: SubjectType } = {}
+    options: { website?: BiographyWebsite; subjectType?: SubjectType; template?: Template } = {}
   ) => {
     const pageUrl = buildTemplatePageUrl(path, options);
 
@@ -275,7 +307,7 @@ export default function DIYDashboard() {
 
   const handlePreviewTemplate = (template: Template) => {
     if (template.previewPath) {
-      const opened = openTemplatePage(template.previewPath);
+      const opened = openTemplatePage(template.previewPath, { template });
       if (!opened) {
         setModalContent({
           title: `${template.title} Preview`,
@@ -291,8 +323,14 @@ export default function DIYDashboard() {
     });
   };
 
+  const getTemplateByIdentifier = (templateId: string) => {
+    return templates.find(
+      (template) => template.id === templateId || template.backendTemplateId === templateId
+    );
+  };
+
   const getEditorPath = (templateId: string) => {
-    return templates.find((template) => template.id === templateId)?.editPath || '';
+    return getTemplateByIdentifier(templateId)?.editPath || '';
   };
 
   const handleOpenBiography = (website: BiographyWebsite) => {
@@ -336,7 +374,7 @@ export default function DIYDashboard() {
     }
 
     setSelectedTemplateId(template.id);
-    const opened = openTemplatePage(template.editPath, { subjectType: selectedSubjectType });
+    const opened = openTemplatePage(template.editPath, { subjectType: selectedSubjectType, template });
     if (!opened) {
       setModalContent({
         title: `${template.title} Editor`,
@@ -496,6 +534,7 @@ export default function DIYDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {biographies.map((website) => {
                 const isOpening = openingWebsiteId === website.id;
+                const websiteTemplate = getTemplateByIdentifier(website.templateId);
                 return (
                   <button
                     key={website.id || `${website.templateId}-${website.title}`}
@@ -509,7 +548,7 @@ export default function DIYDashboard() {
                         <div className="flex items-center gap-2 text-[#B18625]">
                           <BookOpen className="w-4 h-4 shrink-0" />
                           <span className="text-[10px] font-mono font-bold uppercase tracking-wider">
-                            {website.templateId || 'Template'}
+                            {websiteTemplate?.title || website.templateId || 'Template'}
                           </span>
                         </div>
                         <h3 className="font-serif-display text-xl font-semibold text-[#0A1128] truncate">
