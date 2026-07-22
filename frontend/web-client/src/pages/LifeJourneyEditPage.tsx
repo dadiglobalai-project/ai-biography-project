@@ -54,8 +54,6 @@ type TextFieldConfig = {
   section?: EditableTemplateSection;
 };
 
-type EditorMode = 'edit' | 'preview';
-
 const editorSections: Array<{
   key: EditableTemplateSection;
   label: string;
@@ -165,9 +163,7 @@ export default function LifeJourneyEditPage() {
   const [website, setWebsite] = useState<BiographyWebsite | null>(null);
   const [saveMessage, setSaveMessage] = useState('Unsaved changes');
   const [isSaving, setIsSaving] = useState(false);
-  const [editorMode, setEditorMode] = useState<EditorMode>('edit');
   const [activeEditorSection, setActiveEditorSection] = useState<EditableTemplateSection | null>(null);
-  const isEditMode = editorMode === 'edit';
 
   const focusPreviewSection = (section: EditableTemplateSection) => {
     setActiveEditorSection(section);
@@ -189,6 +185,24 @@ export default function LifeJourneyEditPage() {
   React.useEffect(() => {
     document.title = `Edit ${templateRoute.title} | Xinghuoji`;
   }, [templateRoute.title]);
+
+  const openPreviewPage = () => {
+    saveDraft(templateRoute.id, draft, website?.id || websiteId);
+
+    const url = new URL(`/diy-dashboard/templates/${templateRoute.id}/preview`, window.location.origin);
+    const currentWebsiteId = website?.id || websiteId;
+    if (currentWebsiteId) {
+      url.searchParams.set('websiteId', currentWebsiteId);
+    }
+    if (backendTemplateId) {
+      url.searchParams.set('apiTemplateId', backendTemplateId);
+    }
+
+    const opened = window.open(url.toString(), '_blank', 'noopener,noreferrer');
+    if (!opened) {
+      navigate(`${url.pathname}${url.search}`);
+    }
+  };
 
   React.useEffect(() => {
     if (!websiteId) {
@@ -752,24 +766,15 @@ export default function LifeJourneyEditPage() {
             <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
               <button
                 type="button"
-                onClick={() => setEditorMode('edit')}
-                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
-                  isEditMode
-                    ? 'bg-white text-slate-950 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
+                className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-950 shadow-sm transition"
               >
                 <PencilLine className="h-4 w-4" />
                 Edit
               </button>
               <button
                 type="button"
-                onClick={() => setEditorMode('preview')}
-                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
-                  !isEditMode
-                    ? 'bg-white text-slate-950 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
+                onClick={openPreviewPage}
+                className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-500 transition hover:text-slate-900"
               >
                 <Eye className="h-4 w-4" />
                 Preview
@@ -791,8 +796,7 @@ export default function LifeJourneyEditPage() {
         </div>
       </header>
 
-      <main className={isEditMode ? 'grid lg:grid-cols-[360px_minmax(0,1fr)]' : 'grid'}>
-        {isEditMode && (
+      <main className="grid lg:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="border-r border-slate-200 bg-white">
           <div className="p-5 lg:sticky lg:top-[73px] lg:max-h-[calc(100vh-73px)] lg:overflow-y-auto lg:p-6">
             <section className="space-y-5">
@@ -865,45 +869,33 @@ export default function LifeJourneyEditPage() {
             </section>
           </div>
         </aside>
-        )}
 
         <section className="min-w-0 bg-slate-100">
           <div className="sticky top-[73px] z-30 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-100/95 px-4 py-3 backdrop-blur-md lg:px-6">
             <div className="flex items-center gap-2">
-              {isEditMode ? (
-                <Type className="h-4 w-4 text-slate-500" />
-              ) : (
-                <Eye className="h-4 w-4 text-slate-500" />
-              )}
+              <Type className="h-4 w-4 text-slate-500" />
               <div>
                 <span className="block text-xs font-bold uppercase tracking-wide text-slate-500">
-                  {isEditMode ? 'Live Preview' : 'Preview Mode'}
+                  Live Preview
                 </span>
-                {!isEditMode && (
-                  <span className="block text-[11px] text-slate-500">
-                    Editing highlights and inline controls are hidden.
-                  </span>
-                )}
               </div>
             </div>
-            {isEditMode && (
-              <button
-                type="button"
-                onClick={handleReset}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 transition hover:border-rose-300 hover:text-rose-600"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Reset
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleReset}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 transition hover:border-rose-300 hover:text-rose-600"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset
+            </button>
           </div>
 
           <LifeJourneyTemplate
             categoryKey={templateRoute.categoryKey}
             dataOverride={draft}
-            activeEditSection={isEditMode ? activeEditorSection : null}
-            onDataChange={isEditMode ? handleDraftChange : undefined}
-            onEditSectionChange={isEditMode ? setActiveEditorSection : undefined}
+            activeEditSection={activeEditorSection}
+            onDataChange={handleDraftChange}
+            onEditSectionChange={setActiveEditorSection}
           />
         </section>
       </main>
