@@ -190,24 +190,6 @@ export default function LifeJourneyEditPage() {
     document.title = `Edit ${templateRoute.title} | Xinghuoji`;
   }, [templateRoute.title]);
 
-  const openPreviewPage = () => {
-    saveDraft(templateRoute.id, draft, website?.id || websiteId);
-
-    const url = new URL(`/diy-dashboard/templates/${templateRoute.id}/preview`, window.location.origin);
-    const currentWebsiteId = website?.id || websiteId;
-    if (currentWebsiteId) {
-      url.searchParams.set('websiteId', currentWebsiteId);
-    }
-    if (backendTemplateId) {
-      url.searchParams.set('apiTemplateId', backendTemplateId);
-    }
-
-    const opened = window.open(url.toString(), '_blank', 'noopener,noreferrer');
-    if (!opened) {
-      setSaveMessage('Your browser blocked the preview tab');
-    }
-  };
-
   React.useEffect(() => {
     if (!websiteId) {
       return;
@@ -796,14 +778,6 @@ export default function LifeJourneyEditPage() {
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
               {saveMessage}
             </span>
-            <button
-              type="button"
-              onClick={openPreviewPage}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
-            >
-              <Eye className="h-4 w-4" />
-              Open Preview
-            </button>
             <button
               type="button"
               onClick={handleSave}
