@@ -9,13 +9,16 @@ import {
   Lock,
   Mail,
   MessageSquare,
+  Monitor,
   Palette,
   PencilLine,
   RotateCcw,
   Save,
   Sparkles,
+  Smartphone,
   Type,
   UserRound,
+  X,
 } from 'lucide-react';
 import LifeJourneyTemplate from '../Templates/LifeJourney/LifeJourneyTemplate';
 import {
@@ -36,14 +39,17 @@ import type {
   EditableTemplateSection,
   GalleryItem,
   HobbyItem,
+  ImageDisplaySettings,
   MemoryStory,
   PersonalDetails,
+  TextDisplaySettings,
   TimelineMilestone,
   ValueItem,
 } from '../Templates/LifeJourney/types';
 
 const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
 const SUBJECT_TYPES: SubjectType[] = ['SELF', 'PARENT', 'GRANDPARENT', 'CHILD', 'SPOUSE', 'LOVED_ONE'];
+const AUTO_SAVE_DELAY_MS = 1500;
 
 type TextFieldConfig = {
   label: string;
@@ -53,6 +59,43 @@ type TextFieldConfig = {
   rows?: number;
   section?: EditableTemplateSection;
 };
+
+type SelectFieldConfig = {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+  section?: EditableTemplateSection;
+};
+
+type PreviewViewport = 'desktop' | 'mobile';
+
+type PersonalTextFieldKey = {
+  [K in keyof PersonalDetails]: PersonalDetails[K] extends string | undefined ? K : never;
+}[keyof PersonalDetails];
+
+const IMAGE_SIZE_OPTIONS = [
+  { value: 'compact', label: 'Compact' },
+  { value: 'default', label: 'Default' },
+  { value: 'tall', label: 'Tall' },
+];
+
+const IMAGE_FIT_OPTIONS = [
+  { value: 'cover', label: 'Fill frame' },
+  { value: 'contain', label: 'Show full image' },
+];
+
+const IMAGE_POSITION_OPTIONS = [
+  { value: 'center', label: 'Center' },
+  { value: 'top', label: 'Top' },
+  { value: 'bottom', label: 'Bottom' },
+];
+
+const TEXT_SIZE_OPTIONS = [
+  { value: 'small', label: 'Small' },
+  { value: 'default', label: 'Default' },
+  { value: 'large', label: 'Large' },
+];
 
 const editorSections: Array<{
   key: EditableTemplateSection;
@@ -107,7 +150,7 @@ const editorSections: Array<{
 const personalFieldsBySection: Record<
   Extract<EditableTemplateSection, 'hero' | 'about' | 'timeline' | 'contact'>,
   Array<{
-    field: keyof PersonalDetails;
+    field: PersonalTextFieldKey;
     label: string;
     multiline?: boolean;
     rows?: number;
@@ -163,7 +206,13 @@ export default function LifeJourneyEditPage() {
   const [website, setWebsite] = useState<BiographyWebsite | null>(null);
   const [saveMessage, setSaveMessage] = useState('Unsaved changes');
   const [isSaving, setIsSaving] = useState(false);
+  const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
   const [activeEditorSection, setActiveEditorSection] = useState<EditableTemplateSection | null>(null);
+  const [isMobileEditorOpen, setIsMobileEditorOpen] = useState(false);
+  const hasMountedDraftRef = React.useRef(false);
+  const activeWebsiteId = website?.id || websiteId;
+
+  const shouldUseMobileEditor = () => window.matchMedia('(max-width: 1023px)').matches;
 
   const focusPreviewSection = (section: EditableTemplateSection) => {
     setActiveEditorSection(section);
@@ -171,6 +220,20 @@ export default function LifeJourneyEditPage() {
       const previewSection = document.getElementById(`${section}-section`);
       previewSection?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
+  };
+
+  const handleEditSectionChange = (section: EditableTemplateSection) => {
+    setActiveEditorSection(section);
+    if (shouldUseMobileEditor()) {
+      setIsMobileEditorOpen(true);
+    }
+  };
+
+  const handleOpenStyleEditor = () => {
+    setActiveEditorSection('style');
+    if (shouldUseMobileEditor()) {
+      setIsMobileEditorOpen(true);
+    }
   };
 
   const handleDraftChange: React.Dispatch<React.SetStateAction<BiographyCategory>> = (nextDraft) => {
@@ -186,13 +249,34 @@ export default function LifeJourneyEditPage() {
     document.title = `Edit ${templateRoute.title} | Xinghuoji`;
   }, [templateRoute.title]);
 
+  React.useEffect(() => {
+    if (!hasMountedDraftRef.current) {
+      hasMountedDraftRef.current = true;
+      return;
+    }
+
+    const autosaveTimer = window.setTimeout(() => {
+      saveDraft(templateRoute.id, draft, activeWebsiteId);
+      setSaveMessage((currentMessage) => {
+        if (currentMessage !== 'Unsaved changes') {
+          return currentMessage;
+        }
+
+        return activeWebsiteId
+          ? 'Autosaved locally'
+          : 'Autosaved locally. Click Save to add to My Biographies';
+      });
+    }, AUTO_SAVE_DELAY_MS);
+
+    return () => window.clearTimeout(autosaveTimer);
+  }, [activeWebsiteId, draft, templateRoute.id]);
+
   const openPreviewPage = () => {
-    saveDraft(templateRoute.id, draft, website?.id || websiteId);
+    saveDraft(templateRoute.id, draft, activeWebsiteId);
 
     const url = new URL(`/diy-dashboard/templates/${templateRoute.id}/preview`, window.location.origin);
-    const currentWebsiteId = website?.id || websiteId;
-    if (currentWebsiteId) {
-      url.searchParams.set('websiteId', currentWebsiteId);
+    if (activeWebsiteId) {
+      url.searchParams.set('websiteId', activeWebsiteId);
     }
     if (backendTemplateId) {
       url.searchParams.set('apiTemplateId', backendTemplateId);
@@ -234,7 +318,7 @@ export default function LifeJourneyEditPage() {
     };
   }, [websiteId]);
 
-  const updatePersonalDetail = (field: keyof PersonalDetails, value: string) => {
+  const updatePersonalDetail = (field: PersonalTextFieldKey, value: string) => {
     setDraft((current) => ({
       ...current,
       personalDetails: {
@@ -245,7 +329,42 @@ export default function LifeJourneyEditPage() {
     setSaveMessage('Unsaved changes');
   };
 
-  const updateValueItem = (index: number, field: keyof ValueItem, value: string) => {
+  const updateProfileImageSettings = (updates: ImageDisplaySettings) => {
+    setDraft((current) => ({
+      ...current,
+      personalDetails: {
+        ...current.personalDetails,
+        profileImageSettings: {
+          ...(current.personalDetails.profileImageSettings || {}),
+          ...updates,
+        },
+      },
+    }));
+    setSaveMessage('Unsaved changes');
+  };
+
+  const updatePersonalTextSettings = (
+    field:
+      | 'taglineTextSettings'
+      | 'shortIntroTextSettings'
+      | 'bioTextSettings'
+      | 'signatureQuoteTextSettings',
+    updates: TextDisplaySettings
+  ) => {
+    setDraft((current) => ({
+      ...current,
+      personalDetails: {
+        ...current.personalDetails,
+        [field]: {
+          ...(current.personalDetails[field] || {}),
+          ...updates,
+        },
+      },
+    }));
+    setSaveMessage('Unsaved changes');
+  };
+
+  const updateValueItem = <K extends keyof ValueItem>(index: number, field: K, value: ValueItem[K]) => {
     setDraft((current) => ({
       ...current,
       values: current.values.map((item, itemIndex) =>
@@ -255,7 +374,7 @@ export default function LifeJourneyEditPage() {
     setSaveMessage('Unsaved changes');
   };
 
-  const updateHobbyItem = (index: number, field: keyof HobbyItem, value: string) => {
+  const updateHobbyItem = <K extends keyof HobbyItem>(index: number, field: K, value: HobbyItem[K]) => {
     setDraft((current) => ({
       ...current,
       hobbies: current.hobbies.map((item, itemIndex) =>
@@ -285,7 +404,7 @@ export default function LifeJourneyEditPage() {
     setSaveMessage('Unsaved changes');
   };
 
-  const updateStoryItem = (index: number, field: keyof MemoryStory, value: string) => {
+  const updateStoryItem = <K extends keyof MemoryStory>(index: number, field: K, value: MemoryStory[K]) => {
     setDraft((current) => ({
       ...current,
       stories: current.stories.map((item, itemIndex) =>
@@ -306,6 +425,32 @@ export default function LifeJourneyEditPage() {
           [section]: {
             title: sectionCopy[section].title,
             description: value,
+            descriptionTextSettings: current.sectionCopy?.[section]?.descriptionTextSettings,
+          },
+        },
+      };
+    });
+    setSaveMessage('Unsaved changes');
+  };
+
+  const updateSectionDescriptionTextSettings = (
+    section: EditableSectionCopyKey,
+    updates: TextDisplaySettings
+  ) => {
+    setDraft((current) => {
+      const sectionCopy = getSectionCopy(current.sectionCopy);
+
+      return {
+        ...current,
+        sectionCopy: {
+          ...current.sectionCopy,
+          [section]: {
+            title: sectionCopy[section].title,
+            description: sectionCopy[section].description,
+            descriptionTextSettings: {
+              ...(sectionCopy[section].descriptionTextSettings || {}),
+              ...updates,
+            },
           },
         },
       };
@@ -357,6 +502,118 @@ export default function LifeJourneyEditPage() {
     </label>
   );
 
+  const renderSelectField = ({
+    label,
+    value,
+    options,
+    onChange,
+    section = activeEditorSection ?? 'hero',
+  }: SelectFieldConfig) => (
+    <label className="block space-y-1.5">
+      <span className="text-xs font-bold text-slate-500">{label}</span>
+      <select
+        value={value}
+        onFocus={() => focusPreviewSection(section)}
+        onChange={(event) => onChange(event.target.value)}
+        className={inputClass}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
+  const renderImageDisplayFields = ({
+    section,
+    settings,
+    onChange,
+  }: {
+    section: EditableTemplateSection;
+    settings?: ImageDisplaySettings;
+    onChange: (settings: ImageDisplaySettings) => void;
+  }) => {
+    const currentSettings: Required<ImageDisplaySettings> = {
+      size: settings?.size || 'default',
+      fit: settings?.fit || 'cover',
+      position: settings?.position || 'center',
+    };
+
+    const updateImageSettings = (updates: ImageDisplaySettings) => {
+      onChange({
+        ...currentSettings,
+        ...updates,
+      });
+    };
+
+    return (
+      <div className="space-y-3 rounded-xl border border-slate-100 bg-white p-4">
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wide text-slate-700">
+            Image Display
+          </h4>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+            Size changes the image frame, so nearby content moves with it.
+          </p>
+        </div>
+        {renderSelectField({
+          label: 'Image size',
+          value: currentSettings.size,
+          options: IMAGE_SIZE_OPTIONS,
+          section,
+          onChange: (value) => updateImageSettings({ size: value as ImageDisplaySettings['size'] }),
+        })}
+        {renderSelectField({
+          label: 'Image fit',
+          value: currentSettings.fit,
+          options: IMAGE_FIT_OPTIONS,
+          section,
+          onChange: (value) => updateImageSettings({ fit: value as ImageDisplaySettings['fit'] }),
+        })}
+        {renderSelectField({
+          label: 'Image position',
+          value: currentSettings.position,
+          options: IMAGE_POSITION_OPTIONS,
+          section,
+          onChange: (value) => updateImageSettings({ position: value as ImageDisplaySettings['position'] }),
+        })}
+      </div>
+    );
+  };
+
+  const renderTextDisplayFields = ({
+    title = 'Text Display',
+    section,
+    settings,
+    onChange,
+  }: {
+    title?: string;
+    section: EditableTemplateSection;
+    settings?: TextDisplaySettings;
+    onChange: (settings: TextDisplaySettings) => void;
+  }) => {
+    const currentSettings: Required<TextDisplaySettings> = {
+      size: settings?.size || 'default',
+    };
+
+    return (
+      <div className="space-y-3 rounded-xl border border-slate-100 bg-white p-4">
+        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-700">
+          {title}
+        </h4>
+        {renderSelectField({
+          label: 'Text size',
+          value: currentSettings.size,
+          options: TEXT_SIZE_OPTIONS,
+          section,
+          onChange: (value) => onChange({ size: value as TextDisplaySettings['size'] }),
+        })}
+      </div>
+    );
+  };
+
   const renderPersonalFields = (
     section: Extract<EditableTemplateSection, 'hero' | 'about' | 'timeline' | 'contact'>
   ) => {
@@ -404,6 +661,12 @@ export default function LifeJourneyEditPage() {
           section,
           onChange: (value) => updateSectionDescription(section, value),
         })}
+        {renderTextDisplayFields({
+          title: 'Section Description Text',
+          section,
+          settings: sectionCopy.descriptionTextSettings,
+          onChange: (settings) => updateSectionDescriptionTextSettings(section, settings),
+        })}
         <p className="text-[11px] leading-relaxed text-slate-500">
           This description appears below the fixed section title in the template.
         </p>
@@ -414,13 +677,46 @@ export default function LifeJourneyEditPage() {
   const renderSectionEditor = () => {
     switch (activeEditorSection) {
       case 'hero':
-        return renderPersonalFields('hero');
+        return (
+          <div className="space-y-6">
+            {renderPersonalFields('hero')}
+            {renderTextDisplayFields({
+              title: 'Tagline Text',
+              section: 'hero',
+              settings: draft.personalDetails.taglineTextSettings,
+              onChange: (settings) => updatePersonalTextSettings('taglineTextSettings', settings),
+            })}
+            {renderTextDisplayFields({
+              title: 'Introduction Text',
+              section: 'hero',
+              settings: draft.personalDetails.shortIntroTextSettings,
+              onChange: (settings) => updatePersonalTextSettings('shortIntroTextSettings', settings),
+            })}
+            {renderImageDisplayFields({
+              section: 'hero',
+              settings: draft.personalDetails.profileImageSettings,
+              onChange: updateProfileImageSettings,
+            })}
+          </div>
+        );
 
       case 'about':
         return (
           <div className="space-y-6">
             {renderSectionCopyFields('about')}
             {renderPersonalFields('about')}
+            {renderTextDisplayFields({
+              title: 'Biography Summary Text',
+              section: 'about',
+              settings: draft.personalDetails.bioTextSettings,
+              onChange: (settings) => updatePersonalTextSettings('bioTextSettings', settings),
+            })}
+            {renderTextDisplayFields({
+              title: 'Signature Quote Text',
+              section: 'about',
+              settings: draft.personalDetails.signatureQuoteTextSettings,
+              onChange: (settings) => updatePersonalTextSettings('signatureQuoteTextSettings', settings),
+            })}
 
             <div className="space-y-3 border-t border-slate-100 pt-5">
               <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700">
@@ -440,6 +736,12 @@ export default function LifeJourneyEditPage() {
                     multiline: true,
                     section: 'about',
                     onChange: (value) => updateValueItem(index, 'description', value),
+                  })}
+                  {renderTextDisplayFields({
+                    title: `Value ${index + 1} Text`,
+                    section: 'about',
+                    settings: item.textSettings,
+                    onChange: (textSettings) => updateValueItem(index, 'textSettings', textSettings),
                   })}
                 </div>
               ))}
@@ -464,11 +766,22 @@ export default function LifeJourneyEditPage() {
                     section: 'about',
                     onChange: (value) => updateHobbyItem(index, 'description', value),
                   })}
+                  {renderTextDisplayFields({
+                    title: `Interest ${index + 1} Text`,
+                    section: 'about',
+                    settings: item.textSettings,
+                    onChange: (textSettings) => updateHobbyItem(index, 'textSettings', textSettings),
+                  })}
                   {renderTextField({
                     label: `Interest ${index + 1} image URL`,
                     value: item.imageUrl,
                     section: 'about',
                     onChange: (value) => updateHobbyItem(index, 'imageUrl', value),
+                  })}
+                  {renderImageDisplayFields({
+                    section: 'about',
+                    settings: item.imageSettings,
+                    onChange: (imageSettings) => updateHobbyItem(index, 'imageSettings', imageSettings),
                   })}
                 </div>
               ))}
@@ -523,6 +836,30 @@ export default function LifeJourneyEditPage() {
                         details: value.split('\n').map((detail) => detail.trim()).filter(Boolean),
                       }),
                   })}
+                  {renderTextDisplayFields({
+                    title: `Milestone ${index + 1} Text`,
+                    section: 'timeline',
+                    settings: item.textSettings,
+                    onChange: (textSettings) => updateTimelineItem(index, { textSettings }),
+                  })}
+                  {renderTextField({
+                    label: `Milestone ${index + 1} image URL`,
+                    value: item.imageUrl || '',
+                    section: 'timeline',
+                    onChange: (value) => updateTimelineItem(index, { imageUrl: value }),
+                  })}
+                  {renderTextField({
+                    label: `Milestone ${index + 1} image caption`,
+                    value: item.imageCaption || '',
+                    multiline: true,
+                    section: 'timeline',
+                    onChange: (value) => updateTimelineItem(index, { imageCaption: value }),
+                  })}
+                  {renderImageDisplayFields({
+                    section: 'timeline',
+                    settings: item.imageSettings,
+                    onChange: (imageSettings) => updateTimelineItem(index, { imageSettings }),
+                  })}
                 </div>
               ))}
             </div>
@@ -571,12 +908,23 @@ export default function LifeJourneyEditPage() {
                   section: 'gallery',
                   onChange: (value) => updateGalleryItem(index, { imageUrl: value }),
                 })}
+                {renderImageDisplayFields({
+                  section: 'gallery',
+                  settings: item.imageSettings,
+                  onChange: (imageSettings) => updateGalleryItem(index, { imageSettings }),
+                })}
                 {renderTextField({
                   label: `Gallery item ${index + 1} caption`,
                   value: item.caption,
                   multiline: true,
                   section: 'gallery',
                   onChange: (value) => updateGalleryItem(index, { caption: value }),
+                })}
+                {renderTextDisplayFields({
+                  title: `Gallery Item ${index + 1} Text`,
+                  section: 'gallery',
+                  settings: item.textSettings,
+                  onChange: (textSettings) => updateGalleryItem(index, { textSettings }),
                 })}
               </div>
             ))}
@@ -619,12 +967,23 @@ export default function LifeJourneyEditPage() {
                   section: 'stories',
                   onChange: (value) => updateStoryItem(index, 'imageUrl', value),
                 })}
+                {renderImageDisplayFields({
+                  section: 'stories',
+                  settings: item.imageSettings,
+                  onChange: (imageSettings) => updateStoryItem(index, 'imageSettings', imageSettings),
+                })}
                 {renderTextField({
                   label: `Story ${index + 1} short description`,
                   value: item.shortDescription,
                   multiline: true,
                   section: 'stories',
                   onChange: (value) => updateStoryItem(index, 'shortDescription', value),
+                })}
+                {renderTextDisplayFields({
+                  title: `Story ${index + 1} Text`,
+                  section: 'stories',
+                  settings: item.textSettings,
+                  onChange: (textSettings) => updateStoryItem(index, 'textSettings', textSettings),
                 })}
               </div>
             ))}
@@ -700,14 +1059,13 @@ export default function LifeJourneyEditPage() {
   };
 
   const handleSave = async () => {
-    const currentWebsiteId = website?.id || websiteId;
-    saveDraft(templateRoute.id, draft, currentWebsiteId);
+    saveDraft(templateRoute.id, draft, activeWebsiteId);
 
     setIsSaving(true);
     setSaveMessage('Saving...');
 
     try {
-      if (currentWebsiteId) {
+      if (activeWebsiteId) {
         notifyBiographyListChanged();
         setSaveMessage('Saved locally. Biography is in My Biographies');
         return;
@@ -734,9 +1092,92 @@ export default function LifeJourneyEditPage() {
 
   const handleReset = () => {
     const originalDraft = cloneTemplateData(templateRoute.categoryKey);
-    removeDraft(templateRoute.id, website?.id || websiteId);
+    removeDraft(templateRoute.id, activeWebsiteId);
     setDraft(originalDraft);
     setSaveMessage('Reset to original');
+  };
+
+  const renderEditorPanel = (variant: 'desktop' | 'mobile' = 'desktop') => {
+    const selectedSection = activeEditorSection
+      ? editorSections.find((section) => section.key === activeEditorSection)
+      : null;
+    const Icon = selectedSection?.icon || Sparkles;
+
+    return (
+      <section className="space-y-5">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-[#B18625]" />
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Section Editor</h2>
+              <p className="text-[11px] text-slate-500">
+                Click any section in the live preview to edit it here.
+              </p>
+            </div>
+          </div>
+          {variant === 'mobile' && (
+            <button
+              type="button"
+              onClick={() => setIsMobileEditorOpen(false)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-slate-900 hover:text-slate-900"
+              aria-label="Close editor"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {activeEditorSection && selectedSection ? (
+          <div className="space-y-5">
+            <div className="flex items-center gap-3 rounded-xl border border-[#FED362] bg-[#FED362]/15 px-3 py-3 text-left text-slate-950 shadow-sm">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#FED362] bg-white text-[#B18625]">
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs font-bold uppercase tracking-wide">
+                  {selectedSection.label}
+                </span>
+                <span className="block truncate text-[11px] text-slate-500">
+                  {selectedSection.description}
+                </span>
+              </span>
+            </div>
+
+            <div className="border-t border-slate-100 pt-5">
+              <div className="mb-4">
+                <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
+                  Editing
+                </p>
+                <h3 className="text-lg font-bold text-slate-950">
+                  {selectedSection.label}
+                </h3>
+              </div>
+
+              {renderSectionEditor()}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+            <Sparkles className="mx-auto h-5 w-5 text-[#B18625]" />
+            <h3 className="mt-3 text-sm font-bold text-slate-900">
+              No Section Selected
+            </h3>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+              Click the Hero, About, Life Journey, Gallery, Stories, or Contact area in the live preview.
+            </p>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={handleOpenStyleEditor}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-700 transition hover:border-[#FED362] hover:text-slate-950"
+        >
+          <Palette className="h-4 w-4 text-[#B18625]" />
+          Edit Template Style
+        </button>
+      </section>
+    );
   };
 
   return (
@@ -797,76 +1238,9 @@ export default function LifeJourneyEditPage() {
       </header>
 
       <main className="grid lg:grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="border-r border-slate-200 bg-white">
+        <aside className="hidden border-r border-slate-200 bg-white lg:block">
           <div className="p-5 lg:sticky lg:top-[73px] lg:max-h-[calc(100vh-73px)] lg:overflow-y-auto lg:p-6">
-            <section className="space-y-5">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                <Sparkles className="h-4 w-4 text-[#B18625]" />
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900">Section Editor</h2>
-                  <p className="text-[11px] text-slate-500">
-                    Click any section in the live preview to edit it here.
-                  </p>
-                </div>
-              </div>
-
-              {activeEditorSection ? (
-                <div className="space-y-5">
-                  {(() => {
-                    const selectedSection = editorSections.find((section) => section.key === activeEditorSection);
-                    const Icon = selectedSection?.icon || Sparkles;
-
-                    return (
-                      <div className="flex items-center gap-3 rounded-xl border border-[#FED362] bg-[#FED362]/15 px-3 py-3 text-left text-slate-950 shadow-sm">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#FED362] bg-white text-[#B18625]">
-                          <Icon className="h-4 w-4" />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-xs font-bold uppercase tracking-wide">
-                            {selectedSection?.label}
-                          </span>
-                          <span className="block truncate text-[11px] text-slate-500">
-                            {selectedSection?.description}
-                          </span>
-                        </span>
-                      </div>
-                    );
-                  })()}
-
-                  <div className="border-t border-slate-100 pt-5">
-                    <div className="mb-4">
-                      <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
-                        Editing
-                      </p>
-                      <h3 className="text-lg font-bold text-slate-950">
-                        {editorSections.find((section) => section.key === activeEditorSection)?.label}
-                      </h3>
-                    </div>
-
-                    {renderSectionEditor()}
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
-                  <Sparkles className="mx-auto h-5 w-5 text-[#B18625]" />
-                  <h3 className="mt-3 text-sm font-bold text-slate-900">
-                    No Section Selected
-                  </h3>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                    Click the Hero, About, Life Journey, Gallery, Stories, or Contact area in the live preview.
-                  </p>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setActiveEditorSection('style')}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-700 transition hover:border-[#FED362] hover:text-slate-950"
-              >
-                <Palette className="h-4 w-4 text-[#B18625]" />
-                Edit Template Style
-              </button>
-            </section>
+            {renderEditorPanel('desktop')}
           </div>
         </aside>
 
@@ -878,27 +1252,96 @@ export default function LifeJourneyEditPage() {
                 <span className="block text-xs font-bold uppercase tracking-wide text-slate-500">
                   Live Preview
                 </span>
+                <span className="block text-[11px] text-slate-500">
+                  {previewViewport === 'mobile' ? 'Mobile width' : 'Desktop width'}
+                </span>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleReset}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 transition hover:border-rose-300 hover:text-rose-600"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Reset
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+                <button
+                  type="button"
+                  onClick={() => setPreviewViewport('desktop')}
+                  className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
+                    previewViewport === 'desktop'
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <Monitor className="h-3.5 w-3.5" />
+                  Desktop
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewViewport('mobile')}
+                  className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
+                    previewViewport === 'mobile'
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <Smartphone className="h-3.5 w-3.5" />
+                  Mobile
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 transition hover:border-rose-300 hover:text-rose-600"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset
+              </button>
+            </div>
           </div>
 
-          <LifeJourneyTemplate
-            categoryKey={templateRoute.categoryKey}
-            dataOverride={draft}
-            activeEditSection={activeEditorSection}
-            onDataChange={handleDraftChange}
-            onEditSectionChange={setActiveEditorSection}
-          />
+          <div className={previewViewport === 'mobile' ? 'bg-slate-200 px-3 py-6 sm:px-6 lg:px-8' : ''}>
+            <div
+              className={
+                previewViewport === 'mobile'
+                  ? 'mx-auto max-w-[390px] overflow-hidden rounded-[2rem] border border-slate-300 bg-white shadow-2xl'
+                  : ''
+              }
+            >
+              <LifeJourneyTemplate
+                categoryKey={templateRoute.categoryKey}
+                dataOverride={draft}
+                activeEditSection={activeEditorSection}
+                onDataChange={handleDraftChange}
+                onEditSectionChange={handleEditSectionChange}
+              />
+            </div>
+          </div>
         </section>
       </main>
+
+      {!isMobileEditorOpen && (
+        <button
+          type="button"
+          onClick={() => setIsMobileEditorOpen(true)}
+          className="fixed bottom-5 right-5 z-[70] inline-flex items-center gap-2 rounded-full bg-black px-5 py-3 text-xs font-bold uppercase tracking-wide text-white shadow-xl transition active:scale-[0.98] lg:hidden"
+        >
+          <PencilLine className="h-4 w-4" />
+          {activeEditorSection
+            ? `Edit ${editorSections.find((section) => section.key === activeEditorSection)?.label || 'Section'}`
+            : 'Edit Section'}
+        </button>
+      )}
+
+      {isMobileEditorOpen && (
+        <div className="fixed inset-0 z-[90] lg:hidden">
+          <button
+            type="button"
+            onClick={() => setIsMobileEditorOpen(false)}
+            className="absolute inset-0 h-full w-full bg-slate-950/45 backdrop-blur-[2px]"
+            aria-label="Close editor backdrop"
+          />
+          <div className="absolute inset-x-0 bottom-0 max-h-[84vh] overflow-y-auto rounded-t-[1.75rem] border border-slate-200 bg-white px-5 pb-8 pt-4 shadow-2xl">
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200" />
+            {renderEditorPanel('mobile')}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -34,8 +34,10 @@ import type {
   EditableTemplateSection,
   GalleryItem,
   HobbyItem,
+  ImageDisplaySettings,
   MemoryStory,
   PersonalDetails,
+  TextDisplaySettings,
   TimelineMilestone,
   ValueItem,
 } from './types';
@@ -246,6 +248,7 @@ export default function LifeJourneyTemplate({
         [section]: {
           title: sectionCopy[section].title,
           description: value,
+          descriptionTextSettings: current.sectionCopy?.[section]?.descriptionTextSettings,
         },
       },
     }));
@@ -306,6 +309,127 @@ export default function LifeJourneyTemplate({
       case 'classic':
       default:
         return 'font-serif font-black tracking-tight';
+    }
+  };
+
+  const getImageSizeClass = (
+    area: 'profile' | 'hobby' | 'timeline' | 'gallery' | 'story',
+    settings?: ImageDisplaySettings
+  ) => {
+    const size = settings?.size || 'default';
+
+    switch (area) {
+      case 'profile':
+        return size === 'compact'
+          ? 'aspect-square'
+          : size === 'tall'
+            ? 'aspect-[3/5]'
+            : 'aspect-[4/5]';
+
+      case 'hobby':
+        return size === 'compact'
+          ? 'aspect-[16/7]'
+          : size === 'tall'
+            ? 'aspect-[4/3]'
+            : 'aspect-video';
+
+      case 'timeline':
+        return size === 'compact'
+          ? 'aspect-[12/5]'
+          : size === 'tall'
+            ? 'aspect-[4/3]'
+            : 'aspect-[19/10]';
+
+      case 'gallery':
+        return size === 'compact'
+          ? 'aspect-video'
+          : size === 'tall'
+            ? 'aspect-[3/4]'
+            : 'aspect-[4/3]';
+
+      case 'story':
+      default:
+        return size === 'compact'
+          ? 'aspect-[2/1]'
+          : size === 'tall'
+            ? 'aspect-[4/3]'
+            : 'aspect-[16/10]';
+    }
+  };
+
+  const getImageFitClass = (settings?: ImageDisplaySettings) =>
+    settings?.fit === 'contain' ? 'object-contain' : 'object-cover';
+
+  const getImagePositionClass = (settings?: ImageDisplaySettings) => {
+    switch (settings?.position) {
+      case 'top':
+        return 'object-top';
+      case 'bottom':
+        return 'object-bottom';
+      case 'center':
+      default:
+        return 'object-center';
+    }
+  };
+
+  const getTextSizeClass = (
+    area: 'heroTagline' | 'heroIntro' | 'sectionDescription' | 'body' | 'quote' | 'cardDescription' | 'timelineBody' | 'detail' | 'caption',
+    settings?: TextDisplaySettings
+  ) => {
+    const size = settings?.size || 'default';
+
+    switch (area) {
+      case 'heroTagline':
+        return size === 'small'
+          ? 'text-base sm:text-lg'
+          : size === 'large'
+            ? 'text-xl sm:text-2xl'
+            : 'text-lg sm:text-xl';
+
+      case 'heroIntro':
+      case 'body':
+        return size === 'small'
+          ? 'text-[13px] md:text-sm'
+          : size === 'large'
+            ? 'text-base md:text-lg'
+            : 'text-[14px] md:text-[15px]';
+
+      case 'sectionDescription':
+        return size === 'small'
+          ? 'text-[11px] md:text-xs'
+          : size === 'large'
+            ? 'text-sm md:text-base'
+            : 'text-xs md:text-sm';
+
+      case 'quote':
+        return size === 'small'
+          ? 'text-xs'
+          : size === 'large'
+            ? 'text-base'
+            : 'text-sm';
+
+      case 'timelineBody':
+        return size === 'small'
+          ? 'text-xs'
+          : size === 'large'
+            ? 'text-base'
+            : 'text-sm';
+
+      case 'detail':
+        return size === 'small'
+          ? 'text-[11px]'
+          : size === 'large'
+            ? 'text-sm'
+            : 'text-xs';
+
+      case 'caption':
+      case 'cardDescription':
+      default:
+        return size === 'small'
+          ? 'text-[10px]'
+          : size === 'large'
+            ? 'text-xs'
+            : 'text-[11px]';
     }
   };
 
@@ -427,11 +551,11 @@ export default function LifeJourneyTemplate({
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-tr from-amber-500 to-indigo-500 rounded-3xl blur-2xl opacity-15 group-hover:opacity-25 transition-all duration-700 -z-10 scale-[1.01]" />
               
-              <div className="aspect-[4/5] rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-stone-150 relative">
+              <div className={`${getImageSizeClass('profile', data.personalDetails.profileImageSettings)} rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-stone-150 relative`}>
                 <img 
                   src={profileImageUrl} 
                   alt={data.personalDetails.fullName} 
-                  className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-700 filter brightness-95 contrast-[1.02]"
+                  className={`w-full h-full ${getImageFitClass(data.personalDetails.profileImageSettings)} ${getImagePositionClass(data.personalDetails.profileImageSettings)} group-hover:scale-102 transition-transform duration-700 filter brightness-95 contrast-[1.02]`}
                   referrerPolicy="no-referrer"
                   id="hero-portrait"
                 />
@@ -468,12 +592,12 @@ export default function LifeJourneyTemplate({
               
               {renderEditableText({
                 as: 'p',
-                value: data.personalDetails.tagline,
-                section: 'hero',
-                multiline: true,
-                className: `font-sans font-bold text-lg sm:text-xl leading-snug ${theme.highlight}`,
-                onChange: (value) => updatePersonalDetail('tagline', value),
-              })}
+              value: data.personalDetails.tagline,
+              section: 'hero',
+              multiline: true,
+                className: `font-sans font-bold ${getTextSizeClass('heroTagline', data.personalDetails.taglineTextSettings)} leading-snug ${theme.highlight}`,
+              onChange: (value) => updatePersonalDetail('tagline', value),
+            })}
             </div>
 
             <div className={`h-px w-24 ${theme.divider}`} />
@@ -484,7 +608,7 @@ export default function LifeJourneyTemplate({
               value: data.personalDetails.shortIntro,
               section: 'hero',
               multiline: true,
-              className: 'font-sans text-[14px] md:text-[15px] opacity-90 leading-relaxed font-normal',
+              className: `font-sans ${getTextSizeClass('heroIntro', data.personalDetails.shortIntroTextSettings)} opacity-90 leading-relaxed font-normal`,
               onChange: (value) => updatePersonalDetail('shortIntro', value),
             })}
 
@@ -529,7 +653,7 @@ export default function LifeJourneyTemplate({
               value: sectionCopy.about.description,
               section: 'about',
               multiline: true,
-              className: 'font-sans text-xs md:text-sm text-stone-500 mt-1.5',
+              className: `font-sans ${getTextSizeClass('sectionDescription', sectionCopy.about.descriptionTextSettings)} text-stone-500 mt-1.5`,
               onChange: (value) => updateSectionDescription('about', value),
             })}
           </div>
@@ -549,7 +673,7 @@ export default function LifeJourneyTemplate({
                 <h3 className="font-serif text-2xl font-bold text-stone-900 leading-tight">
                   The Journey of My Hands
                 </h3>
-                <div className="font-sans text-[14px] opacity-95 leading-relaxed space-y-4">
+                <div className={`font-sans ${getTextSizeClass('body', data.personalDetails.bioTextSettings)} opacity-95 leading-relaxed space-y-4`}>
                   {data.personalDetails.bioFull.split('\n\n').map((paragraph, index, paragraphs) => (
                     <React.Fragment key={index}>
                       {renderEditableText({
@@ -569,7 +693,7 @@ export default function LifeJourneyTemplate({
               </div>
 
               {/* Decorative blockquote */}
-              <div className="bg-[#FFFDF9] border border-amber-200/50 rounded-2xl p-5 italic text-sm text-stone-700 leading-relaxed font-serif relative mt-2">
+              <div className={`bg-[#FFFDF9] border border-amber-200/50 rounded-2xl p-5 italic ${getTextSizeClass('quote', data.personalDetails.signatureQuoteTextSettings)} text-stone-700 leading-relaxed font-serif relative mt-2`}>
                 <span className="text-amber-500 font-bold block mb-1 text-2xl leading-none">“</span>
                 {renderEditableText({
                   as: 'p',
@@ -611,7 +735,7 @@ export default function LifeJourneyTemplate({
                           value: val.description,
                           section: 'about',
                           multiline: true,
-                          className: 'font-sans text-[11.5px] text-stone-500 leading-relaxed mt-1',
+                          className: `font-sans ${getTextSizeClass('cardDescription', val.textSettings)} text-stone-500 leading-relaxed mt-1`,
                           onChange: (value) => updateValueItem(index, 'description', value),
                         })}
                       </div>
@@ -635,11 +759,11 @@ export default function LifeJourneyTemplate({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-1">
               {data.hobbies.map((hob, index) => (
                 <div key={hob.id} className="text-left space-y-2 group">
-                  <div className="aspect-video rounded-2xl overflow-hidden bg-stone-100 relative border border-stone-200/40 shadow-xs">
+                  <div className={`${getImageSizeClass('hobby', hob.imageSettings)} rounded-2xl overflow-hidden bg-stone-100 relative border border-stone-200/40 shadow-xs`}>
                     <img 
                       src={hob.imageUrl} 
                       alt={hob.title} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      className={`w-full h-full ${getImageFitClass(hob.imageSettings)} ${getImagePositionClass(hob.imageSettings)} group-hover:scale-105 transition-transform duration-500`}
                       referrerPolicy="no-referrer"
                     />
                     <div className="absolute inset-0 bg-black/5" />
@@ -659,7 +783,7 @@ export default function LifeJourneyTemplate({
                     value: hob.description,
                     section: 'about',
                     multiline: true,
-                    className: 'font-sans text-[11px] text-stone-500 leading-relaxed line-clamp-3',
+                    className: `font-sans ${getTextSizeClass('cardDescription', hob.textSettings)} text-stone-500 leading-relaxed line-clamp-3`,
                     onChange: (value) => updateHobbyItem(index, 'description', value),
                   })}
                 </div>
@@ -690,7 +814,7 @@ export default function LifeJourneyTemplate({
               value: sectionCopy.timeline.description,
               section: 'timeline',
               multiline: true,
-              className: 'font-sans text-xs md:text-sm text-stone-500 mt-1.5',
+              className: `font-sans ${getTextSizeClass('sectionDescription', sectionCopy.timeline.descriptionTextSettings)} text-stone-500 mt-1.5`,
               onChange: (value) => updateSectionDescription('timeline', value),
             })}
           </div>
@@ -736,11 +860,11 @@ export default function LifeJourneyTemplate({
                     {/* Integrated Historical Image (if provided) */}
                     {milestone.imageUrl && (
                       <div className="pt-2">
-                        <div className="rounded-xl overflow-hidden aspect-[1.9/1] bg-stone-100 border border-stone-200/50 p-1 bg-white shadow-xs">
+                        <div className={`${getImageSizeClass('timeline', milestone.imageSettings)} rounded-xl overflow-hidden bg-stone-100 border border-stone-200/50 p-1 bg-white shadow-xs`}>
                           <img 
                             src={milestone.imageUrl} 
                             alt={milestone.title} 
-                            className="w-full h-full object-cover rounded-lg filter sepia-[0.1]"
+                            className={`w-full h-full ${getImageFitClass(milestone.imageSettings)} ${getImagePositionClass(milestone.imageSettings)} rounded-lg filter sepia-[0.1]`}
                             referrerPolicy="no-referrer"
                           />
                         </div>
@@ -757,7 +881,7 @@ export default function LifeJourneyTemplate({
                   </div>
 
                   {/* Right block of Milestone Card */}
-                  <div className={`${milestone.imageUrl ? 'lg:col-span-8' : 'lg:col-span-9'} text-sm leading-relaxed text-stone-600 border-t lg:border-t-0 lg:border-l border-stone-200/40 pt-4 lg:pt-0 lg:pl-6 flex flex-col justify-start lg:justify-between space-y-3 lg:space-y-0 lg:h-full`}>
+                  <div className={`${milestone.imageUrl ? 'lg:col-span-8' : 'lg:col-span-9'} ${getTextSizeClass('timelineBody', milestone.textSettings)} leading-relaxed text-stone-600 border-t lg:border-t-0 lg:border-l border-stone-200/40 pt-4 lg:pt-0 lg:pl-6 flex flex-col justify-start lg:justify-between space-y-3 lg:space-y-0 lg:h-full`}>
                     {renderEditableText({
                       as: 'p',
                       value: milestone.description,
@@ -771,7 +895,7 @@ export default function LifeJourneyTemplate({
                       <h4 className="font-mono text-[9px] font-extrabold tracking-widest text-stone-450 uppercase">
                         ACHIEVEMENTS / RECOLLECTIONS
                       </h4>
-                      <ul className="list-none space-y-1.5 font-sans text-xs">
+                      <ul className={`list-none space-y-1.5 font-sans ${getTextSizeClass('detail', milestone.textSettings)}`}>
                         {milestone.details.map((detail, dIdx) => (
                           <li key={dIdx} className="flex gap-2 items-start text-stone-700">
                             <span className="text-amber-600 font-bold shrink-0 mt-0.5">▪</span>
@@ -820,7 +944,7 @@ export default function LifeJourneyTemplate({
               value: sectionCopy.gallery.description,
               section: 'gallery',
               multiline: true,
-              className: 'font-sans text-xs md:text-sm text-stone-500 mt-1.5',
+              className: `font-sans ${getTextSizeClass('sectionDescription', sectionCopy.gallery.descriptionTextSettings)} text-stone-500 mt-1.5`,
               onChange: (value) => updateSectionDescription('gallery', value),
             })}
           </div>
@@ -833,11 +957,11 @@ export default function LifeJourneyTemplate({
                 className={`rounded-2xl border p-4 text-left group transition-all duration-300 flex flex-col justify-between ${theme.card} ${theme.accentHover} hover:shadow-md`}
               >
                 <div>
-                  <div className="aspect-[4/3] rounded-xl overflow-hidden bg-stone-100 mb-4 border border-stone-200/20 relative">
+                  <div className={`${getImageSizeClass('gallery', item.imageSettings)} rounded-xl overflow-hidden bg-stone-100 mb-4 border border-stone-200/20 relative`}>
                     <img 
                       src={item.imageUrl} 
                       alt={item.title} 
-                      className="w-full h-full object-cover group-hover:scale-103 transition-all duration-500 filter contrast-[1.02]"
+                      className={`w-full h-full ${getImageFitClass(item.imageSettings)} ${getImagePositionClass(item.imageSettings)} group-hover:scale-103 transition-all duration-500 filter contrast-[1.02]`}
                       referrerPolicy="no-referrer"
                     />
                     <span className="absolute top-3 right-3 bg-stone-900/80 backdrop-blur-xs px-2 py-0.5 text-[8px] font-mono text-white rounded-md tracking-wider">
@@ -875,7 +999,7 @@ export default function LifeJourneyTemplate({
                   value: item.caption,
                   section: 'gallery',
                   multiline: true,
-                  className: 'font-sans text-[11px] text-stone-500 mt-1 leading-relaxed border-t border-stone-100/50 pt-2.5 mt-3',
+                  className: `font-sans ${getTextSizeClass('caption', item.textSettings)} text-stone-500 mt-1 leading-relaxed border-t border-stone-100/50 pt-2.5 mt-3`,
                   onChange: (value) => updateGalleryItem(idx, { caption: value }),
                 })}
               </div>
@@ -905,7 +1029,7 @@ export default function LifeJourneyTemplate({
               value: sectionCopy.stories.description,
               section: 'stories',
               multiline: true,
-              className: 'font-sans text-xs md:text-sm text-stone-500 mt-1.5',
+              className: `font-sans ${getTextSizeClass('sectionDescription', sectionCopy.stories.descriptionTextSettings)} text-stone-500 mt-1.5`,
               onChange: (value) => updateSectionDescription('stories', value),
             })}
           </div>
@@ -919,11 +1043,11 @@ export default function LifeJourneyTemplate({
               >
                 <div>
                   {/* Image Preview */}
-                  <div className="aspect-[16/10] overflow-hidden bg-stone-100 relative shrink-0">
+                  <div className={`${getImageSizeClass('story', story.imageSettings)} overflow-hidden bg-stone-100 relative shrink-0`}>
                     <img 
                       src={story.imageUrl} 
                       alt={story.title} 
-                      className="w-full h-full object-cover group-hover:scale-101 transition-transform duration-500"
+                      className={`w-full h-full ${getImageFitClass(story.imageSettings)} ${getImagePositionClass(story.imageSettings)} group-hover:scale-101 transition-transform duration-500`}
                       referrerPolicy="no-referrer"
                     />
                     {renderEditableText({
@@ -963,7 +1087,7 @@ export default function LifeJourneyTemplate({
                       value: story.shortDescription,
                       section: 'stories',
                       multiline: true,
-                      className: 'font-sans text-stone-600 text-xs leading-relaxed line-clamp-4',
+                      className: `font-sans text-stone-600 ${getTextSizeClass('detail', story.textSettings)} leading-relaxed line-clamp-4`,
                       onChange: (value) => updateStoryItem(index, 'shortDescription', value),
                     })}
                   </div>
@@ -1012,7 +1136,7 @@ export default function LifeJourneyTemplate({
                     value: sectionCopy.contact.description,
                     section: 'contact',
                     multiline: true,
-                    className: 'font-sans text-xs text-stone-500 leading-relaxed',
+                    className: `font-sans ${getTextSizeClass('detail', sectionCopy.contact.descriptionTextSettings)} text-stone-500 leading-relaxed`,
                     onChange: (value) => updateSectionDescription('contact', value),
                   })}
                 </div>

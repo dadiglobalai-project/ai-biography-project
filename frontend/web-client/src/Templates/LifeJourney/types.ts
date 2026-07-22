@@ -3,6 +3,22 @@ export interface ValueItem {
   title: string;
   description: string;
   icon: string;
+  textSettings?: TextDisplaySettings;
+}
+
+export type ImageSizePreset = 'compact' | 'default' | 'tall';
+export type ImageFitPreset = 'cover' | 'contain';
+export type ImagePositionPreset = 'top' | 'center' | 'bottom';
+export type TextSizePreset = 'small' | 'default' | 'large';
+
+export interface ImageDisplaySettings {
+  size?: ImageSizePreset;
+  fit?: ImageFitPreset;
+  position?: ImagePositionPreset;
+}
+
+export interface TextDisplaySettings {
+  size?: TextSizePreset;
 }
 
 export interface HobbyItem {
@@ -11,6 +27,8 @@ export interface HobbyItem {
   description: string;
   icon: string;
   imageUrl: string;
+  imageSettings?: ImageDisplaySettings;
+  textSettings?: TextDisplaySettings;
 }
 
 export interface TimelineMilestone {
@@ -23,6 +41,8 @@ export interface TimelineMilestone {
   details: string[];
   imageUrl?: string;
   imageCaption?: string;
+  imageSettings?: ImageDisplaySettings;
+  textSettings?: TextDisplaySettings;
 }
 
 export interface GalleryItem {
@@ -32,6 +52,8 @@ export interface GalleryItem {
   imageUrl: string;
   caption: string;
   year?: string;
+  imageSettings?: ImageDisplaySettings;
+  textSettings?: TextDisplaySettings;
 }
 
 export interface MemoryStory {
@@ -41,8 +63,10 @@ export interface MemoryStory {
   readTime: string;
   category: string;
   imageUrl: string;
+  imageSettings?: ImageDisplaySettings;
   shortDescription: string;
   fullStory: string;
+  textSettings?: TextDisplaySettings;
 }
 
 export interface CustomizerSettings {
@@ -54,12 +78,17 @@ export interface CustomizerSettings {
 export interface PersonalDetails {
   fullName: string;
   tagline: string;
+  taglineTextSettings?: TextDisplaySettings;
   profileImageUrl?: string;
+  profileImageSettings?: ImageDisplaySettings;
   birthDetails: string;
   location: string;
   shortIntro: string;
+  shortIntroTextSettings?: TextDisplaySettings;
   bioFull: string;
+  bioTextSettings?: TextDisplaySettings;
   signatureQuote: string;
+  signatureQuoteTextSettings?: TextDisplaySettings;
   occupation: string;
   coordinates: string;
   coordsLabel: string;
@@ -85,6 +114,7 @@ export type EditableSectionCopyKey = 'about' | 'timeline' | 'gallery' | 'stories
 export interface EditableSectionCopy {
   title: string;
   description: string;
+  descriptionTextSettings?: TextDisplaySettings;
 }
 
 export interface BiographyCategory {

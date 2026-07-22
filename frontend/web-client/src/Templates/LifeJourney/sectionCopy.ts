@@ -31,6 +31,7 @@ export function getSectionCopy(sectionCopy?: Partial<Record<EditableSectionCopyK
   const mergeCopy = (section: EditableSectionCopyKey): EditableSectionCopy => ({
     title: DEFAULT_SECTION_COPY[section].title,
     description: sectionCopy?.[section]?.description ?? DEFAULT_SECTION_COPY[section].description,
+    descriptionTextSettings: sectionCopy?.[section]?.descriptionTextSettings,
   });
 
   return {
