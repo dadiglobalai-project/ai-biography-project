@@ -10,4 +10,12 @@ class BiographyApplicationTests {
 	void contextLoads() {
 	}
 
+	@Test
+	void biographySectionComponentsArePresent() throws ClassNotFoundException {
+		Class.forName("com.AI.biography.section.controller.BiographySectionController");
+		Class.forName("com.AI.biography.section.controller.ContactMessageController");
+		Class.forName("com.AI.biography.section.service.impl.BiographySectionServiceImpl");
+		Class.forName("com.AI.biography.section.service.impl.ContactMessageServiceImpl");
+	}
+
 }
