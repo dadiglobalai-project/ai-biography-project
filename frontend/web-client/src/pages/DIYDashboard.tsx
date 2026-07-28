@@ -392,6 +392,19 @@ export default function DIYDashboard() {
     });
   };
 
+  const defaultCreateTemplate = templates.find((template) => template.id === 'life-journey');
+  const createNewUrl = defaultCreateTemplate?.editPath
+    ? buildTemplatePageUrl(defaultCreateTemplate.editPath, {
+        subjectType: selectedSubjectType,
+        template: defaultCreateTemplate,
+      })
+    : '';
+  const latestDraft = biographies.find((website) => website.status.toUpperCase() === 'DRAFT') || biographies[0];
+  const latestDraftEditPath = latestDraft ? getEditorPath(latestDraft.templateId) : '';
+  const continueDraftUrl = latestDraft?.id && latestDraftEditPath
+    ? buildTemplatePageUrl(latestDraftEditPath, { website: latestDraft })
+    : '';
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-between font-sans selection:bg-amber-200">
       
@@ -464,19 +477,52 @@ export default function DIYDashboard() {
 
           {/* Action buttons (Right-aligned in desktop) */}
           <div className="flex items-center gap-3 shrink-0">
-            <button
-              onClick={handleCreateNew}
-              className="px-6 py-3 bg-black hover:bg-slate-900 active:scale-[0.98] text-white rounded-xl text-xs font-bold tracking-wide transition-all duration-150 shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              Create New Biography
-            </button>
-            <button
-              onClick={handleContinueDraft}
-              disabled={isLoadingBiographies || Boolean(openingWebsiteId)}
-              className="px-6 py-3 bg-white border border-slate-200 hover:border-slate-800 active:scale-[0.98] text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold tracking-wide transition-all duration-150 shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {openingWebsiteId ? 'Opening Draft...' : 'Continue Draft'}
-            </button>
+            {createNewUrl ? (
+              <a
+                href={createNewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  if (defaultCreateTemplate) {
+                    setSelectedTemplateId(defaultCreateTemplate.id);
+                  }
+                }}
+                className="px-6 py-3 bg-black hover:bg-slate-900 active:scale-[0.98] text-white rounded-xl text-xs font-bold tracking-wide transition-all duration-150 shadow-sm cursor-pointer"
+              >
+                Create New Biography
+              </a>
+            ) : (
+              <button
+                onClick={handleCreateNew}
+                className="px-6 py-3 bg-black hover:bg-slate-900 active:scale-[0.98] text-white rounded-xl text-xs font-bold tracking-wide transition-all duration-150 shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Create New Biography
+              </button>
+            )}
+            {continueDraftUrl && !isLoadingBiographies ? (
+              <a
+                href={continueDraftUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  if (latestDraft?.id) {
+                    setOpeningWebsiteId(latestDraft.id);
+                    window.setTimeout(() => setOpeningWebsiteId(null), 300);
+                  }
+                }}
+                className="px-6 py-3 bg-white border border-slate-200 hover:border-slate-800 active:scale-[0.98] text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold tracking-wide transition-all duration-150 shadow-sm cursor-pointer"
+              >
+                Continue Draft
+              </a>
+            ) : (
+              <button
+                onClick={handleContinueDraft}
+                disabled={isLoadingBiographies || Boolean(openingWebsiteId)}
+                className="px-6 py-3 bg-white border border-slate-200 hover:border-slate-800 active:scale-[0.98] text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold tracking-wide transition-all duration-150 shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {openingWebsiteId ? 'Opening Draft...' : 'Continue Draft'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -523,14 +569,10 @@ export default function DIYDashboard() {
               {biographies.map((website) => {
                 const isOpening = openingWebsiteId === website.id;
                 const websiteTemplate = getTemplateByIdentifier(website.templateId);
-                return (
-                  <button
-                    key={website.id || `${website.templateId}-${website.title}`}
-                    type="button"
-                    onClick={() => handleOpenBiography(website)}
-                    disabled={isOpening}
-                    className="group rounded-xl border border-slate-100 bg-white p-5 text-left shadow-sm transition hover:border-[#FED362] hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
+                const editPath = website.id ? getEditorPath(website.templateId) : '';
+                const biographyUrl = editPath ? buildTemplatePageUrl(editPath, { website }) : '';
+                const biographyCard = (
+                  <>
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 space-y-2">
                         <div className="flex items-center gap-2 text-[#B18625]">
@@ -550,6 +592,34 @@ export default function DIYDashboard() {
                         {isOpening ? 'Opening' : website.status}
                       </span>
                     </div>
+                  </>
+                );
+
+                return biographyUrl ? (
+                  <a
+                    key={website.id || `${website.templateId}-${website.title}`}
+                    href={biographyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => {
+                      if (website.id) {
+                        setOpeningWebsiteId(website.id);
+                        window.setTimeout(() => setOpeningWebsiteId(null), 300);
+                      }
+                    }}
+                    className="group rounded-xl border border-slate-100 bg-white p-5 text-left shadow-sm transition hover:border-[#FED362] hover:shadow-md"
+                  >
+                    {biographyCard}
+                  </a>
+                ) : (
+                  <button
+                    key={website.id || `${website.templateId}-${website.title}`}
+                    type="button"
+                    onClick={() => handleOpenBiography(website)}
+                    disabled={isOpening}
+                    className="group rounded-xl border border-slate-100 bg-white p-5 text-left shadow-sm transition hover:border-[#FED362] hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {biographyCard}
                   </button>
                 );
               })}
@@ -660,6 +730,12 @@ export default function DIYDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
             {templates.map((template) => {
               const isSelected = selectedTemplateId === template.id;
+              const previewUrl = template.previewPath
+                ? buildTemplatePageUrl(template.previewPath, { template })
+                : '';
+              const editUrl = template.editPath
+                ? buildTemplatePageUrl(template.editPath, { subjectType: selectedSubjectType, template })
+                : '';
               return (
                 <div
                   key={template.id}
@@ -727,28 +803,57 @@ export default function DIYDashboard() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handlePreviewTemplate(template);
-                          }}
-                          className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          Preview
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleEditTemplate(template);
-                          }}
-                          className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-black px-3 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-slate-900 disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          <PenTool className="w-3.5 h-3.5" />
-                          Edit
-                        </button>
+                        {previewUrl ? (
+                          <a
+                            href={previewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(event) => event.stopPropagation()}
+                            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Preview
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handlePreviewTemplate(template);
+                            }}
+                            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Preview
+                          </button>
+                        )}
+                        {editUrl ? (
+                          <a
+                            href={editUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedTemplateId(template.id);
+                            }}
+                            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-black px-3 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-slate-900"
+                          >
+                            <PenTool className="w-3.5 h-3.5" />
+                            Edit
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleEditTemplate(template);
+                            }}
+                            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-black px-3 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-slate-900 disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            <PenTool className="w-3.5 h-3.5" />
+                            Edit
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
