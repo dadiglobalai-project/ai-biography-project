@@ -271,9 +271,7 @@ export default function LifeJourneyEditPage() {
     return () => window.clearTimeout(autosaveTimer);
   }, [activeWebsiteId, draft, templateRoute.id]);
 
-  const openPreviewPage = () => {
-    saveDraft(templateRoute.id, draft, activeWebsiteId);
-
+  const previewPageUrl = React.useMemo(() => {
     const url = new URL(`/diy-dashboard/templates/${templateRoute.id}/preview`, window.location.origin);
     if (activeWebsiteId) {
       url.searchParams.set('websiteId', activeWebsiteId);
@@ -282,10 +280,11 @@ export default function LifeJourneyEditPage() {
       url.searchParams.set('apiTemplateId', backendTemplateId);
     }
 
-    const opened = window.open(url.toString(), '_blank', 'noopener,noreferrer');
-    if (!opened) {
-      navigate(`${url.pathname}${url.search}`);
-    }
+    return url.toString();
+  }, [activeWebsiteId, backendTemplateId, templateRoute.id]);
+
+  const openPreviewPage = () => {
+    saveDraft(templateRoute.id, draft, activeWebsiteId);
   };
 
   React.useEffect(() => {
@@ -1212,14 +1211,16 @@ export default function LifeJourneyEditPage() {
                 <PencilLine className="h-4 w-4" />
                 Edit
               </button>
-              <button
-                type="button"
+              <a
+                href={previewPageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={openPreviewPage}
                 className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-500 transition hover:text-slate-900"
               >
                 <Eye className="h-4 w-4" />
                 Preview
-              </button>
+              </a>
             </div>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
               {saveMessage}

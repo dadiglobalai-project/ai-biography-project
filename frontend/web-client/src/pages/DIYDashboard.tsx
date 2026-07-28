@@ -269,7 +269,14 @@ export default function DIYDashboard() {
   ) => {
     const pageUrl = buildTemplatePageUrl(path, options);
 
-    return window.open(pageUrl, '_blank', 'noopener,noreferrer') !== null;
+    const link = document.createElement('a');
+    link.href = pageUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   };
 
   const handleApplyRecommendation = () => {
@@ -307,13 +314,7 @@ export default function DIYDashboard() {
 
   const handlePreviewTemplate = (template: Template) => {
     if (template.previewPath) {
-      const opened = openTemplatePage(template.previewPath, { template });
-      if (!opened) {
-        setModalContent({
-          title: `${template.title} Preview`,
-          desc: 'Your browser blocked the preview page. Please allow pop-ups for this site and try again.'
-        });
-      }
+      openTemplatePage(template.previewPath, { template });
       return;
     }
 
@@ -353,15 +354,8 @@ export default function DIYDashboard() {
     }
 
     setOpeningWebsiteId(website.id);
-    const opened = openTemplatePage(editPath, { website });
+    openTemplatePage(editPath, { website });
     setOpeningWebsiteId(null);
-
-    if (!opened) {
-      setModalContent({
-        title: 'Unable to Open Biography',
-        desc: 'Your browser blocked the editor tab. Please allow pop-ups for this site and try again.'
-      });
-    }
   };
 
   const handleEditTemplate = (template: Template) => {
@@ -374,13 +368,7 @@ export default function DIYDashboard() {
     }
 
     setSelectedTemplateId(template.id);
-    const opened = openTemplatePage(template.editPath, { subjectType: selectedSubjectType, template });
-    if (!opened) {
-      setModalContent({
-        title: `${template.title} Editor`,
-        desc: 'Your browser blocked the editor tab. Please allow pop-ups for this site and try again.'
-      });
-    }
+    openTemplatePage(template.editPath, { subjectType: selectedSubjectType, template });
   };
 
   const handleCreateNew = () => {

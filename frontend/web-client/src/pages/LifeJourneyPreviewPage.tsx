@@ -17,7 +17,7 @@ export default function LifeJourneyPreviewPage() {
     document.title = `${templateRoute.title} Preview | Xinghuoji`;
   }, [templateRoute.title]);
 
-  const openEditorPage = () => {
+  const editorPageUrl = React.useMemo(() => {
     const url = new URL(`/diy-dashboard/templates/${templateRoute.id}/edit`, window.location.origin);
     const websiteId = searchParams.get('websiteId');
     if (websiteId) {
@@ -28,11 +28,8 @@ export default function LifeJourneyPreviewPage() {
       url.searchParams.set('apiTemplateId', backendTemplateId);
     }
 
-    const opened = window.open(url.toString(), '_blank', 'noopener,noreferrer');
-    if (!opened) {
-      navigate(`${url.pathname}${url.search}`);
-    }
-  };
+    return url.toString();
+  }, [searchParams, templateRoute.id]);
 
   return (
     <div className="relative min-h-screen bg-[#FAF6F0]">
@@ -45,14 +42,15 @@ export default function LifeJourneyPreviewPage() {
           <ArrowLeft className="h-4 w-4" />
           Dashboard
         </button>
-        <button
-          type="button"
-          onClick={openEditorPage}
+        <a
+          href={editorPageUrl}
+          target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-900 bg-stone-900 px-4 py-3 text-xs font-bold uppercase tracking-wide text-amber-50 shadow-lg transition hover:bg-stone-800"
         >
           <PenTool className="h-4 w-4" />
           Edit
-        </button>
+        </a>
       </div>
 
       <LifeJourneyTemplate categoryKey={templateRoute.categoryKey} dataOverride={previewDraft} />
