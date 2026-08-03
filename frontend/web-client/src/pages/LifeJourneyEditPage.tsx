@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -16,6 +17,7 @@ import {
   Save,
   Sparkles,
   Smartphone,
+  Tablet,
   Type,
   UserRound,
   X,
@@ -50,6 +52,82 @@ import type {
 const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
 const SUBJECT_TYPES: SubjectType[] = ['SELF', 'PARENT', 'GRANDPARENT', 'CHILD', 'SPOUSE', 'LOVED_ONE'];
 const AUTO_SAVE_DELAY_MS = 1500;
+const MOBILE_PREVIEW_SRC_DOC =
+  '<!doctype html><html><head></head><body><div id="mobile-preview-root"></div></body></html>';
+
+type PreviewViewport = 'desktop' | 'tablet' | 'phone';
+type FramedPreviewViewport = Exclude<PreviewViewport, 'desktop'>;
+type EditorMode = 'edit' | 'preview';
+
+const DEVICE_PREVIEW_CONFIG: Record<FramedPreviewViewport, { label: string; width: number; height: number }> = {
+  tablet: { label: 'Tablet', width: 768, height: 900 },
+  phone: { label: 'Phone', width: 390, height: 780 },
+};
+
+function DevicePreviewFrame({
+  children,
+  iframeRef,
+  viewport,
+}: {
+  children: React.ReactNode;
+  iframeRef: React.RefObject<HTMLIFrameElement | null>;
+  viewport: FramedPreviewViewport;
+}) {
+  const [mountNode, setMountNode] = React.useState<HTMLElement | null>(null);
+  const config = DEVICE_PREVIEW_CONFIG[viewport];
+
+  const syncFrameDocument = React.useCallback(() => {
+    const frameDocument = iframeRef.current?.contentDocument;
+    if (!frameDocument) {
+      return;
+    }
+
+    let baseElement = frameDocument.head.querySelector('base');
+    if (!baseElement) {
+      baseElement = frameDocument.createElement('base');
+      frameDocument.head.prepend(baseElement);
+    }
+    baseElement.href = `${window.location.origin}/`;
+    baseElement.target = '_self';
+
+    frameDocument.documentElement.className = document.documentElement.className;
+    frameDocument.body.className = 'm-0 min-h-screen bg-white';
+    frameDocument.body.style.margin = '0';
+
+    frameDocument.head
+      .querySelectorAll('[data-mobile-preview-style="true"]')
+      .forEach((node) => node.remove());
+
+    document.head.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
+      const clone = node.cloneNode(true) as HTMLElement;
+      clone.dataset.mobilePreviewStyle = 'true';
+      frameDocument.head.appendChild(clone);
+    });
+
+    setMountNode(frameDocument.getElementById('mobile-preview-root'));
+  }, [iframeRef]);
+
+  React.useEffect(() => {
+    syncFrameDocument();
+  }, [syncFrameDocument]);
+
+  return (
+    <div
+      className="mx-auto rounded-[2rem] border border-slate-300 bg-white shadow-2xl"
+      style={{ width: config.width, maxWidth: '100%' }}
+    >
+      <iframe
+        ref={iframeRef}
+        title={`${config.label} template preview`}
+        srcDoc={MOBILE_PREVIEW_SRC_DOC}
+        onLoad={syncFrameDocument}
+        className="block w-full rounded-[2rem] bg-white"
+        style={{ height: config.height, maxHeight: 'calc(100vh - 170px)' }}
+      />
+      {mountNode ? createPortal(children, mountNode) : null}
+    </div>
+  );
+}
 
 type TextFieldConfig = {
   label: string;
@@ -67,8 +145,6 @@ type SelectFieldConfig = {
   onChange: (value: string) => void;
   section?: EditableTemplateSection;
 };
-
-type PreviewViewport = 'desktop' | 'mobile';
 
 type PersonalTextFieldKey = {
   [K in keyof PersonalDetails]: PersonalDetails[K] extends string | undefined ? K : never;
@@ -206,23 +282,38 @@ export default function LifeJourneyEditPage() {
   const [website, setWebsite] = useState<BiographyWebsite | null>(null);
   const [saveMessage, setSaveMessage] = useState('Unsaved changes');
   const [isSaving, setIsSaving] = useState(false);
+  const [editorMode, setEditorMode] = useState<EditorMode>('edit');
   const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
   const [activeEditorSection, setActiveEditorSection] = useState<EditableTemplateSection | null>(null);
   const [isMobileEditorOpen, setIsMobileEditorOpen] = useState(false);
+  const devicePreviewFrameRef = React.useRef<HTMLIFrameElement | null>(null);
   const hasMountedDraftRef = React.useRef(false);
   const activeWebsiteId = website?.id || websiteId;
+  const isEditingMode = editorMode === 'edit';
+  const previewModeLabel =
+    previewViewport === 'desktop'
+      ? 'Desktop width'
+      : `${DEVICE_PREVIEW_CONFIG[previewViewport].label} width (${DEVICE_PREVIEW_CONFIG[previewViewport].width}px)`;
 
   const shouldUseMobileEditor = () => window.matchMedia('(max-width: 1023px)').matches;
 
   const focusPreviewSection = (section: EditableTemplateSection) => {
     setActiveEditorSection(section);
     window.requestAnimationFrame(() => {
-      const previewSection = document.getElementById(`${section}-section`);
+      const previewDocument =
+        previewViewport === 'desktop'
+          ? document
+          : devicePreviewFrameRef.current?.contentDocument;
+      const previewSection = previewDocument?.getElementById(`${section}-section`);
       previewSection?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
   };
 
   const handleEditSectionChange = (section: EditableTemplateSection) => {
+    if (!isEditingMode) {
+      return;
+    }
+
     setActiveEditorSection(section);
     if (shouldUseMobileEditor()) {
       setIsMobileEditorOpen(true);
@@ -230,6 +321,10 @@ export default function LifeJourneyEditPage() {
   };
 
   const handleOpenStyleEditor = () => {
+    if (!isEditingMode) {
+      return;
+    }
+
     setActiveEditorSection('style');
     if (shouldUseMobileEditor()) {
       setIsMobileEditorOpen(true);
@@ -237,6 +332,10 @@ export default function LifeJourneyEditPage() {
   };
 
   const handleDraftChange: React.Dispatch<React.SetStateAction<BiographyCategory>> = (nextDraft) => {
+    if (!isEditingMode) {
+      return;
+    }
+
     setDraft((current) =>
       typeof nextDraft === 'function'
         ? (nextDraft as (current: BiographyCategory) => BiographyCategory)(current)
@@ -271,20 +370,15 @@ export default function LifeJourneyEditPage() {
     return () => window.clearTimeout(autosaveTimer);
   }, [activeWebsiteId, draft, templateRoute.id]);
 
-  const previewPageUrl = React.useMemo(() => {
-    const url = new URL(`/diy-dashboard/templates/${templateRoute.id}/preview`, window.location.origin);
-    if (activeWebsiteId) {
-      url.searchParams.set('websiteId', activeWebsiteId);
-    }
-    if (backendTemplateId) {
-      url.searchParams.set('apiTemplateId', backendTemplateId);
-    }
-
-    return url.toString();
-  }, [activeWebsiteId, backendTemplateId, templateRoute.id]);
-
-  const openPreviewPage = () => {
+  const handleEnterPreviewMode = () => {
     saveDraft(templateRoute.id, draft, activeWebsiteId);
+    setEditorMode('preview');
+    setActiveEditorSection(null);
+    setIsMobileEditorOpen(false);
+  };
+
+  const handleEnterEditMode = () => {
+    setEditorMode('edit');
   };
 
   React.useEffect(() => {
@@ -1194,7 +1288,7 @@ export default function LifeJourneyEditPage() {
             </button>
             <div>
               <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
-                Template Editor
+                {isEditingMode ? 'Template Editor' : 'Template Preview'}
               </p>
               <h1 className="font-serif-display text-2xl font-semibold leading-tight text-[#0A1128]">
                 {templateRoute.title}
@@ -1206,21 +1300,28 @@ export default function LifeJourneyEditPage() {
             <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-950 shadow-sm transition"
+                onClick={handleEnterEditMode}
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
+                  isEditingMode
+                    ? 'bg-white text-slate-950 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
               >
                 <PencilLine className="h-4 w-4" />
                 Edit
               </button>
-              <a
-                href={previewPageUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={openPreviewPage}
-                className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-500 transition hover:text-slate-900"
+              <button
+                type="button"
+                onClick={handleEnterPreviewMode}
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
+                  !isEditingMode
+                    ? 'bg-white text-slate-950 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
               >
                 <Eye className="h-4 w-4" />
                 Preview
-              </a>
+              </button>
             </div>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
               {saveMessage}
@@ -1238,12 +1339,14 @@ export default function LifeJourneyEditPage() {
         </div>
       </header>
 
-      <main className="grid lg:grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="hidden border-r border-slate-200 bg-white lg:block">
-          <div className="p-5 lg:sticky lg:top-[73px] lg:max-h-[calc(100vh-73px)] lg:overflow-y-auto lg:p-6">
-            {renderEditorPanel('desktop')}
-          </div>
-        </aside>
+      <main className={isEditingMode ? 'grid lg:grid-cols-[360px_minmax(0,1fr)]' : 'grid'}>
+        {isEditingMode && (
+          <aside className="hidden border-r border-slate-200 bg-white lg:block">
+            <div className="p-5 lg:sticky lg:top-[73px] lg:max-h-[calc(100vh-73px)] lg:overflow-y-auto lg:p-6">
+              {renderEditorPanel('desktop')}
+            </div>
+          </aside>
+        )}
 
         <section className="min-w-0 bg-slate-100">
           <div className="sticky top-[73px] z-30 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-100/95 px-4 py-3 backdrop-blur-md lg:px-6">
@@ -1254,7 +1357,7 @@ export default function LifeJourneyEditPage() {
                   Live Preview
                 </span>
                 <span className="block text-[11px] text-slate-500">
-                  {previewViewport === 'mobile' ? 'Mobile width' : 'Desktop width'}
+                  {previewModeLabel}
                 </span>
               </div>
             </div>
@@ -1274,49 +1377,67 @@ export default function LifeJourneyEditPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPreviewViewport('mobile')}
+                  onClick={() => setPreviewViewport('tablet')}
                   className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
-                    previewViewport === 'mobile'
+                    previewViewport === 'tablet'
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <Tablet className="h-3.5 w-3.5" />
+                  Tablet
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewViewport('phone')}
+                  className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
+                    previewViewport === 'phone'
                       ? 'bg-slate-900 text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-900'
                   }`}
                 >
                   <Smartphone className="h-3.5 w-3.5" />
-                  Mobile
+                  Phone
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={handleReset}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 transition hover:border-rose-300 hover:text-rose-600"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Reset
-              </button>
+              {isEditingMode && (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 transition hover:border-rose-300 hover:text-rose-600"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reset
+                </button>
+              )}
             </div>
           </div>
 
-          <div className={previewViewport === 'mobile' ? 'bg-slate-200 px-3 py-6 sm:px-6 lg:px-8' : ''}>
-            <div
-              className={
-                previewViewport === 'mobile'
-                  ? 'mx-auto max-w-[390px] overflow-hidden rounded-[2rem] border border-slate-300 bg-white shadow-2xl'
-                  : ''
-              }
-            >
-              <LifeJourneyTemplate
-                categoryKey={templateRoute.categoryKey}
-                dataOverride={draft}
-                activeEditSection={activeEditorSection}
-                onDataChange={handleDraftChange}
-                onEditSectionChange={handleEditSectionChange}
-              />
+          {previewViewport !== 'desktop' ? (
+            <div className="bg-slate-200 px-3 py-6 sm:px-6 lg:px-8">
+              <DevicePreviewFrame iframeRef={devicePreviewFrameRef} viewport={previewViewport}>
+                <LifeJourneyTemplate
+                  categoryKey={templateRoute.categoryKey}
+                  dataOverride={draft}
+                  activeEditSection={isEditingMode ? activeEditorSection : null}
+                  onDataChange={isEditingMode ? handleDraftChange : undefined}
+                  onEditSectionChange={isEditingMode ? handleEditSectionChange : undefined}
+                />
+              </DevicePreviewFrame>
             </div>
-          </div>
+          ) : (
+            <LifeJourneyTemplate
+              categoryKey={templateRoute.categoryKey}
+              dataOverride={draft}
+              activeEditSection={isEditingMode ? activeEditorSection : null}
+              onDataChange={isEditingMode ? handleDraftChange : undefined}
+              onEditSectionChange={isEditingMode ? handleEditSectionChange : undefined}
+            />
+          )}
         </section>
       </main>
 
-      {!isMobileEditorOpen && (
+      {isEditingMode && !isMobileEditorOpen && (
         <button
           type="button"
           onClick={() => setIsMobileEditorOpen(true)}
@@ -1329,7 +1450,7 @@ export default function LifeJourneyEditPage() {
         </button>
       )}
 
-      {isMobileEditorOpen && (
+      {isEditingMode && isMobileEditorOpen && (
         <div className="fixed inset-0 z-[90] lg:hidden">
           <button
             type="button"
