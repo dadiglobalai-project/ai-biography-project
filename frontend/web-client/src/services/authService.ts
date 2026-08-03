@@ -348,7 +348,7 @@ export interface CreateContactSectionPayload {
     email: string;
   };
   socialLinks: Array<{
-    platform: 'LINKEDIN' | 'INSTAGRAM' | 'TWITTER' | 'FACEBOOK';
+    platform: 'LINKEDIN' | 'INSTAGRAM' | 'X' | 'FACEBOOK';
     displayName: string;
     profileUrl: string;
     icon: string;
@@ -375,7 +375,7 @@ export interface UpdateContactSectionPayload {
   contactInfo: CreateContactSectionPayload['contactInfo'];
   socialLinks: Array<{
     id: string;
-    platform: 'LINKEDIN' | 'INSTAGRAM' | 'TWITTER' | 'FACEBOOK';
+    platform: 'LINKEDIN' | 'INSTAGRAM' | 'X' | 'FACEBOOK';
     displayName: string;
     profileUrl: string;
     icon: string;

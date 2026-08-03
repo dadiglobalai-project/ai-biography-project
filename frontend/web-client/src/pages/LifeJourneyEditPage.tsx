@@ -1608,7 +1608,7 @@ export default function LifeJourneyEditPage() {
       return `https://www.instagram.com/${encodeURIComponent(handle)}`;
     }
 
-    if (platform === 'TWITTER') {
+    if (platform === 'X') {
       return `https://x.com/${encodeURIComponent(handle)}`;
     }
 
@@ -1630,7 +1630,7 @@ export default function LifeJourneyEditPage() {
         icon: 'instagram',
       },
       {
-        platform: 'TWITTER',
+        platform: 'X',
         displayName: draft.personalDetails.twitterHandle || '@VanceShipwrights',
         icon: 'twitter',
       },
