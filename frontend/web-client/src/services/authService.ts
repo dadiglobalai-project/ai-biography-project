@@ -44,6 +44,17 @@ function getAuthHeaders(): HeadersInit {
   return headers;
 }
 
+function getMultipartAuthHeaders(): HeadersInit {
+  const headers: Record<string, string> = {};
+  const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
 export interface AuthResponse {
   success: boolean;
   message: string;
@@ -70,6 +81,15 @@ export interface DashboardResponse {
   user?: AuthResponse['user'];
   serviceType?: ServiceType;
   onboardingStatus?: string;
+  statistics?: {
+    totalWebsites: number;
+    drafts: number;
+    published: number;
+  };
+  actions?: {
+    hasDraft: boolean;
+    latestDraftId: string | null;
+  };
 }
 
 export type SubjectType = 'SELF' | 'PARENT' | 'GRANDPARENT' | 'CHILD' | 'SPOUSE' | 'LOVED_ONE';
@@ -99,6 +119,282 @@ export interface BiographyTemplate {
   layoutKey: string;
   category?: string;
   premium: boolean;
+}
+
+export interface BiographyWebsiteSection {
+  id: string;
+  key: string;
+  title: string;
+  description?: string;
+  order?: number;
+  sortOrder?: number;
+  isVisible?: boolean;
+  content?: unknown;
+}
+
+export interface BiographyContactMessage {
+  id: string;
+  senderName: string;
+  senderEmail: string;
+  subject: string;
+  message: string;
+  createdAt?: string;
+  status?: string;
+}
+
+export type MediaUsageType =
+  | 'PROFILE_IMAGE'
+  | 'BACKGROUND_IMAGE'
+  | 'PURSUIT_IMAGE'
+  | 'TIMELINE_IMAGE'
+  | 'GALLERY_IMAGE'
+  | 'STORY_IMAGE';
+
+export interface BiographyMediaAsset {
+  mediaAssetId: string;
+  websiteId: string;
+  usageType: MediaUsageType | string;
+  originalFilename: string;
+  mimeType: string;
+  fileSize: number;
+  width?: number;
+  height?: number;
+  bucketName?: string;
+  storageKey?: string;
+  accessUrl?: string | null;
+  createdAt?: string;
+}
+
+export interface UpdateSectionSettingsPayload {
+  isVisible: boolean;
+  sortOrder: number;
+}
+
+export interface CreateHeroSectionPayload {
+  fullName: string;
+  designation: string;
+  tagline: string;
+  shortDescription: string;
+  profileImageId: string;
+  backgroundImageId: string;
+  sortOrder: number;
+  isVisible: boolean;
+}
+
+export type UpdateHeroSectionPayload = CreateHeroSectionPayload;
+
+export interface CreateChronicleSectionPayload {
+  sectionLabel: string;
+  sectionTitle: string;
+  sectionDescription: string;
+  journal: {
+    cardLabel: string;
+    storyTitle: string;
+    storyContent: string;
+    quote: string;
+  };
+  beliefs: {
+    cardLabel: string;
+    items: Array<{
+      icon: string;
+      title: string;
+      description: string;
+      sortOrder: number;
+    }>;
+  };
+  sortOrder: number;
+  isVisible: boolean;
+}
+
+export interface UpdateChronicleSectionPayload {
+  sectionLabel: string;
+  sectionTitle: string;
+  sectionDescription: string;
+  journal: CreateChronicleSectionPayload['journal'];
+  beliefs: {
+    cardLabel: string;
+    items: Array<{
+      id: string;
+      icon: string;
+      title: string;
+      description: string;
+      sortOrder: number;
+    }>;
+  };
+  sortOrder: number;
+  isVisible: boolean;
+}
+
+export interface CreatePursuitsSectionPayload {
+  sectionLabel: string;
+  items: Array<{
+    imageId: string;
+    icon: string;
+    title: string;
+    description: string;
+    sortOrder: number;
+  }>;
+  sortOrder: number;
+  isVisible: boolean;
+}
+
+export interface UpdatePursuitsSectionPayload {
+  sectionLabel: string;
+  items: Array<{
+    id: string;
+    imageId: string;
+    icon: string;
+    title: string;
+    description: string;
+    sortOrder: number;
+  }>;
+  sortOrder: number;
+  isVisible: boolean;
+}
+
+export interface CreateTimelineSectionPayload {
+  sectionLabel: string;
+  sectionTitle: string;
+  sectionDescription: string;
+  timelineEvents: Array<{
+    timePeriod: string;
+    title: string;
+    location: string;
+    quote: string;
+    imageId: string;
+    imageAltText: string;
+    imageCaption: string;
+    sortOrder: number;
+    highlights: Array<{
+      highlightText: string;
+      sortOrder: number;
+    }>;
+  }>;
+  sortOrder: number;
+  isVisible: boolean;
+}
+
+export interface UpdateTimelineSectionPayload {
+  sectionLabel: string;
+  sectionTitle: string;
+  sectionDescription: string;
+  timelineEvents: Array<{
+    id: string;
+    timePeriod: string;
+    title: string;
+    location: string;
+    quote: string;
+    imageId: string;
+    imageAltText: string;
+    imageCaption: string;
+    sortOrder: number;
+    highlights: Array<{
+      id: string;
+      highlightText: string;
+      sortOrder: number;
+    }>;
+  }>;
+  sortOrder: number;
+  isVisible: boolean;
+}
+
+export interface CreateGallerySectionPayload {
+  sectionLabel: string;
+  sectionTitle: string;
+  sectionDescription: string;
+  items: Array<{
+    mediaAssetId: string;
+    thumbnailAssetId: string;
+    mediaType: 'IMAGE' | 'VIDEO';
+    category: string;
+    recordLabel: string;
+    displayYear: string;
+    title: string;
+    description: string;
+    altText: string;
+    sortOrder: number;
+  }>;
+  sortOrder: number;
+  isVisible: boolean;
+}
+
+export interface UpdateGallerySectionPayload {
+  sectionLabel: string;
+  sectionTitle: string;
+  sectionDescription: string;
+  items: Array<{
+    id: string;
+    mediaAssetId: string;
+    thumbnailAssetId: string;
+    mediaType: 'IMAGE' | 'VIDEO';
+    category: string;
+    recordLabel: string;
+    displayYear: string;
+    title: string;
+    description: string;
+    altText: string;
+    sortOrder: number;
+  }>;
+  sortOrder: number;
+  isVisible: boolean;
+}
+
+export interface CreateContactSectionPayload {
+  sectionLabel: string;
+  sectionTitle: string;
+  sectionDescription: string;
+  contactInfo: {
+    label: string;
+    email: string;
+  };
+  socialLinks: Array<{
+    platform: 'LINKEDIN' | 'INSTAGRAM' | 'TWITTER' | 'FACEBOOK';
+    displayName: string;
+    profileUrl: string;
+    icon: string;
+    sortOrder: number;
+  }>;
+  formSettings: {
+    title: string;
+    namePlaceholder: string;
+    emailPlaceholder: string;
+    subjectPlaceholder: string;
+    messagePlaceholder: string;
+    submitButtonText: string;
+    successMessage: string;
+    errorMessage: string;
+  };
+  sortOrder: number;
+  isVisible: boolean;
+}
+
+export interface UpdateContactSectionPayload {
+  sectionLabel: string;
+  sectionTitle: string;
+  sectionDescription: string;
+  contactInfo: CreateContactSectionPayload['contactInfo'];
+  socialLinks: Array<{
+    id: string;
+    platform: 'LINKEDIN' | 'INSTAGRAM' | 'TWITTER' | 'FACEBOOK';
+    displayName: string;
+    profileUrl: string;
+    icon: string;
+    sortOrder: number;
+  }>;
+  formSettings: CreateContactSectionPayload['formSettings'];
+  sortOrder: number;
+  isVisible: boolean;
+}
+
+export interface CreatePublicContactMessagePayload {
+  senderName: string;
+  senderEmail: string;
+  subject: string;
+  message: string;
+}
+
+export interface UpdateContactMessageStatusPayload {
+  status: string;
 }
 
 interface LocalBiographyWebsitePayload {
@@ -296,6 +592,11 @@ function getEmailFromData(data: any) {
   );
 }
 
+function getNumberFromData(value: unknown, fallback = 0) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : fallback;
+}
+
 function getWebsiteId(data: any) {
   return String(data?.id || data?.websiteId || data?.biographyWebsiteId || data?.uuid || '');
 }
@@ -322,6 +623,84 @@ function normalizeBiographyTemplate(data: any): BiographyTemplate {
     layoutKey: String(data?.layoutKey || data?.templateId || data?.id || ''),
     category: typeof data?.category === 'string' ? data.category : undefined,
     premium: Boolean(data?.premium),
+  };
+}
+
+function normalizeBiographyWebsiteSection(
+  data: any,
+  index: number,
+  fallback?: Partial<BiographyWebsiteSection>
+): BiographyWebsiteSection {
+  const key = String(
+    data?.key ||
+      data?.sectionKey ||
+      data?.sectionType ||
+      data?.type ||
+      data?.slug ||
+      data?.name ||
+      fallback?.key ||
+      `section-${index + 1}`
+  );
+  const title = String(data?.title || data?.name || fallback?.title || key || `Section ${index + 1}`);
+  const order = Number(data?.order ?? data?.sortOrder ?? data?.position ?? fallback?.order ?? index + 1);
+  const sortOrder = Number(data?.sortOrder ?? data?.order ?? data?.position ?? fallback?.sortOrder ?? order);
+  const isVisible =
+    typeof data?.isVisible === 'boolean'
+      ? data.isVisible
+      : typeof data?.visible === 'boolean'
+        ? data.visible
+        : fallback?.isVisible;
+
+  return {
+    id: String(data?.sectionId || data?.id || data?.websiteSectionId || data?.uuid || fallback?.id || key),
+    key,
+    title,
+    description: typeof data?.description === 'string' ? data.description : fallback?.description,
+    order: Number.isFinite(order) ? order : index + 1,
+    sortOrder: Number.isFinite(sortOrder) ? sortOrder : Number.isFinite(order) ? order : index + 1,
+    isVisible,
+    content: data?.content ?? data?.hero ?? fallback?.content ?? data,
+  };
+}
+
+function normalizeBiographyContactMessage(data: any, index: number): BiographyContactMessage {
+  return {
+    id: String(data?.messageId || data?.contactMessageId || data?.id || data?.uuid || `message-${index + 1}`),
+    senderName: String(data?.senderName || data?.name || data?.fullName || ''),
+    senderEmail: String(data?.senderEmail || data?.email || ''),
+    subject: String(data?.subject || ''),
+    message: String(data?.message || data?.content || data?.body || ''),
+    createdAt:
+      typeof data?.createdAt === 'string'
+        ? data.createdAt
+        : typeof data?.submittedAt === 'string'
+          ? data.submittedAt
+          : undefined,
+    status: typeof data?.status === 'string' ? data.status : undefined,
+  };
+}
+
+function normalizeBiographyMediaAsset(data: any): BiographyMediaAsset {
+  return {
+    mediaAssetId: String(data?.mediaAssetId || data?.id || data?.assetId || ''),
+    websiteId: String(data?.websiteId || ''),
+    usageType: String(data?.usageType || ''),
+    originalFilename: String(data?.originalFilename || data?.filename || data?.name || ''),
+    mimeType: String(data?.mimeType || data?.contentType || ''),
+    fileSize: Number(data?.fileSize || data?.size || 0),
+    width: Number.isFinite(Number(data?.width)) ? Number(data.width) : undefined,
+    height: Number.isFinite(Number(data?.height)) ? Number(data.height) : undefined,
+    bucketName: typeof data?.bucketName === 'string' ? data.bucketName : undefined,
+    storageKey: typeof data?.storageKey === 'string' ? data.storageKey : undefined,
+    accessUrl:
+      typeof data?.accessUrl === 'string'
+        ? data.accessUrl
+        : typeof data?.url === 'string'
+          ? data.url
+          : typeof data?.signedUrl === 'string'
+            ? data.signedUrl
+            : null,
+    createdAt: typeof data?.createdAt === 'string' ? data.createdAt : undefined,
   };
 }
 
@@ -450,6 +829,90 @@ function getTemplatesFromResponse(data: any) {
   }
 
   return [];
+}
+
+function getSectionsFromResponse(data: any) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.sections)) {
+    return data.sections;
+  }
+
+  if (Array.isArray(data?.websiteSections)) {
+    return data.websiteSections;
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data;
+  }
+
+  if (Array.isArray(data?.content?.sections)) {
+    return data.content.sections;
+  }
+
+  return [];
+}
+
+function getContactMessagesFromResponse(data: any) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.contactMessages)) {
+    return data.contactMessages;
+  }
+
+  if (Array.isArray(data?.messages)) {
+    return data.messages;
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data;
+  }
+
+  if (Array.isArray(data?.content?.contactMessages)) {
+    return data.content.contactMessages;
+  }
+
+  return [];
+}
+
+function getMediaAssetsFromResponse(data: any) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.mediaAssets)) {
+    return data.mediaAssets;
+  }
+
+  if (Array.isArray(data?.assets)) {
+    return data.assets;
+  }
+
+  if (Array.isArray(data?.media)) {
+    return data.media;
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data;
+  }
+
+  if (Array.isArray(data?.content?.mediaAssets)) {
+    return data.content.mediaAssets;
+  }
+
+  return [];
+}
+
+function getSectionFromResponse(data: any) {
+  return data?.section || data?.websiteSection || data?.data || data;
+}
+
+function getMediaAssetFromResponse(data: any) {
+  return data?.mediaAsset || data?.asset || data?.data || data;
 }
 
 function getSessionFromJwt(token: string) {
@@ -688,7 +1151,10 @@ export const authService = {
     const email = getEmailFromData(data) || tokenSession?.email || '';
     const fullName = getFullNameFromData(data) || tokenSession?.fullName || getKnownFullName(email);
 
-    const serviceType = normalizeServiceType(data.serviceType) || readSelectedServiceType(email);
+    const serviceType =
+      normalizeServiceType(data.serviceType) ||
+      normalizeServiceType(data?.user?.serviceType) ||
+      readSelectedServiceType(email);
     if (serviceType) {
       storeSelectedServiceType(serviceType, email);
     }
@@ -699,6 +1165,22 @@ export const authService = {
       user: email ? { fullName, email } : undefined,
       serviceType,
       onboardingStatus: data.onboardingStatus,
+      statistics: data.statistics
+        ? {
+            totalWebsites: getNumberFromData(data.statistics.totalWebsites),
+            drafts: getNumberFromData(data.statistics.drafts),
+            published: getNumberFromData(data.statistics.published),
+          }
+        : undefined,
+      actions: data.actions
+        ? {
+            hasDraft: Boolean(data.actions.hasDraft),
+            latestDraftId:
+              typeof data.actions.latestDraftId === 'string' && data.actions.latestDraftId.trim()
+                ? data.actions.latestDraftId
+                : null,
+          }
+        : undefined,
     };
   },
 
@@ -784,6 +1266,947 @@ export const authService = {
       return normalizeBiographyWebsite(getWebsiteFromResponse(data));
     } catch {
       throw new Error('Unable to load biography website');
+    }
+  },
+
+  async getBiographyWebsiteSections(websiteId: string): Promise<BiographyWebsiteSection[]> {
+    if (!websiteId || websiteId.startsWith('local-')) {
+      return [];
+    }
+
+    try {
+      const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/sections`), {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to load biography sections'));
+      }
+
+      return getSectionsFromResponse(data)
+        .map(normalizeBiographyWebsiteSection)
+        .sort((a, b) => (a.sortOrder ?? a.order ?? 0) - (b.sortOrder ?? b.order ?? 0));
+    } catch {
+      return [];
+    }
+  },
+
+  async getBiographyWebsiteContactMessages(websiteId: string): Promise<BiographyContactMessage[]> {
+    if (!websiteId || websiteId.startsWith('local-')) {
+      return [];
+    }
+
+    try {
+      const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/contact-messages`), {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to load contact messages'));
+      }
+
+      return getContactMessagesFromResponse(data)
+        .map(normalizeBiographyContactMessage)
+        .filter((message) => Boolean(message.id))
+        .sort((a, b) => {
+          const dateA = new Date(a.createdAt || 0).getTime();
+          const dateB = new Date(b.createdAt || 0).getTime();
+          return dateB - dateA;
+        });
+    } catch {
+      return [];
+    }
+  },
+
+  async getBiographyWebsiteMedia(websiteId: string): Promise<BiographyMediaAsset[]> {
+    if (!websiteId || websiteId.startsWith('local-')) {
+      return [];
+    }
+
+    try {
+      const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/media`), {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to load media assets'));
+      }
+
+      return getMediaAssetsFromResponse(data)
+        .map(normalizeBiographyMediaAsset)
+        .filter((mediaAsset) => Boolean(mediaAsset.mediaAssetId))
+        .sort((a, b) => {
+          const dateA = new Date(a.createdAt || 0).getTime();
+          const dateB = new Date(b.createdAt || 0).getTime();
+          return dateB - dateA;
+        });
+    } catch {
+      return [];
+    }
+  },
+
+  async uploadBiographyWebsiteMedia(
+    websiteId: string,
+    file: File,
+    usageType: MediaUsageType
+  ): Promise<BiographyMediaAsset | null> {
+    if (!websiteId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('usageType', usageType);
+
+      const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/media`), {
+        method: 'POST',
+        headers: getMultipartAuthHeaders(),
+        body: formData,
+      });
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to upload media'));
+      }
+
+      const mediaAsset = normalizeBiographyMediaAsset(getMediaAssetFromResponse(data));
+      return mediaAsset.mediaAssetId ? mediaAsset : null;
+    } catch {
+      return null;
+    }
+  },
+
+  async deleteBiographyWebsiteMedia(websiteId: string, mediaAssetId: string): Promise<boolean> {
+    if (!websiteId || !mediaAssetId || websiteId.startsWith('local-')) {
+      return false;
+    }
+
+    try {
+      const response = await fetch(
+        apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/media/${encodeURIComponent(mediaAssetId)}`),
+        {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+        }
+      );
+
+      if (!response.ok) {
+        const text = await response.text();
+        let data: any = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch {
+          data = { message: text };
+        }
+
+        throw new Error(getMessage(data, 'Unable to delete media'));
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async updateBiographyContactMessageStatus(
+    websiteId: string,
+    messageId: string,
+    payload: UpdateContactMessageStatusPayload
+  ): Promise<boolean> {
+    if (!websiteId || !messageId || websiteId.startsWith('local-')) {
+      return false;
+    }
+
+    try {
+      const response = await fetch(
+        apiUrl(
+          `/api/websites/${encodeURIComponent(websiteId)}/contact-messages/${encodeURIComponent(messageId)}/status`
+        ),
+        {
+          method: 'PATCH',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!response.ok) {
+        const text = await response.text();
+        let data: any = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch {
+          data = { message: text };
+        }
+
+        throw new Error(getMessage(data, 'Unable to update contact message status'));
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async deleteBiographyContactMessage(websiteId: string, messageId: string): Promise<boolean> {
+    if (!websiteId || !messageId || websiteId.startsWith('local-')) {
+      return false;
+    }
+
+    try {
+      const response = await fetch(
+        apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/contact-messages/${encodeURIComponent(messageId)}`),
+        {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+        }
+      );
+
+      if (!response.ok) {
+        const text = await response.text();
+        let data: any = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch {
+          data = { message: text };
+        }
+
+        throw new Error(getMessage(data, 'Unable to delete contact message'));
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async getBiographyWebsiteSection(
+    websiteId: string,
+    sectionId: string
+  ): Promise<BiographyWebsiteSection | null> {
+    if (!websiteId || !sectionId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        apiUrl(
+          `/api/websites/${encodeURIComponent(websiteId)}/sections/${encodeURIComponent(sectionId)}`
+        ),
+        {
+          method: 'GET',
+          headers: getAuthHeaders(),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to load biography section'));
+      }
+
+      return normalizeBiographyWebsiteSection(getSectionFromResponse(data), 0);
+    } catch {
+      return null;
+    }
+  },
+
+  async updateBiographyWebsiteSectionSettings(
+    websiteId: string,
+    sectionId: string,
+    payload: UpdateSectionSettingsPayload
+  ): Promise<BiographyWebsiteSection | null> {
+    if (!websiteId || !sectionId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        apiUrl(
+          `/api/websites/${encodeURIComponent(websiteId)}/sections/${encodeURIComponent(sectionId)}/settings`
+        ),
+        {
+          method: 'PATCH',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to update section settings'));
+      }
+
+      return data
+        ? normalizeBiographyWebsiteSection(getSectionFromResponse(data), 0, {
+            id: sectionId,
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+          })
+        : {
+            id: sectionId,
+            key: sectionId,
+            title: sectionId,
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+          };
+    } catch {
+      return null;
+    }
+  },
+
+  async deleteBiographyWebsiteSection(websiteId: string, sectionId: string): Promise<boolean> {
+    if (!websiteId || !sectionId || websiteId.startsWith('local-')) {
+      return false;
+    }
+
+    try {
+      const response = await fetch(
+        apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/sections/${encodeURIComponent(sectionId)}`),
+        {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+        }
+      );
+
+      if (!response.ok) {
+        const text = await response.text();
+        let data: any = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch {
+          data = { message: text };
+        }
+
+        throw new Error(getMessage(data, 'Unable to delete biography section'));
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async createHeroSection(
+    websiteId: string,
+    payload: CreateHeroSectionPayload
+  ): Promise<BiographyWebsiteSection | null> {
+    if (!websiteId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/sections/hero`), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to create hero section'));
+      }
+
+      return data
+        ? normalizeBiographyWebsiteSection(getSectionFromResponse(data), 0, {
+            key: 'hero',
+            title: 'Hero',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          })
+        : {
+            id: 'hero',
+            key: 'hero',
+            title: 'Hero',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          };
+    } catch {
+      return null;
+    }
+  },
+
+  async updateHeroSection(
+    websiteId: string,
+    sectionId: string,
+    payload: UpdateHeroSectionPayload
+  ): Promise<BiographyWebsiteSection | null> {
+    if (!websiteId || !sectionId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/sections/${encodeURIComponent(sectionId)}/hero`),
+        {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to update hero section'));
+      }
+
+      return data
+        ? normalizeBiographyWebsiteSection(getSectionFromResponse(data), 0, {
+            id: sectionId,
+            key: 'hero',
+            title: 'Hero',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          })
+        : {
+            id: sectionId,
+            key: 'hero',
+            title: 'Hero',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          };
+    } catch {
+      return null;
+    }
+  },
+
+  async createChronicleSection(
+    websiteId: string,
+    payload: CreateChronicleSectionPayload
+  ): Promise<BiographyWebsiteSection | null> {
+    if (!websiteId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/sections/chronicle`), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to create chronicle section'));
+      }
+
+      return data
+        ? normalizeBiographyWebsiteSection(getSectionFromResponse(data), 1, {
+            key: 'chronicle',
+            title: payload.sectionTitle || 'Chronicle',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          })
+        : {
+            id: 'chronicle',
+            key: 'chronicle',
+            title: payload.sectionTitle || 'Chronicle',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          };
+    } catch {
+      return null;
+    }
+  },
+
+  async updateChronicleSection(
+    websiteId: string,
+    sectionId: string,
+    payload: UpdateChronicleSectionPayload
+  ): Promise<BiographyWebsiteSection | null> {
+    if (!websiteId || !sectionId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/sections/${encodeURIComponent(sectionId)}/chronicle`),
+        {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to update chronicle section'));
+      }
+
+      return data
+        ? normalizeBiographyWebsiteSection(getSectionFromResponse(data), 1, {
+            id: sectionId,
+            key: 'chronicle',
+            title: payload.sectionTitle || 'Chronicle',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          })
+        : {
+            id: sectionId,
+            key: 'chronicle',
+            title: payload.sectionTitle || 'Chronicle',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          };
+    } catch {
+      return null;
+    }
+  },
+
+  async createPursuitsSection(
+    websiteId: string,
+    payload: CreatePursuitsSectionPayload
+  ): Promise<BiographyWebsiteSection | null> {
+    if (!websiteId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/sections/pursuits`), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to create pursuits section'));
+      }
+
+      return data
+        ? normalizeBiographyWebsiteSection(getSectionFromResponse(data), 2, {
+            key: 'pursuits',
+            title: payload.sectionLabel || 'Pursuits',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          })
+        : {
+            id: 'pursuits',
+            key: 'pursuits',
+            title: payload.sectionLabel || 'Pursuits',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          };
+    } catch {
+      return null;
+    }
+  },
+
+  async updatePursuitsSection(
+    websiteId: string,
+    sectionId: string,
+    payload: UpdatePursuitsSectionPayload
+  ): Promise<BiographyWebsiteSection | null> {
+    if (!websiteId || !sectionId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/sections/${encodeURIComponent(sectionId)}/pursuits`),
+        {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to update pursuits section'));
+      }
+
+      return data
+        ? normalizeBiographyWebsiteSection(getSectionFromResponse(data), 2, {
+            id: sectionId,
+            key: 'pursuits',
+            title: payload.sectionLabel || 'Pursuits',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          })
+        : {
+            id: sectionId,
+            key: 'pursuits',
+            title: payload.sectionLabel || 'Pursuits',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          };
+    } catch {
+      return null;
+    }
+  },
+
+  async createTimelineSection(
+    websiteId: string,
+    payload: CreateTimelineSectionPayload
+  ): Promise<BiographyWebsiteSection | null> {
+    if (!websiteId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/sections/timeline`), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to create timeline section'));
+      }
+
+      return data
+        ? normalizeBiographyWebsiteSection(getSectionFromResponse(data), 3, {
+            key: 'timeline',
+            title: payload.sectionTitle || 'Timeline',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          })
+        : {
+            id: 'timeline',
+            key: 'timeline',
+            title: payload.sectionTitle || 'Timeline',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          };
+    } catch {
+      return null;
+    }
+  },
+
+  async updateTimelineSection(
+    websiteId: string,
+    sectionId: string,
+    payload: UpdateTimelineSectionPayload
+  ): Promise<BiographyWebsiteSection | null> {
+    if (!websiteId || !sectionId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/sections/${encodeURIComponent(sectionId)}/timeline`),
+        {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to update timeline section'));
+      }
+
+      return data
+        ? normalizeBiographyWebsiteSection(getSectionFromResponse(data), 3, {
+            id: sectionId,
+            key: 'timeline',
+            title: payload.sectionTitle || 'Timeline',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          })
+        : {
+            id: sectionId,
+            key: 'timeline',
+            title: payload.sectionTitle || 'Timeline',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          };
+    } catch {
+      return null;
+    }
+  },
+
+  async createGallerySection(
+    websiteId: string,
+    payload: CreateGallerySectionPayload
+  ): Promise<BiographyWebsiteSection | null> {
+    if (!websiteId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/sections/gallery`), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to create gallery section'));
+      }
+
+      return data
+        ? normalizeBiographyWebsiteSection(getSectionFromResponse(data), 4, {
+            key: 'gallery',
+            title: payload.sectionTitle || 'Gallery',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          })
+        : {
+            id: 'gallery',
+            key: 'gallery',
+            title: payload.sectionTitle || 'Gallery',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          };
+    } catch {
+      return null;
+    }
+  },
+
+  async updateGallerySection(
+    websiteId: string,
+    sectionId: string,
+    payload: UpdateGallerySectionPayload
+  ): Promise<BiographyWebsiteSection | null> {
+    if (!websiteId || !sectionId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/sections/${encodeURIComponent(sectionId)}/gallery`),
+        {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to update gallery section'));
+      }
+
+      return data
+        ? normalizeBiographyWebsiteSection(getSectionFromResponse(data), 4, {
+            id: sectionId,
+            key: 'gallery',
+            title: payload.sectionTitle || 'Gallery',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          })
+        : {
+            id: sectionId,
+            key: 'gallery',
+            title: payload.sectionTitle || 'Gallery',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          };
+    } catch {
+      return null;
+    }
+  },
+
+  async createContactSection(
+    websiteId: string,
+    payload: CreateContactSectionPayload
+  ): Promise<BiographyWebsiteSection | null> {
+    if (!websiteId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/sections/contact`), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to create contact section'));
+      }
+
+      return data
+        ? normalizeBiographyWebsiteSection(getSectionFromResponse(data), 6, {
+            key: 'contact',
+            title: payload.sectionTitle || 'Contact',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          })
+        : {
+            id: 'contact',
+            key: 'contact',
+            title: payload.sectionTitle || 'Contact',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          };
+    } catch {
+      return null;
+    }
+  },
+
+  async updateContactSection(
+    websiteId: string,
+    sectionId: string,
+    payload: UpdateContactSectionPayload
+  ): Promise<BiographyWebsiteSection | null> {
+    if (!websiteId || !sectionId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/sections/${encodeURIComponent(sectionId)}/contact`),
+        {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to update contact section'));
+      }
+
+      return data
+        ? normalizeBiographyWebsiteSection(getSectionFromResponse(data), 6, {
+            id: sectionId,
+            key: 'contact',
+            title: payload.sectionTitle || 'Contact',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          })
+        : {
+            id: sectionId,
+            key: 'contact',
+            title: payload.sectionTitle || 'Contact',
+            isVisible: payload.isVisible,
+            sortOrder: payload.sortOrder,
+            order: payload.sortOrder,
+            content: payload,
+          };
+    } catch {
+      return null;
+    }
+  },
+
+  async createPublicContactMessage(
+    websiteId: string,
+    payload: CreatePublicContactMessagePayload
+  ): Promise<boolean> {
+    if (!websiteId || websiteId.startsWith('local-')) {
+      return false;
+    }
+
+    try {
+      const response = await fetch(
+        apiUrl(`/api/public/websites/${encodeURIComponent(websiteId)}/contact-messages`),
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!response.ok) {
+        const text = await response.text();
+        let data: any = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch {
+          data = { message: text };
+        }
+
+        throw new Error(getMessage(data, 'Unable to send contact message'));
+      }
+
+      return true;
+    } catch {
+      return false;
     }
   }
 };
