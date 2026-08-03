@@ -2,6 +2,7 @@ package com.AI.biography.integration;
 
 import com.AI.biography.section.dto.request.*;
 import com.AI.biography.section.entity.WebsiteMediaAsset;
+import com.AI.biography.media.MediaUsageType;
 import com.AI.biography.section.enums.GalleryMediaType;
 import com.AI.biography.section.enums.MediaType;
 import com.AI.biography.section.enums.SocialPlatform;
@@ -60,8 +61,12 @@ final class TestDataFactory {
         media.setWebsite(website);
         media.setMediaType(MediaType.IMAGE);
         media.setOriginalFileName("portrait.jpg");
+        media.setStorageProvider("SUPABASE");
+        media.setBucketName("test-bucket");
         media.setStorageKey("tests/" + media.getMediaAssetId() + ".jpg");
         media.setPublicUrl("https://cdn.example.com/" + media.getMediaAssetId() + ".jpg");
+        media.setUploadedByUserId(website.getUserId());
+        media.setUsageType(MediaUsageType.GALLERY);
         media.setMimeType("image/jpeg");
         media.setFileSizeBytes(1024L);
         media.setWidthPx(800);

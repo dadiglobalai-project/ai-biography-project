@@ -8,8 +8,8 @@ import java.util.List;
 
 public interface ContactMessageService {
     PublicContactMessageResponse createPublicMessage(String websiteId, PublicContactMessageRequest request);
-    List<ContactMessageResponse> getMessages(String websiteId);
-    ContactMessageResponse getMessage(String websiteId, String messageId);
-    ContactMessageResponse updateStatus(String websiteId, String messageId, ContactMessageStatusRequest request);
-    void deleteMessage(String websiteId, String messageId);
+    List<ContactMessageResponse> getMessages(String userId, String websiteId);
+    ContactMessageResponse getMessage(String userId, String websiteId, String messageId);
+    ContactMessageResponse updateStatus(String userId, String websiteId, String messageId, ContactMessageStatusRequest request);
+    void deleteMessage(String userId, String websiteId, String messageId);
 }

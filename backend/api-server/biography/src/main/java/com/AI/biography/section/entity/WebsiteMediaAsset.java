@@ -1,5 +1,6 @@
 package com.AI.biography.section.entity;
 
+import com.AI.biography.media.MediaUsageType;
 import com.AI.biography.section.enums.MediaType;
 import com.AI.biography.website.BiographyWebsite;
 import jakarta.persistence.*;
@@ -23,11 +24,24 @@ public class WebsiteMediaAsset {
     @Column(name = "original_file_name", length = 500)
     private String originalFileName;
 
+    @Column(name = "storage_provider", nullable = false, length = 50)
+    private String storageProvider;
+
+    @Column(name = "bucket_name", nullable = false, length = 255)
+    private String bucketName;
+
     @Column(name = "storage_key", nullable = false, length = 1000)
     private String storageKey;
 
     @Column(name = "public_url", length = 2000)
     private String publicUrl;
+
+    @Column(name = "uploaded_by_user_id", columnDefinition = "CHAR(36)", length = 36)
+    private String uploadedByUserId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "usage_type", nullable = false, length = 50)
+    private MediaUsageType usageType;
 
     @Column(name = "mime_type", length = 150)
     private String mimeType;
@@ -58,10 +72,18 @@ public class WebsiteMediaAsset {
     public void setMediaType(MediaType mediaType) { this.mediaType = mediaType; }
     public String getOriginalFileName() { return originalFileName; }
     public void setOriginalFileName(String originalFileName) { this.originalFileName = originalFileName; }
+    public String getStorageProvider() { return storageProvider; }
+    public void setStorageProvider(String storageProvider) { this.storageProvider = storageProvider; }
+    public String getBucketName() { return bucketName; }
+    public void setBucketName(String bucketName) { this.bucketName = bucketName; }
     public String getStorageKey() { return storageKey; }
     public void setStorageKey(String storageKey) { this.storageKey = storageKey; }
     public String getPublicUrl() { return publicUrl; }
     public void setPublicUrl(String publicUrl) { this.publicUrl = publicUrl; }
+    public String getUploadedByUserId() { return uploadedByUserId; }
+    public void setUploadedByUserId(String uploadedByUserId) { this.uploadedByUserId = uploadedByUserId; }
+    public MediaUsageType getUsageType() { return usageType; }
+    public void setUsageType(MediaUsageType usageType) { this.usageType = usageType; }
     public String getMimeType() { return mimeType; }
     public void setMimeType(String mimeType) { this.mimeType = mimeType; }
     public Long getFileSizeBytes() { return fileSizeBytes; }

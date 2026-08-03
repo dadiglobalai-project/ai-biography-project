@@ -33,6 +33,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class BiographySectionServiceImplTest {
+    private static final String USER_ID = "user-1";
     private static final String WEBSITE_ID = "website-1";
     private static final String SECTION_ID = "section-1";
 
@@ -53,7 +54,7 @@ class BiographySectionServiceImplTest {
 
     @Test
     void createHeroSavesSectionWithMediaAndSortOrder() {
-        when(websiteRepository.findById(WEBSITE_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
         when(sectionRepository.existsByWebsiteWebsiteIdAndSectionType(WEBSITE_ID, SectionType.HERO)).thenReturn(false);
         when(mediaAssetRepository.findByMediaAssetIdAndWebsiteWebsiteId("media-1", WEBSITE_ID))
                 .thenReturn(Optional.of(media("media-1", WEBSITE_ID)));
@@ -62,7 +63,7 @@ class BiographySectionServiceImplTest {
         HeroSectionRequest request = heroRequest();
         request.profileImageId = "media-1";
 
-        var response = service.createHero(WEBSITE_ID, request);
+        var response = service.createHero(USER_ID, WEBSITE_ID, request);
 
         assertThat(response.sectionType).isEqualTo(SectionType.HERO);
         assertThat(response.sectionKey).isEqualTo("hero");
@@ -79,10 +80,10 @@ class BiographySectionServiceImplTest {
     void updateHeroRejectsWrongSectionType() {
         BiographySection section = section(SectionType.CONTACT);
         section.setContactSection(new ContactSection());
-        when(websiteRepository.findById(WEBSITE_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
         when(sectionRepository.findBySectionIdAndWebsiteWebsiteId(SECTION_ID, WEBSITE_ID)).thenReturn(Optional.of(section));
 
-        assertThatThrownBy(() -> service.updateHero(WEBSITE_ID, SECTION_ID, heroRequest()))
+        assertThatThrownBy(() -> service.updateHero(USER_ID, WEBSITE_ID, SECTION_ID, heroRequest()))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessage("Invalid section type");
     }
@@ -92,11 +93,11 @@ class BiographySectionServiceImplTest {
         BiographySection section = heroSection();
         HeroSectionRequest request = heroRequest();
         request.profileImageId = "other-media";
-        when(websiteRepository.findById(WEBSITE_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
         when(sectionRepository.findBySectionIdAndWebsiteWebsiteId(SECTION_ID, WEBSITE_ID)).thenReturn(Optional.of(section));
         when(mediaAssetRepository.findByMediaAssetIdAndWebsiteWebsiteId("other-media", WEBSITE_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.updateHero(WEBSITE_ID, SECTION_ID, request))
+        assertThatThrownBy(() -> service.updateHero(USER_ID, WEBSITE_ID, SECTION_ID, request))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessage("Media asset does not belong to this website");
     }
@@ -104,41 +105,52 @@ class BiographySectionServiceImplTest {
     @Test
     void getAndDeleteUseWebsiteScopedSectionLookup() {
         BiographySection section = heroSection();
-        when(websiteRepository.findById(WEBSITE_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
         when(sectionRepository.findBySectionIdAndWebsiteWebsiteId(SECTION_ID, WEBSITE_ID)).thenReturn(Optional.of(section));
 
-        assertThat(service.getSection(WEBSITE_ID, SECTION_ID).sectionId).isEqualTo(SECTION_ID);
+        assertThat(service.getSection(USER_ID, WEBSITE_ID, SECTION_ID).sectionId).isEqualTo(SECTION_ID);
 
-        service.deleteSection(WEBSITE_ID, SECTION_ID);
+        service.deleteSection(USER_ID, WEBSITE_ID, SECTION_ID);
 
         verify(sectionRepository).delete(section);
     }
 
     @Test
     void missingWebsiteAndWrongWebsiteOwnershipReturnNotFound() {
-        when(websiteRepository.findById("missing")).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.getSections("missing"))
+        when(websiteRepository.findByWebsiteIdAndUserId("missing", USER_ID)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.getSections(USER_ID, "missing"))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessage("Website not found");
 
-        when(websiteRepository.findById(WEBSITE_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
         when(sectionRepository.findBySectionIdAndWebsiteWebsiteId(SECTION_ID, WEBSITE_ID)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.getSection(WEBSITE_ID, SECTION_ID))
+        assertThatThrownBy(() -> service.getSection(USER_ID, WEBSITE_ID, SECTION_ID))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessage("Section not found");
     }
 
     @Test
+    void nonOwnerCannotAccessSections() {
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, "other-user")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getSections("other-user", WEBSITE_ID))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Website not found");
+
+        verifyNoInteractions(sectionRepository);
+    }
+
+    @Test
     void updateSettingsPreservesRequestedSortOrderAndVisibility() {
         BiographySection section = heroSection();
-        when(websiteRepository.findById(WEBSITE_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
         when(sectionRepository.findBySectionIdAndWebsiteWebsiteId(SECTION_ID, WEBSITE_ID)).thenReturn(Optional.of(section));
 
         SectionSettingsRequest request = new SectionSettingsRequest();
         request.sortOrder = 7;
         request.isVisible = false;
 
-        var response = service.updateSettings(WEBSITE_ID, SECTION_ID, request);
+        var response = service.updateSettings(USER_ID, WEBSITE_ID, SECTION_ID, request);
 
         assertThat(response.sortOrder).isEqualTo(7);
         assertThat(response.isVisible).isFalse();
@@ -147,7 +159,7 @@ class BiographySectionServiceImplTest {
     @Test
     void updateChronicleCreatesUpdatesAndRemovesBeliefs() {
         BiographySection section = chronicleSectionWithBeliefs();
-        when(websiteRepository.findById(WEBSITE_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
         when(sectionRepository.findBySectionIdAndWebsiteWebsiteId(SECTION_ID, WEBSITE_ID)).thenReturn(Optional.of(section));
 
         ChronicleSectionRequest request = chronicleRequest();
@@ -155,7 +167,7 @@ class BiographySectionServiceImplTest {
         request.beliefs.items.get(0).title = "Updated belief";
         request.beliefs.items.add(beliefRequest(null, "New belief", 3));
 
-        var response = service.updateChronicle(WEBSITE_ID, SECTION_ID, request);
+        var response = service.updateChronicle(USER_ID, WEBSITE_ID, SECTION_ID, request);
 
         SectionContentResponses.ChronicleContent content = (SectionContentResponses.ChronicleContent) response.content;
         assertThat(content.beliefs.items).hasSize(2);
@@ -168,7 +180,7 @@ class BiographySectionServiceImplTest {
     @Test
     void updatePursuitsCreatesUpdatesRemovesItemsAndValidatesMediaOwnership() {
         BiographySection section = pursuitSectionWithItems();
-        when(websiteRepository.findById(WEBSITE_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
         when(sectionRepository.findBySectionIdAndWebsiteWebsiteId(SECTION_ID, WEBSITE_ID)).thenReturn(Optional.of(section));
         when(mediaAssetRepository.findByMediaAssetIdAndWebsiteWebsiteId("media-1", WEBSITE_ID))
                 .thenReturn(Optional.of(media("media-1", WEBSITE_ID)));
@@ -179,7 +191,7 @@ class BiographySectionServiceImplTest {
         request.items.get(0).title = "Updated pursuit";
         request.items.add(pursuitItemRequest(null, null, "New pursuit", 5));
 
-        var response = service.updatePursuits(WEBSITE_ID, SECTION_ID, request);
+        var response = service.updatePursuits(USER_ID, WEBSITE_ID, SECTION_ID, request);
 
         SectionContentResponses.PursuitContent content = (SectionContentResponses.PursuitContent) response.content;
         assertThat(content.items).hasSize(2);
@@ -193,7 +205,7 @@ class BiographySectionServiceImplTest {
     @Test
     void updateTimelineCreatesUpdatesRemovesEventsAndHighlights() {
         BiographySection section = timelineSectionWithEvents();
-        when(websiteRepository.findById(WEBSITE_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
         when(sectionRepository.findBySectionIdAndWebsiteWebsiteId(SECTION_ID, WEBSITE_ID)).thenReturn(Optional.of(section));
 
         TimelineSectionRequest request = timelineRequest();
@@ -203,7 +215,7 @@ class BiographySectionServiceImplTest {
         request.timelineEvents.get(0).highlights.get(0).highlightText = "Updated highlight";
         request.timelineEvents.get(0).highlights.add(highlightRequest(null, "New highlight", 4));
 
-        var response = service.updateTimeline(WEBSITE_ID, SECTION_ID, request);
+        var response = service.updateTimeline(USER_ID, WEBSITE_ID, SECTION_ID, request);
 
         SectionContentResponses.TimelineContent content = (SectionContentResponses.TimelineContent) response.content;
         assertThat(content.timelineEvents).hasSize(1);
@@ -217,7 +229,7 @@ class BiographySectionServiceImplTest {
     @Test
     void updateGalleryCreatesUpdatesRemovesItemsAndValidatesMediaOwnership() {
         BiographySection section = gallerySectionWithItems();
-        when(websiteRepository.findById(WEBSITE_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
         when(sectionRepository.findBySectionIdAndWebsiteWebsiteId(SECTION_ID, WEBSITE_ID)).thenReturn(Optional.of(section));
         when(mediaAssetRepository.findByMediaAssetIdAndWebsiteWebsiteId("media-1", WEBSITE_ID))
                 .thenReturn(Optional.of(media("media-1", WEBSITE_ID)));
@@ -227,7 +239,7 @@ class BiographySectionServiceImplTest {
         request.items.get(0).title = "Updated gallery item";
         request.items.get(0).mediaAssetId = "media-1";
 
-        var response = service.updateGallery(WEBSITE_ID, SECTION_ID, request);
+        var response = service.updateGallery(USER_ID, WEBSITE_ID, SECTION_ID, request);
 
         SectionContentResponses.GalleryContent content = (SectionContentResponses.GalleryContent) response.content;
         assertThat(content.items).hasSize(1);
@@ -239,7 +251,7 @@ class BiographySectionServiceImplTest {
     @Test
     void updateContactCreatesUpdatesRemovesSocialLinksAndFormSettings() {
         BiographySection section = contactSectionWithLinks();
-        when(websiteRepository.findById(WEBSITE_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
         when(sectionRepository.findBySectionIdAndWebsiteWebsiteId(SECTION_ID, WEBSITE_ID)).thenReturn(Optional.of(section));
 
         ContactSectionRequest request = contactRequest();
@@ -247,7 +259,7 @@ class BiographySectionServiceImplTest {
         request.socialLinks.get(0).displayName = "Updated Instagram";
         request.socialLinks.add(socialRequest(null, SocialPlatform.LINKEDIN, "LinkedIn", 4));
 
-        var response = service.updateContact(WEBSITE_ID, SECTION_ID, request);
+        var response = service.updateContact(USER_ID, WEBSITE_ID, SECTION_ID, request);
 
         SectionContentResponses.ContactContent content = (SectionContentResponses.ContactContent) response.content;
         assertThat(content.socialLinks).hasSize(2);
@@ -261,6 +273,7 @@ class BiographySectionServiceImplTest {
     private BiographyWebsite website(String websiteId) {
         BiographyWebsite website = new BiographyWebsite();
         website.setWebsiteId(websiteId);
+        website.setUserId(USER_ID);
         return website;
     }
 

@@ -28,6 +28,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ContactMessageServiceImplTest {
+    private static final String USER_ID = "user-1";
     private static final String WEBSITE_ID = "website-1";
     private static final String MESSAGE_ID = "message-1";
 
@@ -64,29 +65,29 @@ class ContactMessageServiceImplTest {
     @Test
     void getUpdateAndDeleteUseWebsiteScopedMessageLookup() {
         ContactMessage message = message();
-        when(websiteRepository.findById(WEBSITE_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
         when(contactMessageRepository.findByContactMessageIdAndWebsiteWebsiteId(MESSAGE_ID, WEBSITE_ID))
                 .thenReturn(Optional.of(message));
 
-        assertThat(service.getMessage(WEBSITE_ID, MESSAGE_ID).contactMessageId).isEqualTo(MESSAGE_ID);
+        assertThat(service.getMessage(USER_ID, WEBSITE_ID, MESSAGE_ID).contactMessageId).isEqualTo(MESSAGE_ID);
 
         ContactMessageStatusRequest statusRequest = new ContactMessageStatusRequest();
         statusRequest.status = ContactMessageStatus.REPLIED;
-        var updated = service.updateStatus(WEBSITE_ID, MESSAGE_ID, statusRequest);
+        var updated = service.updateStatus(USER_ID, WEBSITE_ID, MESSAGE_ID, statusRequest);
         assertThat(updated.status).isEqualTo(ContactMessageStatus.REPLIED);
         assertThat(updated.repliedAt).isNotNull();
 
-        service.deleteMessage(WEBSITE_ID, MESSAGE_ID);
+        service.deleteMessage(USER_ID, WEBSITE_ID, MESSAGE_ID);
         verify(contactMessageRepository).delete(message);
     }
 
     @Test
     void getMessagesReturnsMessagesForWebsite() {
-        when(websiteRepository.findById(WEBSITE_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
         when(contactMessageRepository.findByWebsiteWebsiteIdOrderBySubmittedAtDesc(WEBSITE_ID))
                 .thenReturn(List.of(message()));
 
-        var responses = service.getMessages(WEBSITE_ID);
+        var responses = service.getMessages(USER_ID, WEBSITE_ID);
 
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).websiteId).isEqualTo(WEBSITE_ID);
@@ -100,18 +101,30 @@ class ContactMessageServiceImplTest {
                 .isInstanceOf(NotFoundException.class)
                 .hasMessage("Website not found");
 
-        when(websiteRepository.findById(WEBSITE_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
         when(contactMessageRepository.findByContactMessageIdAndWebsiteWebsiteId(MESSAGE_ID, WEBSITE_ID))
                 .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getMessage(WEBSITE_ID, MESSAGE_ID))
+        assertThatThrownBy(() -> service.getMessage(USER_ID, WEBSITE_ID, MESSAGE_ID))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessage("Contact message not found");
+    }
+
+    @Test
+    void privateMessageAccessRejectsNonOwner() {
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, "other-user")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getMessages("other-user", WEBSITE_ID))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Website not found");
+
+        verifyNoInteractions(contactMessageRepository);
     }
 
     private BiographyWebsite website(String websiteId) {
         BiographyWebsite website = new BiographyWebsite();
         website.setWebsiteId(websiteId);
+        website.setUserId(USER_ID);
         return website;
     }
 

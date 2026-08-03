@@ -65,12 +65,14 @@ class ContactMessageControllerIntegrationTest {
 
         assertThat(contactMessageRepository.findById(messageId)).isPresent();
 
-        mockMvc.perform(get("/api/websites/{websiteId}/contact-messages", fixture.websiteId()))
+        mockMvc.perform(get("/api/websites/{websiteId}/contact-messages", fixture.websiteId())
+                        .requestAttr("userId", fixture.userId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].contactMessageId").value(messageId))
                 .andExpect(jsonPath("$[0].senderEmail").value("grace@example.com"));
 
-        mockMvc.perform(get("/api/websites/{websiteId}/contact-messages/{messageId}", fixture.websiteId(), messageId))
+        mockMvc.perform(get("/api/websites/{websiteId}/contact-messages/{messageId}", fixture.websiteId(), messageId)
+                        .requestAttr("userId", fixture.userId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.websiteId").value(fixture.websiteId()))
                 .andExpect(jsonPath("$.contactMessageId").value(messageId));
@@ -78,6 +80,7 @@ class ContactMessageControllerIntegrationTest {
         ContactMessageStatusRequest readRequest = new ContactMessageStatusRequest();
         readRequest.status = ContactMessageStatus.READ;
         mockMvc.perform(patch("/api/websites/{websiteId}/contact-messages/{messageId}/status", fixture.websiteId(), messageId)
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(readRequest)))
                 .andExpect(status().isOk())
@@ -87,18 +90,21 @@ class ContactMessageControllerIntegrationTest {
         ContactMessageStatusRequest repliedRequest = new ContactMessageStatusRequest();
         repliedRequest.status = ContactMessageStatus.REPLIED;
         mockMvc.perform(patch("/api/websites/{websiteId}/contact-messages/{messageId}/status", fixture.websiteId(), messageId)
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(repliedRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("REPLIED"))
                 .andExpect(jsonPath("$.repliedAt").isNotEmpty());
 
-        mockMvc.perform(delete("/api/websites/{websiteId}/contact-messages/{messageId}", fixture.websiteId(), messageId))
+        mockMvc.perform(delete("/api/websites/{websiteId}/contact-messages/{messageId}", fixture.websiteId(), messageId)
+                        .requestAttr("userId", fixture.userId()))
                 .andExpect(status().isNoContent());
 
         assertThat(contactMessageRepository.findById(messageId)).isEmpty();
 
-        mockMvc.perform(delete("/api/websites/{websiteId}/contact-messages/{messageId}", fixture.websiteId(), messageId))
+        mockMvc.perform(delete("/api/websites/{websiteId}/contact-messages/{messageId}", fixture.websiteId(), messageId)
+                        .requestAttr("userId", fixture.userId()))
                 .andExpect(status().isNotFound());
     }
 
@@ -126,21 +132,27 @@ class ContactMessageControllerIntegrationTest {
                 .andReturn();
         String messageId = read(create).get("contactMessageId").asText();
 
-        mockMvc.perform(get("/api/websites/{websiteId}/contact-messages/{messageId}", other.websiteId(), messageId))
+        mockMvc.perform(get("/api/websites/{websiteId}/contact-messages/{messageId}", other.websiteId(), messageId)
+                        .requestAttr("userId", other.userId()))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/websites/{websiteId}/contact-messages", fixture.websiteId())
+                        .requestAttr("userId", other.userId()))
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(patch("/api/websites/{websiteId}/contact-messages/{messageId}/status", fixture.websiteId(), messageId)
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"NOT_REAL\"}"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    void currentSecurityConfigurationLeavesAdminEndpointsPublic() throws Exception {
+    void privateEndpointsRequireOwnedWebsite() throws Exception {
         Fixture fixture = fixture();
 
         mockMvc.perform(get("/api/websites/{websiteId}/contact-messages", fixture.websiteId()))
-                .andExpect(status().isOk());
+                .andExpect(status().isNotFound());
     }
 
     private Fixture fixture() {
@@ -148,7 +160,7 @@ class ContactMessageControllerIntegrationTest {
         var template = templateRepository.saveAndFlush(TestDataFactory.template());
         BiographyWebsite website = websiteRepository.saveAndFlush(TestDataFactory.website(user, template));
         WebsiteMediaAsset media = mediaRepository.saveAndFlush(TestDataFactory.media(website));
-        return new Fixture(website.getWebsiteId(), media.getMediaAssetId());
+        return new Fixture(user.getUserId(), website.getWebsiteId(), media.getMediaAssetId());
     }
 
     private String json(Object body) throws Exception {
@@ -159,6 +171,6 @@ class ContactMessageControllerIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString());
     }
 
-    private record Fixture(String websiteId, String mediaId) {
+    private record Fixture(String userId, String websiteId, String mediaId) {
     }
 }

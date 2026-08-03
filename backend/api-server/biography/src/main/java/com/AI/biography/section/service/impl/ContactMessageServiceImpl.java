@@ -51,8 +51,8 @@ public class ContactMessageServiceImpl implements ContactMessageService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ContactMessageResponse> getMessages(String websiteId) {
-        requireWebsite(websiteId);
+    public List<ContactMessageResponse> getMessages(String userId, String websiteId) {
+        requireOwnedWebsite(userId, websiteId);
         return contactMessageRepository.findByWebsiteWebsiteIdOrderBySubmittedAtDesc(websiteId)
                 .stream()
                 .map(mapper::toContactMessageResponse)
@@ -61,14 +61,14 @@ public class ContactMessageServiceImpl implements ContactMessageService {
 
     @Override
     @Transactional(readOnly = true)
-    public ContactMessageResponse getMessage(String websiteId, String messageId) {
-        return mapper.toContactMessageResponse(requireMessage(websiteId, messageId));
+    public ContactMessageResponse getMessage(String userId, String websiteId, String messageId) {
+        return mapper.toContactMessageResponse(requireMessage(userId, websiteId, messageId));
     }
 
     @Override
     @Transactional
-    public ContactMessageResponse updateStatus(String websiteId, String messageId, ContactMessageStatusRequest request) {
-        ContactMessage message = requireMessage(websiteId, messageId);
+    public ContactMessageResponse updateStatus(String userId, String websiteId, String messageId, ContactMessageStatusRequest request) {
+        ContactMessage message = requireMessage(userId, websiteId, messageId);
         message.setStatus(request.status);
         if (request.status == ContactMessageStatus.READ && message.getReadAt() == null) {
             message.setReadAt(LocalDateTime.now());
@@ -81,8 +81,8 @@ public class ContactMessageServiceImpl implements ContactMessageService {
 
     @Override
     @Transactional
-    public void deleteMessage(String websiteId, String messageId) {
-        ContactMessage message = requireMessage(websiteId, messageId);
+    public void deleteMessage(String userId, String websiteId, String messageId) {
+        ContactMessage message = requireMessage(userId, websiteId, messageId);
         contactMessageRepository.delete(message);
     }
 
@@ -91,8 +91,13 @@ public class ContactMessageServiceImpl implements ContactMessageService {
                 .orElseThrow(() -> new NotFoundException("Website not found"));
     }
 
-    private ContactMessage requireMessage(String websiteId, String messageId) {
-        requireWebsite(websiteId);
+    private BiographyWebsite requireOwnedWebsite(String userId, String websiteId) {
+        return websiteRepository.findByWebsiteIdAndUserId(websiteId, userId)
+                .orElseThrow(() -> new NotFoundException("Website not found"));
+    }
+
+    private ContactMessage requireMessage(String userId, String websiteId, String messageId) {
+        requireOwnedWebsite(userId, websiteId);
         return contactMessageRepository.findByContactMessageIdAndWebsiteWebsiteId(messageId, websiteId)
                 .orElseThrow(() -> new NotFoundException("Contact message not found"));
     }

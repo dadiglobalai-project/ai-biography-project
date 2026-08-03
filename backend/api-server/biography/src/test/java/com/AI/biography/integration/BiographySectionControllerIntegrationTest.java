@@ -60,6 +60,7 @@ class BiographySectionControllerIntegrationTest {
         Fixture fixture = fixture();
 
         MvcResult create = mockMvc.perform(post("/api/websites/{websiteId}/sections/hero", fixture.websiteId())
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(TestDataFactory.hero(fixture.mediaId()))))
                 .andExpect(status().isCreated())
@@ -71,7 +72,8 @@ class BiographySectionControllerIntegrationTest {
 
         assertThat(count("hero_sections", "section_id", sectionId)).isEqualTo(1);
 
-        mockMvc.perform(get("/api/websites/{websiteId}/sections/{sectionId}", fixture.websiteId(), sectionId))
+        mockMvc.perform(get("/api/websites/{websiteId}/sections/{sectionId}", fixture.websiteId(), sectionId)
+                        .requestAttr("userId", fixture.userId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sectionId").value(sectionId))
                 .andExpect(jsonPath("$.content.profileImageId").value(fixture.mediaId()));
@@ -81,6 +83,7 @@ class BiographySectionControllerIntegrationTest {
         settings.sortOrder = 12;
 
         mockMvc.perform(patch("/api/websites/{websiteId}/sections/{sectionId}/settings", fixture.websiteId(), sectionId)
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(settings)))
                 .andExpect(status().isOk())
@@ -88,13 +91,15 @@ class BiographySectionControllerIntegrationTest {
                 .andExpect(jsonPath("$.isVisible").value(false))
                 .andExpect(jsonPath("$.content.fullName").value("Ada Lovelace"));
 
-        mockMvc.perform(delete("/api/websites/{websiteId}/sections/{sectionId}", fixture.websiteId(), sectionId))
+        mockMvc.perform(delete("/api/websites/{websiteId}/sections/{sectionId}", fixture.websiteId(), sectionId)
+                        .requestAttr("userId", fixture.userId()))
                 .andExpect(status().isNoContent());
 
         assertThat(count("biography_sections", "section_id", sectionId)).isZero();
         assertThat(count("hero_sections", "section_id", sectionId)).isZero();
 
-        mockMvc.perform(delete("/api/websites/{websiteId}/sections/{sectionId}", fixture.websiteId(), sectionId))
+        mockMvc.perform(delete("/api/websites/{websiteId}/sections/{sectionId}", fixture.websiteId(), sectionId)
+                        .requestAttr("userId", fixture.userId()))
                 .andExpect(status().isNotFound());
     }
 
@@ -102,15 +107,18 @@ class BiographySectionControllerIntegrationTest {
     void sectionsEndpointReturnsSectionsInSortOrder() throws Exception {
         Fixture fixture = fixture();
         mockMvc.perform(post("/api/websites/{websiteId}/sections/hero", fixture.websiteId())
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(TestDataFactory.hero(fixture.mediaId()))))
                 .andExpect(status().isCreated());
         mockMvc.perform(post("/api/websites/{websiteId}/sections/chronicle", fixture.websiteId())
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(TestDataFactory.chronicle())))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(get("/api/websites/{websiteId}/sections", fixture.websiteId()))
+        mockMvc.perform(get("/api/websites/{websiteId}/sections", fixture.websiteId())
+                        .requestAttr("userId", fixture.userId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.websiteId").value(fixture.websiteId()))
                 .andExpect(jsonPath("$.sections[0].sortOrder").value(2))
@@ -120,7 +128,7 @@ class BiographySectionControllerIntegrationTest {
     @Test
     void chroniclePostAndPutUpdatesAddsAndRemovesBeliefs() throws Exception {
         Fixture fixture = fixture();
-        MvcResult create = postSection(fixture.websiteId(), "chronicle", TestDataFactory.chronicle());
+        MvcResult create = postSection(fixture, "chronicle", TestDataFactory.chronicle());
         JsonNode created = read(create);
         String sectionId = created.get("sectionId").asText();
         String keptBeliefId = created.at("/content/beliefs/items/0/id").asText();
@@ -132,6 +140,7 @@ class BiographySectionControllerIntegrationTest {
                 TestDataFactory.belief(null, "New courage", 5));
 
         mockMvc.perform(put("/api/websites/{websiteId}/sections/{sectionId}/chronicle", fixture.websiteId(), sectionId)
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(update)))
                 .andExpect(status().isOk())
@@ -145,7 +154,7 @@ class BiographySectionControllerIntegrationTest {
     @Test
     void pursuitsPostAndPutUpdatesAddsAndRemovesItems() throws Exception {
         Fixture fixture = fixture();
-        MvcResult create = postSection(fixture.websiteId(), "pursuits", TestDataFactory.pursuits(fixture.mediaId()));
+        MvcResult create = postSection(fixture, "pursuits", TestDataFactory.pursuits(fixture.mediaId()));
         JsonNode created = read(create);
         String sectionId = created.get("sectionId").asText();
         String keptItemId = created.at("/content/items/0/id").asText();
@@ -156,6 +165,7 @@ class BiographySectionControllerIntegrationTest {
                 TestDataFactory.pursuit(null, "New lecturing", null, 4));
 
         mockMvc.perform(put("/api/websites/{websiteId}/sections/{sectionId}/pursuits", fixture.websiteId(), sectionId)
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(update)))
                 .andExpect(status().isOk())
@@ -169,7 +179,7 @@ class BiographySectionControllerIntegrationTest {
     @Test
     void timelinePostAndPutUpdatesAddsAndRemovesEventsAndHighlights() throws Exception {
         Fixture fixture = fixture();
-        MvcResult create = postSection(fixture.websiteId(), "timeline", TestDataFactory.timeline(fixture.mediaId()));
+        MvcResult create = postSection(fixture, "timeline", TestDataFactory.timeline(fixture.mediaId()));
         JsonNode created = read(create);
         String sectionId = created.get("sectionId").asText();
         String keptEventId = created.at("/content/timelineEvents/0/id").asText();
@@ -186,6 +196,7 @@ class BiographySectionControllerIntegrationTest {
                 TestDataFactory.event(null, "New public lecture", null, 10));
 
         mockMvc.perform(put("/api/websites/{websiteId}/sections/{sectionId}/timeline", fixture.websiteId(), sectionId)
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(update)))
                 .andExpect(status().isOk())
@@ -205,7 +216,7 @@ class BiographySectionControllerIntegrationTest {
     @Test
     void galleryPostAndPutUpdatesAddsAndRemovesItems() throws Exception {
         Fixture fixture = fixture();
-        MvcResult create = postSection(fixture.websiteId(), "gallery", TestDataFactory.gallery(fixture.mediaId()));
+        MvcResult create = postSection(fixture, "gallery", TestDataFactory.gallery(fixture.mediaId()));
         JsonNode created = read(create);
         String sectionId = created.get("sectionId").asText();
         String keptItemId = created.at("/content/items/0/id").asText();
@@ -216,6 +227,7 @@ class BiographySectionControllerIntegrationTest {
                 TestDataFactory.galleryItem(null, "New diagram", null, 6));
 
         mockMvc.perform(put("/api/websites/{websiteId}/sections/{sectionId}/gallery", fixture.websiteId(), sectionId)
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(update)))
                 .andExpect(status().isOk())
@@ -229,7 +241,7 @@ class BiographySectionControllerIntegrationTest {
     @Test
     void contactPostAndPutUpdatesAddsAndRemovesSocialLinks() throws Exception {
         Fixture fixture = fixture();
-        MvcResult create = postSection(fixture.websiteId(), "contact", TestDataFactory.contact());
+        MvcResult create = postSection(fixture, "contact", TestDataFactory.contact());
         JsonNode created = read(create);
         String sectionId = created.get("sectionId").asText();
         String keptLinkId = created.at("/content/socialLinks/0/id").asText();
@@ -241,6 +253,7 @@ class BiographySectionControllerIntegrationTest {
                 TestDataFactory.social(null, SocialPlatform.EMAIL, 4));
 
         mockMvc.perform(put("/api/websites/{websiteId}/sections/{sectionId}/contact", fixture.websiteId(), sectionId)
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(update)))
                 .andExpect(status().isOk())
@@ -260,31 +273,41 @@ class BiographySectionControllerIntegrationTest {
         HeroSectionRequest invalidHero = TestDataFactory.hero(fixture.mediaId());
         invalidHero.fullName = "";
         mockMvc.perform(post("/api/websites/{websiteId}/sections/hero", fixture.websiteId())
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(invalidHero)))
                 .andExpect(status().isBadRequest());
 
-        MvcResult hero = postSection(fixture.websiteId(), "hero", TestDataFactory.hero(fixture.mediaId()));
+        MvcResult hero = postSection(fixture, "hero", TestDataFactory.hero(fixture.mediaId()));
         String sectionId = read(hero).get("sectionId").asText();
 
         mockMvc.perform(post("/api/websites/{websiteId}/sections/hero", fixture.websiteId())
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(TestDataFactory.hero(fixture.mediaId()))))
                 .andExpect(status().isBadRequest());
 
-        mockMvc.perform(get("/api/websites/{websiteId}/sections/{sectionId}", other.websiteId(), sectionId))
+        mockMvc.perform(get("/api/websites/{websiteId}/sections/{sectionId}", other.websiteId(), sectionId)
+                        .requestAttr("userId", other.userId()))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/websites/{websiteId}/sections", fixture.websiteId())
+                        .requestAttr("userId", other.userId()))
                 .andExpect(status().isNotFound());
 
         HeroSectionRequest wrongMedia = TestDataFactory.hero(other.mediaId());
         mockMvc.perform(put("/api/websites/{websiteId}/sections/{sectionId}/hero", fixture.websiteId(), sectionId)
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(wrongMedia)))
                 .andExpect(status().isBadRequest());
 
-        mockMvc.perform(get("/api/websites/{websiteId}/sections", "not-a-uuid"))
+        mockMvc.perform(get("/api/websites/{websiteId}/sections", "not-a-uuid")
+                        .requestAttr("userId", fixture.userId()))
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(post("/api/websites/{websiteId}/sections/gallery", fixture.websiteId())
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"sectionTitle":"Gallery","sortOrder":1,"isVisible":true,
@@ -293,8 +316,9 @@ class BiographySectionControllerIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
-    private MvcResult postSection(String websiteId, String endpoint, Object request) throws Exception {
-        return mockMvc.perform(post("/api/websites/{websiteId}/sections/" + endpoint, websiteId)
+    private MvcResult postSection(Fixture fixture, String endpoint, Object request) throws Exception {
+        return mockMvc.perform(post("/api/websites/{websiteId}/sections/" + endpoint, fixture.websiteId())
+                        .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(request)))
                 .andExpect(status().isCreated())
@@ -308,7 +332,7 @@ class BiographySectionControllerIntegrationTest {
         var template = templateRepository.saveAndFlush(TestDataFactory.template());
         BiographyWebsite website = websiteRepository.saveAndFlush(TestDataFactory.website(user, template));
         WebsiteMediaAsset media = mediaRepository.saveAndFlush(TestDataFactory.media(website));
-        return new Fixture(website.getWebsiteId(), media.getMediaAssetId());
+        return new Fixture(user.getUserId(), website.getWebsiteId(), media.getMediaAssetId());
     }
 
     private String json(Object body) throws Exception {
@@ -325,6 +349,6 @@ class BiographySectionControllerIntegrationTest {
                 Integer.class, value);
     }
 
-    private record Fixture(String websiteId, String mediaId) {
+    private record Fixture(String userId, String websiteId, String mediaId) {
     }
 }

@@ -41,8 +41,8 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     @Override
     @Transactional(readOnly = true)
-    public SectionsResponse getSections(String websiteId) {
-        requireWebsite(websiteId);
+    public SectionsResponse getSections(String userId, String websiteId) {
+        requireOwnedWebsite(userId, websiteId);
         SectionsResponse response = new SectionsResponse();
         response.websiteId = websiteId;
         response.sections = sectionRepository.findByWebsiteWebsiteIdOrderBySortOrderAsc(websiteId)
@@ -54,14 +54,14 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     @Override
     @Transactional(readOnly = true)
-    public SectionResponse getSection(String websiteId, String sectionId) {
-        return mapper.toSectionResponse(requireSection(websiteId, sectionId));
+    public SectionResponse getSection(String userId, String websiteId, String sectionId) {
+        return mapper.toSectionResponse(requireSection(userId, websiteId, sectionId));
     }
 
     @Override
     @Transactional
-    public SectionResponse updateSettings(String websiteId, String sectionId, SectionSettingsRequest request) {
-        BiographySection section = requireSection(websiteId, sectionId);
+    public SectionResponse updateSettings(String userId, String websiteId, String sectionId, SectionSettingsRequest request) {
+        BiographySection section = requireSection(userId, websiteId, sectionId);
         section.setVisible(request.isVisible);
         section.setSortOrder(request.sortOrder);
         touch(section);
@@ -70,15 +70,15 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     @Override
     @Transactional
-    public void deleteSection(String websiteId, String sectionId) {
-        BiographySection section = requireSection(websiteId, sectionId);
+    public void deleteSection(String userId, String websiteId, String sectionId) {
+        BiographySection section = requireSection(userId, websiteId, sectionId);
         sectionRepository.delete(section);
     }
 
     @Override
     @Transactional
-    public SectionResponse createHero(String websiteId, HeroSectionRequest request) {
-        BiographySection section = newSection(websiteId, SectionType.HERO, "hero", request.sortOrder, request.isVisible);
+    public SectionResponse createHero(String userId, String websiteId, HeroSectionRequest request) {
+        BiographySection section = newSection(userId, websiteId, SectionType.HERO, "hero", request.sortOrder, request.isVisible);
         HeroSection hero = new HeroSection();
         hero.setSection(section);
         applyHero(hero, request, websiteId);
@@ -88,8 +88,8 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     @Override
     @Transactional
-    public SectionResponse updateHero(String websiteId, String sectionId, HeroSectionRequest request) {
-        BiographySection section = requireTypedSection(websiteId, sectionId, SectionType.HERO);
+    public SectionResponse updateHero(String userId, String websiteId, String sectionId, HeroSectionRequest request) {
+        BiographySection section = requireTypedSection(userId, websiteId, sectionId, SectionType.HERO);
         applySettings(section, request.sortOrder, request.isVisible);
         applyHero(section.getHeroSection(), request, websiteId);
         return mapper.toSectionResponse(section);
@@ -97,8 +97,8 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     @Override
     @Transactional
-    public SectionResponse createChronicle(String websiteId, ChronicleSectionRequest request) {
-        BiographySection section = newSection(websiteId, SectionType.CHRONICLE_VALUES, "chronicle", request.sortOrder, request.isVisible);
+    public SectionResponse createChronicle(String userId, String websiteId, ChronicleSectionRequest request) {
+        BiographySection section = newSection(userId, websiteId, SectionType.CHRONICLE_VALUES, "chronicle", request.sortOrder, request.isVisible);
         ChronicleSection chronicle = new ChronicleSection();
         chronicle.setSection(section);
         applyChronicle(chronicle, request);
@@ -108,8 +108,8 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     @Override
     @Transactional
-    public SectionResponse updateChronicle(String websiteId, String sectionId, ChronicleSectionRequest request) {
-        BiographySection section = requireTypedSection(websiteId, sectionId, SectionType.CHRONICLE_VALUES);
+    public SectionResponse updateChronicle(String userId, String websiteId, String sectionId, ChronicleSectionRequest request) {
+        BiographySection section = requireTypedSection(userId, websiteId, sectionId, SectionType.CHRONICLE_VALUES);
         applySettings(section, request.sortOrder, request.isVisible);
         applyChronicle(section.getChronicleSection(), request);
         return mapper.toSectionResponse(section);
@@ -117,8 +117,8 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     @Override
     @Transactional
-    public SectionResponse createPursuits(String websiteId, PursuitSectionRequest request) {
-        BiographySection section = newSection(websiteId, SectionType.SPECIALIZED_PURSUITS, "pursuits", request.sortOrder, request.isVisible);
+    public SectionResponse createPursuits(String userId, String websiteId, PursuitSectionRequest request) {
+        BiographySection section = newSection(userId, websiteId, SectionType.SPECIALIZED_PURSUITS, "pursuits", request.sortOrder, request.isVisible);
         PursuitSection pursuit = new PursuitSection();
         pursuit.setSection(section);
         applyPursuit(pursuit, request, websiteId);
@@ -128,8 +128,8 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     @Override
     @Transactional
-    public SectionResponse updatePursuits(String websiteId, String sectionId, PursuitSectionRequest request) {
-        BiographySection section = requireTypedSection(websiteId, sectionId, SectionType.SPECIALIZED_PURSUITS);
+    public SectionResponse updatePursuits(String userId, String websiteId, String sectionId, PursuitSectionRequest request) {
+        BiographySection section = requireTypedSection(userId, websiteId, sectionId, SectionType.SPECIALIZED_PURSUITS);
         applySettings(section, request.sortOrder, request.isVisible);
         applyPursuit(section.getPursuitSection(), request, websiteId);
         return mapper.toSectionResponse(section);
@@ -137,8 +137,8 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     @Override
     @Transactional
-    public SectionResponse createTimeline(String websiteId, TimelineSectionRequest request) {
-        BiographySection section = newSection(websiteId, SectionType.LIFE_JOURNEY, "timeline", request.sortOrder, request.isVisible);
+    public SectionResponse createTimeline(String userId, String websiteId, TimelineSectionRequest request) {
+        BiographySection section = newSection(userId, websiteId, SectionType.LIFE_JOURNEY, "timeline", request.sortOrder, request.isVisible);
         TimelineSection timeline = new TimelineSection();
         timeline.setSection(section);
         applyTimeline(timeline, request, websiteId);
@@ -148,8 +148,8 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     @Override
     @Transactional
-    public SectionResponse updateTimeline(String websiteId, String sectionId, TimelineSectionRequest request) {
-        BiographySection section = requireTypedSection(websiteId, sectionId, SectionType.LIFE_JOURNEY);
+    public SectionResponse updateTimeline(String userId, String websiteId, String sectionId, TimelineSectionRequest request) {
+        BiographySection section = requireTypedSection(userId, websiteId, sectionId, SectionType.LIFE_JOURNEY);
         applySettings(section, request.sortOrder, request.isVisible);
         applyTimeline(section.getTimelineSection(), request, websiteId);
         return mapper.toSectionResponse(section);
@@ -157,8 +157,8 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     @Override
     @Transactional
-    public SectionResponse createGallery(String websiteId, GallerySectionRequest request) {
-        BiographySection section = newSection(websiteId, SectionType.MEDIA_GALLERY, "gallery", request.sortOrder, request.isVisible);
+    public SectionResponse createGallery(String userId, String websiteId, GallerySectionRequest request) {
+        BiographySection section = newSection(userId, websiteId, SectionType.MEDIA_GALLERY, "gallery", request.sortOrder, request.isVisible);
         GallerySection gallery = new GallerySection();
         gallery.setSection(section);
         applyGallery(gallery, request, websiteId);
@@ -168,8 +168,8 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     @Override
     @Transactional
-    public SectionResponse updateGallery(String websiteId, String sectionId, GallerySectionRequest request) {
-        BiographySection section = requireTypedSection(websiteId, sectionId, SectionType.MEDIA_GALLERY);
+    public SectionResponse updateGallery(String userId, String websiteId, String sectionId, GallerySectionRequest request) {
+        BiographySection section = requireTypedSection(userId, websiteId, sectionId, SectionType.MEDIA_GALLERY);
         applySettings(section, request.sortOrder, request.isVisible);
         applyGallery(section.getGallerySection(), request, websiteId);
         return mapper.toSectionResponse(section);
@@ -177,8 +177,8 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     @Override
     @Transactional
-    public SectionResponse createContact(String websiteId, ContactSectionRequest request) {
-        BiographySection section = newSection(websiteId, SectionType.CONTACT, "contact", request.sortOrder, request.isVisible);
+    public SectionResponse createContact(String userId, String websiteId, ContactSectionRequest request) {
+        BiographySection section = newSection(userId, websiteId, SectionType.CONTACT, "contact", request.sortOrder, request.isVisible);
         ContactSection contact = new ContactSection();
         contact.setSection(section);
         applyContact(contact, request);
@@ -188,34 +188,34 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     @Override
     @Transactional
-    public SectionResponse updateContact(String websiteId, String sectionId, ContactSectionRequest request) {
-        BiographySection section = requireTypedSection(websiteId, sectionId, SectionType.CONTACT);
+    public SectionResponse updateContact(String userId, String websiteId, String sectionId, ContactSectionRequest request) {
+        BiographySection section = requireTypedSection(userId, websiteId, sectionId, SectionType.CONTACT);
         applySettings(section, request.sortOrder, request.isVisible);
         applyContact(section.getContactSection(), request);
         return mapper.toSectionResponse(section);
     }
 
-    private BiographyWebsite requireWebsite(String websiteId) {
-        return websiteRepository.findById(websiteId)
+    private BiographyWebsite requireOwnedWebsite(String userId, String websiteId) {
+        return websiteRepository.findByWebsiteIdAndUserId(websiteId, userId)
                 .orElseThrow(() -> new NotFoundException("Website not found"));
     }
 
-    private BiographySection requireSection(String websiteId, String sectionId) {
-        requireWebsite(websiteId);
+    private BiographySection requireSection(String userId, String websiteId, String sectionId) {
+        requireOwnedWebsite(userId, websiteId);
         return sectionRepository.findBySectionIdAndWebsiteWebsiteId(sectionId, websiteId)
                 .orElseThrow(() -> new NotFoundException("Section not found"));
     }
 
-    private BiographySection requireTypedSection(String websiteId, String sectionId, SectionType sectionType) {
-        BiographySection section = requireSection(websiteId, sectionId);
+    private BiographySection requireTypedSection(String userId, String websiteId, String sectionId, SectionType sectionType) {
+        BiographySection section = requireSection(userId, websiteId, sectionId);
         if (section.getSectionType() != sectionType) {
             throw new BadRequestException("Invalid section type");
         }
         return section;
     }
 
-    private BiographySection newSection(String websiteId, SectionType sectionType, String sectionKey, Integer sortOrder, Boolean visible) {
-        BiographyWebsite website = requireWebsite(websiteId);
+    private BiographySection newSection(String userId, String websiteId, SectionType sectionType, String sectionKey, Integer sortOrder, Boolean visible) {
+        BiographyWebsite website = requireOwnedWebsite(userId, websiteId);
         if (sectionRepository.existsByWebsiteWebsiteIdAndSectionType(websiteId, sectionType)) {
             throw new BadRequestException("Section type already exists for this website");
         }
