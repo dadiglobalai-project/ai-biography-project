@@ -143,12 +143,12 @@ export interface BiographyContactMessage {
 }
 
 export type MediaUsageType =
-  | 'PROFILE_IMAGE'
-  | 'BACKGROUND_IMAGE'
-  | 'PURSUIT_IMAGE'
-  | 'TIMELINE_IMAGE'
-  | 'GALLERY_IMAGE'
-  | 'STORY_IMAGE';
+  | 'HERO_PROFILE'
+  | 'HERO_BACKGROUND'
+  | 'PURSUIT'
+  | 'TIMELINE'
+  | 'GALLERY'
+  | 'STORY';
 
 export interface BiographyMediaAsset {
   mediaAssetId: string;

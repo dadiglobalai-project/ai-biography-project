@@ -791,12 +791,14 @@ export default function LifeJourneyTemplate({
               {data.hobbies.map((hob, index) => (
                 <div key={hob.id} className="text-left space-y-2 group">
                   <div className={`${getImageSizeClass('hobby', hob.imageSettings)} rounded-2xl overflow-hidden bg-stone-100 relative border border-stone-200/40 shadow-xs`}>
-                    <img 
-                      src={hob.imageUrl} 
-                      alt={hob.title} 
-                      className={`w-full h-full ${getImageFitClass(hob.imageSettings)} ${getImagePositionClass(hob.imageSettings)} group-hover:scale-105 transition-transform duration-500`}
-                      referrerPolicy="no-referrer"
-                    />
+                    {hob.imageUrl && (
+                      <img
+                        src={hob.imageUrl}
+                        alt={hob.title}
+                        className={`w-full h-full ${getImageFitClass(hob.imageSettings)} ${getImagePositionClass(hob.imageSettings)} group-hover:scale-105 transition-transform duration-500`}
+                        referrerPolicy="no-referrer"
+                      />
+                    )}
                     <div className="absolute inset-0 bg-black/5" />
                     <div className="absolute top-3 left-3 bg-stone-900/85 backdrop-blur-xs w-6 h-6 rounded-md flex items-center justify-center text-amber-100 border border-stone-800 shadow-xs">
                       {renderIcon(hob.icon, "w-3.5 h-3.5 text-amber-400")}
@@ -989,12 +991,14 @@ export default function LifeJourneyTemplate({
               >
                 <div>
                   <div className={`${getImageSizeClass('gallery', item.imageSettings)} rounded-xl overflow-hidden bg-stone-100 mb-4 border border-stone-200/20 relative`}>
-                    <img 
-                      src={item.imageUrl} 
-                      alt={item.title} 
-                      className={`w-full h-full ${getImageFitClass(item.imageSettings)} ${getImagePositionClass(item.imageSettings)} group-hover:scale-103 transition-all duration-500 filter contrast-[1.02]`}
-                      referrerPolicy="no-referrer"
-                    />
+                    {item.imageUrl && (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.title}
+                        className={`w-full h-full ${getImageFitClass(item.imageSettings)} ${getImagePositionClass(item.imageSettings)} group-hover:scale-103 transition-all duration-500 filter contrast-[1.02]`}
+                        referrerPolicy="no-referrer"
+                      />
+                    )}
                     <span className="absolute top-3 right-3 bg-stone-900/80 backdrop-blur-xs px-2 py-0.5 text-[8px] font-mono text-white rounded-md tracking-wider">
                       {item.category.toUpperCase()}
                     </span>
@@ -1075,12 +1079,14 @@ export default function LifeJourneyTemplate({
                 <div>
                   {/* Image Preview */}
                   <div className={`${getImageSizeClass('story', story.imageSettings)} overflow-hidden bg-stone-100 relative shrink-0`}>
-                    <img 
-                      src={story.imageUrl} 
-                      alt={story.title} 
-                      className={`w-full h-full ${getImageFitClass(story.imageSettings)} ${getImagePositionClass(story.imageSettings)} group-hover:scale-101 transition-transform duration-500`}
-                      referrerPolicy="no-referrer"
-                    />
+                    {story.imageUrl && (
+                      <img
+                        src={story.imageUrl}
+                        alt={story.title}
+                        className={`w-full h-full ${getImageFitClass(story.imageSettings)} ${getImagePositionClass(story.imageSettings)} group-hover:scale-101 transition-transform duration-500`}
+                        referrerPolicy="no-referrer"
+                      />
+                    )}
                     {renderEditableText({
                       value: story.category,
                       section: 'stories',

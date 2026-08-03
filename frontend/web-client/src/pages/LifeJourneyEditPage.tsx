@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { createPortal } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -78,6 +78,7 @@ const SUBJECT_TYPES: SubjectType[] = ['SELF', 'PARENT', 'GRANDPARENT', 'CHILD', 
 const AUTO_SAVE_DELAY_MS = 1500;
 const IMAGE_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const IMAGE_UPLOAD_MAX_DIMENSION = 1600;
+const EMPTY_OMITTED_MEDIA_ASSET_IDS = new Set<string>();
 const IMAGE_UPLOAD_ACCEPT = 'image/png,image/jpeg,image/webp';
 const MOBILE_PREVIEW_SRC_DOC =
   '<!doctype html><html><head></head><body><div id="mobile-preview-root"></div></body></html>';
@@ -1370,15 +1371,29 @@ export default function LifeJourneyEditPage() {
     return typeof id === 'string' ? id : '';
   };
 
-  const buildHeroSectionPayload = (section?: BiographyWebsiteSection | null) => ({
+  const getPayloadMediaAssetId = (
+    mediaAssetId?: string,
+    omittedMediaAssetIds: ReadonlySet<string> = EMPTY_OMITTED_MEDIA_ASSET_IDS
+  ) => (mediaAssetId && omittedMediaAssetIds.has(mediaAssetId) ? '' : mediaAssetId);
+
+  const buildHeroSectionPayload = (
+    section?: BiographyWebsiteSection | null,
+    omittedMediaAssetIds: ReadonlySet<string> = EMPTY_OMITTED_MEDIA_ASSET_IDS
+  ) => ({
     fullName: draft.personalDetails.fullName || '',
     designation: draft.personalDetails.occupation || '',
     tagline: draft.personalDetails.tagline || '',
     shortDescription: draft.personalDetails.shortIntro || '',
     profileImageId:
-      draft.personalDetails.profileImageAssetId || getBackendSectionValue(section, 'profileImageId'),
+      getPayloadMediaAssetId(
+        draft.personalDetails.profileImageAssetId ?? getBackendSectionValue(section, 'profileImageId'),
+        omittedMediaAssetIds
+      ) ?? '',
     backgroundImageId:
-      draft.personalDetails.backgroundImageAssetId || getBackendSectionValue(section, 'backgroundImageId'),
+      getPayloadMediaAssetId(
+        draft.personalDetails.backgroundImageAssetId ?? getBackendSectionValue(section, 'backgroundImageId'),
+        omittedMediaAssetIds
+      ) ?? '',
     sortOrder: section?.sortOrder ?? section?.order ?? 1,
     isVisible: section?.isVisible ?? true,
   });
@@ -1429,10 +1444,12 @@ export default function LifeJourneyEditPage() {
     };
   };
 
-  const buildPursuitsSectionPayload = (): CreatePursuitsSectionPayload => ({
+  const buildPursuitsSectionPayload = (
+    omittedMediaAssetIds: ReadonlySet<string> = EMPTY_OMITTED_MEDIA_ASSET_IDS
+  ): CreatePursuitsSectionPayload => ({
     sectionLabel: 'SPECIALIZED PURSUITS',
     items: draft.hobbies.map((hobby, index) => ({
-      imageId: hobby.imageAssetId || '',
+      imageId: getPayloadMediaAssetId(hobby.imageAssetId, omittedMediaAssetIds) || '',
       icon: hobby.icon || '',
       title: hobby.title || '',
       description: hobby.description || '',
@@ -1443,12 +1460,17 @@ export default function LifeJourneyEditPage() {
   });
 
   const buildUpdatePursuitsSectionPayload = (
-    section: BiographyWebsiteSection
+    section: BiographyWebsiteSection,
+    omittedMediaAssetIds: ReadonlySet<string> = EMPTY_OMITTED_MEDIA_ASSET_IDS
   ): UpdatePursuitsSectionPayload => ({
     sectionLabel: 'SPECIALIZED PURSUITS',
     items: draft.hobbies.map((hobby, index) => ({
       id: getBackendPursuitItemValue(section, index, hobby.title || '', 'id'),
-      imageId: hobby.imageAssetId || getBackendPursuitItemValue(section, index, hobby.title || '', 'imageId'),
+      imageId:
+        getPayloadMediaAssetId(
+          hobby.imageAssetId ?? getBackendPursuitItemValue(section, index, hobby.title || '', 'imageId'),
+          omittedMediaAssetIds
+        ) || '',
       icon: hobby.icon || '',
       title: hobby.title || '',
       description: hobby.description || '',
@@ -1458,7 +1480,9 @@ export default function LifeJourneyEditPage() {
     isVisible: section.isVisible ?? true,
   });
 
-  const buildTimelineSectionPayload = (): CreateTimelineSectionPayload => {
+  const buildTimelineSectionPayload = (
+    omittedMediaAssetIds: ReadonlySet<string> = EMPTY_OMITTED_MEDIA_ASSET_IDS
+  ): CreateTimelineSectionPayload => {
     const timelineCopy = getSectionCopy(draft.sectionCopy).timeline;
 
     return {
@@ -1470,7 +1494,7 @@ export default function LifeJourneyEditPage() {
         title: milestone.title || '',
         location: milestone.location || '',
         quote: milestone.description || '',
-        imageId: milestone.imageAssetId || '',
+        imageId: getPayloadMediaAssetId(milestone.imageAssetId, omittedMediaAssetIds) || '',
         imageAltText: milestone.title || '',
         imageCaption: milestone.imageCaption || '',
         sortOrder: index + 1,
@@ -1485,9 +1509,10 @@ export default function LifeJourneyEditPage() {
   };
 
   const buildUpdateTimelineSectionPayload = (
-    section: BiographyWebsiteSection
+    section: BiographyWebsiteSection,
+    omittedMediaAssetIds: ReadonlySet<string> = EMPTY_OMITTED_MEDIA_ASSET_IDS
   ): UpdateTimelineSectionPayload => {
-    const payload = buildTimelineSectionPayload();
+    const payload = buildTimelineSectionPayload(omittedMediaAssetIds);
 
     return {
       ...payload,
@@ -1501,14 +1526,17 @@ export default function LifeJourneyEditPage() {
         ),
         ...event,
         imageId:
-          event.imageId ||
-          getBackendTimelineEventValue(
-            section,
-            eventIndex,
-            event.title,
-            event.timePeriod,
-            'imageId'
-          ),
+          getPayloadMediaAssetId(
+            event.imageId ??
+              getBackendTimelineEventValue(
+                section,
+                eventIndex,
+                event.title,
+                event.timePeriod,
+                'imageId'
+              ),
+            omittedMediaAssetIds
+          ) || '',
         highlights: event.highlights.map((highlight, highlightIndex) => ({
           id: getBackendTimelineHighlightId(
             section,
@@ -1526,7 +1554,9 @@ export default function LifeJourneyEditPage() {
     };
   };
 
-  const buildGallerySectionPayload = (): CreateGallerySectionPayload => {
+  const buildGallerySectionPayload = (
+    omittedMediaAssetIds: ReadonlySet<string> = EMPTY_OMITTED_MEDIA_ASSET_IDS
+  ): CreateGallerySectionPayload => {
     const galleryCopy = getSectionCopy(draft.sectionCopy).gallery;
 
     return {
@@ -1534,8 +1564,9 @@ export default function LifeJourneyEditPage() {
       sectionTitle: galleryCopy.title || '',
       sectionDescription: galleryCopy.description || '',
       items: draft.gallery.map((item, index) => ({
-        mediaAssetId: item.mediaAssetId || '',
-        thumbnailAssetId: item.thumbnailAssetId || item.mediaAssetId || '',
+        mediaAssetId: getPayloadMediaAssetId(item.mediaAssetId, omittedMediaAssetIds) || '',
+        thumbnailAssetId:
+          getPayloadMediaAssetId(item.thumbnailAssetId || item.mediaAssetId, omittedMediaAssetIds) || '',
         mediaType: 'IMAGE',
         category: item.category || '',
         recordLabel: `${(item.category || 'media').toUpperCase()} RECORD`,
@@ -1551,9 +1582,10 @@ export default function LifeJourneyEditPage() {
   };
 
   const buildUpdateGallerySectionPayload = (
-    section: BiographyWebsiteSection
+    section: BiographyWebsiteSection,
+    omittedMediaAssetIds: ReadonlySet<string> = EMPTY_OMITTED_MEDIA_ASSET_IDS
   ): UpdateGallerySectionPayload => {
-    const payload = buildGallerySectionPayload();
+    const payload = buildGallerySectionPayload(omittedMediaAssetIds);
 
     return {
       ...payload,
@@ -1561,24 +1593,30 @@ export default function LifeJourneyEditPage() {
         id: getBackendGalleryItemValue(section, index, item.title, item.displayYear, 'id'),
         ...item,
         mediaAssetId:
-          item.mediaAssetId ||
-          getBackendGalleryItemValue(
-            section,
-            index,
-            item.title,
-            item.displayYear,
-            'mediaAssetId'
-          ),
+          getPayloadMediaAssetId(
+            item.mediaAssetId ??
+              getBackendGalleryItemValue(
+                section,
+                index,
+                item.title,
+                item.displayYear,
+                'mediaAssetId'
+              ),
+            omittedMediaAssetIds
+          ) || '',
         thumbnailAssetId:
-          item.thumbnailAssetId ||
-          item.mediaAssetId ||
-          getBackendGalleryItemValue(
-            section,
-            index,
-            item.title,
-            item.displayYear,
-            'thumbnailAssetId'
-          ),
+          getPayloadMediaAssetId(
+            item.thumbnailAssetId ??
+              item.mediaAssetId ??
+              getBackendGalleryItemValue(
+                section,
+                index,
+                item.title,
+                item.displayYear,
+                'thumbnailAssetId'
+              ),
+            omittedMediaAssetIds
+          ) || '',
       })),
       sortOrder: section.sortOrder ?? section.order ?? 5,
       isVisible: section.isVisible ?? true,
@@ -2306,7 +2344,10 @@ export default function LifeJourneyEditPage() {
     );
   };
 
-  const syncBiographySectionsToBackend = async (targetWebsiteId: string) => {
+  const syncBiographySectionsToBackend = async (
+    targetWebsiteId: string,
+    omittedMediaAssetIds: ReadonlySet<string> = EMPTY_OMITTED_MEDIA_ASSET_IDS
+  ) => {
     if (!targetWebsiteId || targetWebsiteId.startsWith('local-')) {
       return [];
     }
@@ -2342,14 +2383,14 @@ export default function LifeJourneyEditPage() {
       'Hero',
       { key: 'hero', title: 'Hero', sortOrder: 1, order: 1, isVisible: true },
       (sections) => getBackendSectionForEditorSection('hero', sections),
-      () => authService.createHeroSection(targetWebsiteId, buildHeroSectionPayload()),
+      () => authService.createHeroSection(targetWebsiteId, buildHeroSectionPayload(null, omittedMediaAssetIds)),
       async (section) => {
         const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
         const sectionToUpdate = detailedSection || section;
         return authService.updateHeroSection(
           targetWebsiteId,
           sectionToUpdate.id,
-          buildHeroSectionPayload(sectionToUpdate)
+          buildHeroSectionPayload(sectionToUpdate, omittedMediaAssetIds)
         );
       }
     );
@@ -2374,14 +2415,14 @@ export default function LifeJourneyEditPage() {
       'Pursuits',
       { key: 'pursuits', title: 'Pursuits', sortOrder: 3, order: 3, isVisible: true },
       (sections) => getBackendSectionByAliases(['pursuits', 'pursuit', 'specialized pursuits'], sections),
-      () => authService.createPursuitsSection(targetWebsiteId, buildPursuitsSectionPayload()),
+      () => authService.createPursuitsSection(targetWebsiteId, buildPursuitsSectionPayload(omittedMediaAssetIds)),
       async (section) => {
         const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
         const sectionToUpdate = detailedSection || section;
         return authService.updatePursuitsSection(
           targetWebsiteId,
           sectionToUpdate.id,
-          buildUpdatePursuitsSectionPayload(sectionToUpdate)
+          buildUpdatePursuitsSectionPayload(sectionToUpdate, omittedMediaAssetIds)
         );
       }
     );
@@ -2390,14 +2431,14 @@ export default function LifeJourneyEditPage() {
       'Timeline',
       { key: 'timeline', title: 'Timeline', sortOrder: 4, order: 4, isVisible: true },
       (sections) => getBackendSectionForEditorSection('timeline', sections),
-      () => authService.createTimelineSection(targetWebsiteId, buildTimelineSectionPayload()),
+      () => authService.createTimelineSection(targetWebsiteId, buildTimelineSectionPayload(omittedMediaAssetIds)),
       async (section) => {
         const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
         const sectionToUpdate = detailedSection || section;
         return authService.updateTimelineSection(
           targetWebsiteId,
           sectionToUpdate.id,
-          buildUpdateTimelineSectionPayload(sectionToUpdate)
+          buildUpdateTimelineSectionPayload(sectionToUpdate, omittedMediaAssetIds)
         );
       }
     );
@@ -2406,14 +2447,14 @@ export default function LifeJourneyEditPage() {
       'Gallery',
       { key: 'gallery', title: 'Gallery', sortOrder: 5, order: 5, isVisible: true },
       (sections) => getBackendSectionForEditorSection('gallery', sections),
-      () => authService.createGallerySection(targetWebsiteId, buildGallerySectionPayload()),
+      () => authService.createGallerySection(targetWebsiteId, buildGallerySectionPayload(omittedMediaAssetIds)),
       async (section) => {
         const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
         const sectionToUpdate = detailedSection || section;
         return authService.updateGallerySection(
           targetWebsiteId,
           sectionToUpdate.id,
-          buildUpdateGallerySectionPayload(sectionToUpdate)
+          buildUpdateGallerySectionPayload(sectionToUpdate, omittedMediaAssetIds)
         );
       }
     );
@@ -2751,11 +2792,41 @@ export default function LifeJourneyEditPage() {
               {value && (
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
+                    const removedAssetId = assetId;
                     focusPreviewSection(section);
-                    onChange('');
-                    onAssetChange?.('');
+                    flushSync(() => {
+                      onChange('');
+                      onAssetChange?.('');
+                    });
                     setSaveMessage('Image removed');
+
+                    if (activeWebsiteId && !activeWebsiteId.startsWith('local-') && removedAssetId) {
+                      setSaveMessage('Removing image from database and media storage...');
+
+                      try {
+                        await syncBiographySectionsToBackend(activeWebsiteId, new Set([removedAssetId]));
+
+                        const wasDeleted = await authService.deleteBiographyWebsiteMedia(
+                          activeWebsiteId,
+                          removedAssetId
+                        );
+
+                        if (wasDeleted) {
+                          setMediaAssets((currentAssets) =>
+                            currentAssets.filter((asset) => asset.mediaAssetId !== removedAssetId)
+                          );
+                          setMediaAssetsMessage('Deleted media asset');
+                          setSaveMessage('Image removed from page and media storage');
+                          return;
+                        }
+
+                        setMediaAssetsMessage('Unable to delete media. Remove it from other sections first');
+                        setSaveMessage('Image removed from page. Media asset could not be deleted');
+                      } catch (err: any) {
+                        setSaveMessage(err?.message || 'Image removed from page, but media deletion failed');
+                      }
+                    }
                   }}
                   className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-600 transition hover:border-rose-300 hover:text-rose-600"
                 >
@@ -2927,7 +2998,7 @@ export default function LifeJourneyEditPage() {
               label: 'Profile image',
               value: draft.personalDetails.profileImageUrl || '',
               assetId: draft.personalDetails.profileImageAssetId,
-              usageType: 'PROFILE_IMAGE',
+              usageType: 'HERO_PROFILE',
               section: 'hero',
               onChange: (value) => updatePersonalDetail('profileImageUrl', value),
               onAssetChange: (assetId) => updatePersonalDetail('profileImageAssetId', assetId),
@@ -3028,7 +3099,7 @@ export default function LifeJourneyEditPage() {
                     label: `Interest ${index + 1} image`,
                     value: item.imageUrl,
                     assetId: item.imageAssetId,
-                    usageType: 'PURSUIT_IMAGE',
+                    usageType: 'PURSUIT',
                     section: 'about',
                     onChange: (value) => updateHobbyItem(index, 'imageUrl', value),
                     onAssetChange: (assetId) => updateHobbyItem(index, 'imageAssetId', assetId),
@@ -3101,7 +3172,7 @@ export default function LifeJourneyEditPage() {
                     label: `Milestone ${index + 1} image`,
                     value: item.imageUrl || '',
                     assetId: item.imageAssetId,
-                    usageType: 'TIMELINE_IMAGE',
+                    usageType: 'TIMELINE',
                     section: 'timeline',
                     onChange: (value) => updateTimelineItem(index, { imageUrl: value }),
                     onAssetChange: (assetId) => updateTimelineItem(index, { imageAssetId: assetId }),
@@ -3164,7 +3235,7 @@ export default function LifeJourneyEditPage() {
                   label: `Gallery item ${index + 1} image`,
                   value: item.imageUrl,
                   assetId: item.mediaAssetId,
-                  usageType: 'GALLERY_IMAGE',
+                  usageType: 'GALLERY',
                   section: 'gallery',
                   onChange: (value) => updateGalleryItem(index, { imageUrl: value }),
                   onAssetChange: (assetId) =>
@@ -3227,7 +3298,7 @@ export default function LifeJourneyEditPage() {
                   label: `Story ${index + 1} image`,
                   value: item.imageUrl,
                   assetId: item.imageAssetId,
-                  usageType: 'STORY_IMAGE',
+                  usageType: 'STORY',
                   section: 'stories',
                   onChange: (value) => updateStoryItem(index, 'imageUrl', value),
                   onAssetChange: (assetId) => updateStoryItem(index, 'imageAssetId', assetId),
