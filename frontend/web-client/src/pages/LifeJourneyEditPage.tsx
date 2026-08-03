@@ -2263,6 +2263,184 @@ export default function LifeJourneyEditPage() {
     setSectionDetailMessage('Updated Contact content in backend');
   };
 
+  const sortBackendSections = (sections: BiographyWebsiteSection[]) =>
+    [...sections].sort((a, b) => (a.sortOrder ?? a.order ?? 0) - (b.sortOrder ?? b.order ?? 0));
+
+  const mergeBackendSection = (
+    sections: BiographyWebsiteSection[],
+    section: BiographyWebsiteSection
+  ) => sortBackendSections([
+    section,
+    ...sections.filter((item) => item.id !== section.id),
+  ]);
+
+  const normalizeSyncedSection = (
+    savedSection: BiographyWebsiteSection,
+    fallback: Pick<BiographyWebsiteSection, 'key' | 'title' | 'sortOrder' | 'order' | 'isVisible'>,
+    existingSection?: BiographyWebsiteSection | null
+  ): BiographyWebsiteSection => ({
+    ...existingSection,
+    ...savedSection,
+    id: savedSection.id || existingSection?.id || fallback.key,
+    key:
+      savedSection.key && savedSection.key !== savedSection.id
+        ? savedSection.key
+        : existingSection?.key || fallback.key,
+    title:
+      savedSection.title && savedSection.title !== savedSection.id
+        ? savedSection.title
+        : existingSection?.title || fallback.title,
+    sortOrder: savedSection.sortOrder ?? savedSection.order ?? existingSection?.sortOrder ?? fallback.sortOrder,
+    order: savedSection.order ?? savedSection.sortOrder ?? existingSection?.order ?? fallback.order,
+    isVisible: savedSection.isVisible ?? existingSection?.isVisible ?? fallback.isVisible,
+  });
+
+  const loadDetailedBackendSections = async (targetWebsiteId: string) => {
+    const sections = await authService.getBiographyWebsiteSections(targetWebsiteId);
+
+    return Promise.all(
+      sections.map(async (section) => {
+        const sectionDetail = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
+        return sectionDetail || section;
+      })
+    );
+  };
+
+  const syncBiographySectionsToBackend = async (targetWebsiteId: string) => {
+    if (!targetWebsiteId || targetWebsiteId.startsWith('local-')) {
+      return [];
+    }
+
+    setSectionDetailMessage('Saving biography sections to backend...');
+
+    let latestSections = await loadDetailedBackendSections(targetWebsiteId);
+    const syncedSections: BiographyWebsiteSection[] = [];
+
+    const syncSection = async (
+      label: string,
+      fallback: Pick<BiographyWebsiteSection, 'key' | 'title' | 'sortOrder' | 'order' | 'isVisible'>,
+      findSection: (sections: BiographyWebsiteSection[]) => BiographyWebsiteSection | null,
+      createSection: () => Promise<BiographyWebsiteSection | null>,
+      updateSection: (section: BiographyWebsiteSection) => Promise<BiographyWebsiteSection | null>
+    ) => {
+      const existingSection = findSection(latestSections);
+      const savedSection = existingSection
+        ? await updateSection(existingSection)
+        : await createSection();
+
+      if (!savedSection) {
+        throw new Error(`Unable to save ${label} section to backend`);
+      }
+
+      const normalizedSection = normalizeSyncedSection(savedSection, fallback, existingSection);
+      latestSections = mergeBackendSection(latestSections, normalizedSection);
+      syncedSections.push(normalizedSection);
+      return normalizedSection;
+    };
+
+    await syncSection(
+      'Hero',
+      { key: 'hero', title: 'Hero', sortOrder: 1, order: 1, isVisible: true },
+      (sections) => getBackendSectionForEditorSection('hero', sections),
+      () => authService.createHeroSection(targetWebsiteId, buildHeroSectionPayload()),
+      async (section) => {
+        const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
+        const sectionToUpdate = detailedSection || section;
+        return authService.updateHeroSection(
+          targetWebsiteId,
+          sectionToUpdate.id,
+          buildHeroSectionPayload(sectionToUpdate)
+        );
+      }
+    );
+
+    await syncSection(
+      'Chronicle',
+      { key: 'chronicle', title: 'Chronicle', sortOrder: 2, order: 2, isVisible: true },
+      (sections) => getBackendSectionForEditorSection('about', sections),
+      () => authService.createChronicleSection(targetWebsiteId, buildChronicleSectionPayload()),
+      async (section) => {
+        const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
+        const sectionToUpdate = detailedSection || section;
+        return authService.updateChronicleSection(
+          targetWebsiteId,
+          sectionToUpdate.id,
+          buildUpdateChronicleSectionPayload(sectionToUpdate)
+        );
+      }
+    );
+
+    await syncSection(
+      'Pursuits',
+      { key: 'pursuits', title: 'Pursuits', sortOrder: 3, order: 3, isVisible: true },
+      (sections) => getBackendSectionByAliases(['pursuits', 'pursuit', 'specialized pursuits'], sections),
+      () => authService.createPursuitsSection(targetWebsiteId, buildPursuitsSectionPayload()),
+      async (section) => {
+        const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
+        const sectionToUpdate = detailedSection || section;
+        return authService.updatePursuitsSection(
+          targetWebsiteId,
+          sectionToUpdate.id,
+          buildUpdatePursuitsSectionPayload(sectionToUpdate)
+        );
+      }
+    );
+
+    await syncSection(
+      'Timeline',
+      { key: 'timeline', title: 'Timeline', sortOrder: 4, order: 4, isVisible: true },
+      (sections) => getBackendSectionForEditorSection('timeline', sections),
+      () => authService.createTimelineSection(targetWebsiteId, buildTimelineSectionPayload()),
+      async (section) => {
+        const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
+        const sectionToUpdate = detailedSection || section;
+        return authService.updateTimelineSection(
+          targetWebsiteId,
+          sectionToUpdate.id,
+          buildUpdateTimelineSectionPayload(sectionToUpdate)
+        );
+      }
+    );
+
+    await syncSection(
+      'Gallery',
+      { key: 'gallery', title: 'Gallery', sortOrder: 5, order: 5, isVisible: true },
+      (sections) => getBackendSectionForEditorSection('gallery', sections),
+      () => authService.createGallerySection(targetWebsiteId, buildGallerySectionPayload()),
+      async (section) => {
+        const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
+        const sectionToUpdate = detailedSection || section;
+        return authService.updateGallerySection(
+          targetWebsiteId,
+          sectionToUpdate.id,
+          buildUpdateGallerySectionPayload(sectionToUpdate)
+        );
+      }
+    );
+
+    await syncSection(
+      'Contact',
+      { key: 'contact', title: 'Contact', sortOrder: 7, order: 7, isVisible: true },
+      (sections) => getBackendSectionForEditorSection('contact', sections),
+      () => authService.createContactSection(targetWebsiteId, buildContactSectionPayload()),
+      async (section) => {
+        const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
+        const sectionToUpdate = detailedSection || section;
+        return authService.updateContactSection(
+          targetWebsiteId,
+          sectionToUpdate.id,
+          buildUpdateContactSectionPayload(sectionToUpdate)
+        );
+      }
+    );
+
+    const nextSections = sortBackendSections(latestSections);
+    setWebsiteSections(nextSections);
+    setSectionLoadMessage(`Saved ${syncedSections.length} backend sections`);
+    setSectionDetailMessage('Saved biography content to backend');
+    return nextSections;
+  };
+
   const updatePersonalDetail = (field: PersonalTextFieldKey, value: string) => {
     setDraft((current) => ({
       ...current,
@@ -3153,6 +3331,15 @@ export default function LifeJourneyEditPage() {
 
     try {
       if (activeWebsiteId) {
+        if (!activeWebsiteId.startsWith('local-')) {
+          setSaveMessage('Saving biography content to database...');
+          await syncBiographySectionsToBackend(activeWebsiteId);
+          saveDraft(templateRoute.id, draft, activeWebsiteId);
+          notifyBiographyListChanged();
+          setSaveMessage('Saved to database and My Biographies');
+          return;
+        }
+
         notifyBiographyListChanged();
         setSaveMessage('Saved locally. Biography is in My Biographies');
         return;
@@ -3168,8 +3355,19 @@ export default function LifeJourneyEditPage() {
       setSearchParams({ websiteId: savedWebsite.id }, { replace: true });
       saveDraft(templateRoute.id, draft, savedWebsite.id);
       removeTemplateDraft(templateRoute.id);
+
+      if (!savedWebsite.id.startsWith('local-')) {
+        setSaveMessage('Created biography. Saving content to database...');
+        await syncBiographySectionsToBackend(savedWebsite.id);
+        saveDraft(templateRoute.id, draft, savedWebsite.id);
+      }
+
       notifyBiographyListChanged();
-      setSaveMessage('Saved to My Biographies');
+      setSaveMessage(
+        savedWebsite.id.startsWith('local-')
+          ? 'Saved locally. Biography is in My Biographies'
+          : 'Saved to database and My Biographies'
+      );
     } catch (err: any) {
       setSaveMessage(err?.message || 'Saved locally, but My Biographies was not updated');
     } finally {
