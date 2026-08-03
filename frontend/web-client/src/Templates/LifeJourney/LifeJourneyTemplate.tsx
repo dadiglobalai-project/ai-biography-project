@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { CATEGORIES_DATA } from './data';
 import { getSectionCopy } from './sectionCopy';
+import { authService } from '../../services/authService';
 import type {
   BiographyCategory,
   EditableSectionCopyKey,
@@ -48,6 +49,7 @@ interface LifeJourneyTemplateProps {
   activeEditSection?: EditableTemplateSection | null;
   onDataChange?: React.Dispatch<React.SetStateAction<BiographyCategory>>;
   onEditSectionChange?: (section: EditableTemplateSection) => void;
+  websiteId?: string;
 }
 
 export default function LifeJourneyTemplate({
@@ -56,6 +58,7 @@ export default function LifeJourneyTemplate({
   activeEditSection = null,
   onDataChange,
   onEditSectionChange,
+  websiteId = '',
 }: LifeJourneyTemplateProps) {
   const [formData, setFormData] = useState({
     name: '',
@@ -65,18 +68,46 @@ export default function LifeJourneyTemplate({
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const data = dataOverride ?? CATEGORIES_DATA[categoryKey];
   const isInlineEditable = Boolean(onDataChange);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    window.setTimeout(() => {
+    setSubmitError('');
+
+    if (!websiteId || websiteId.startsWith('local-')) {
+      window.setTimeout(() => {
+        setIsSubmitting(false);
+        setIsSubmitted(true);
+      }, 300);
+      return;
+    }
+
+    const wasSent = await authService.createPublicContactMessage(websiteId, {
+      senderName: formData.name.trim(),
+      senderEmail: formData.email.trim(),
+      subject: formData.subject.trim(),
+      message: formData.message.trim(),
+    });
+
+    if (wasSent) {
       setIsSubmitting(false);
       setIsSubmitted(true);
-    }, 300);
+      setFormData({
+        name: '',
+        email: '',
+        subject: '',
+        message: '',
+      });
+      return;
+    }
+
+    setIsSubmitting(false);
+    setSubmitError('Unable to send your message. Please try again.');
   };
 
   // Helper to render correct icons dynamically from data names
@@ -1291,6 +1322,12 @@ export default function LifeJourneyTemplate({
                         className={`w-full rounded-lg p-3 resize-none ${theme.input}`}
                       />
                     </div>
+
+                    {submitError && (
+                      <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700">
+                        {submitError}
+                      </p>
+                    )}
 
                     <button 
                       type="submit" 

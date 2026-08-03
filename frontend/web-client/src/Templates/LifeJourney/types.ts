@@ -27,6 +27,7 @@ export interface HobbyItem {
   description: string;
   icon: string;
   imageUrl: string;
+  imageAssetId?: string;
   imageSettings?: ImageDisplaySettings;
   textSettings?: TextDisplaySettings;
 }
@@ -40,6 +41,7 @@ export interface TimelineMilestone {
   description: string;
   details: string[];
   imageUrl?: string;
+  imageAssetId?: string;
   imageCaption?: string;
   imageSettings?: ImageDisplaySettings;
   textSettings?: TextDisplaySettings;
@@ -50,6 +52,8 @@ export interface GalleryItem {
   title: string;
   category: 'family' | 'career' | 'travel' | 'creative';
   imageUrl: string;
+  mediaAssetId?: string;
+  thumbnailAssetId?: string;
   caption: string;
   year?: string;
   imageSettings?: ImageDisplaySettings;
@@ -63,6 +67,7 @@ export interface MemoryStory {
   readTime: string;
   category: string;
   imageUrl: string;
+  imageAssetId?: string;
   imageSettings?: ImageDisplaySettings;
   shortDescription: string;
   fullStory: string;
@@ -80,6 +85,8 @@ export interface PersonalDetails {
   tagline: string;
   taglineTextSettings?: TextDisplaySettings;
   profileImageUrl?: string;
+  profileImageAssetId?: string;
+  backgroundImageAssetId?: string;
   profileImageSettings?: ImageDisplaySettings;
   birthDetails: string;
   location: string;

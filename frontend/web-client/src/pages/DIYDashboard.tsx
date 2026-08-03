@@ -16,11 +16,22 @@ import {
   Eye,
   Compass,
   Star,
-  AlertCircle
+  AlertCircle,
+  CheckCircle2,
+  CircleDashed,
+  ClipboardCheck
 } from 'lucide-react';
-import { authService, BiographyTemplate, BiographyWebsite, SubjectType } from '../services/authService';
+import { authService, BiographyTemplate, BiographyWebsite, DashboardResponse, SubjectType } from '../services/authService';
 import BrandLogo from '../components/BrandLogo';
 import lifeJourneyPreviewImage from '../Templates/LifeJourney/assets/images/life-journey-thumbnail.png';
+import { getWebsiteDraftStorageKey } from '../Templates/LifeJourney/draftStorage';
+import {
+  DIY_PREVIEWED_PROGRESS_CHANGED_KEY,
+  getTemplatePreviewProgressKey,
+  getWebsitePreviewProgressKey,
+  markDiyPreviewedProgressKey,
+  readDiyPreviewedProgressKeys,
+} from '../utils/diyProgress';
 
 type RelationType = 'Myself' | 'Parent' | 'Grandparent' | 'Child' | 'Spouse' | 'Loved One';
 const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
@@ -46,12 +57,31 @@ interface Template {
   editPath?: string;
 }
 
+interface ProgressChecklistItem {
+  id: string;
+  title: string;
+  description: string;
+  isComplete: boolean;
+  icon: React.ElementType;
+  actionLabel?: string;
+  actionHref?: string;
+  actionOnClick?: () => void;
+  opensInNewTab?: boolean;
+  disabled?: boolean;
+}
+
 export default function DIYDashboard() {
   const navigate = useNavigate();
+  const templateChooserRef = React.useRef<HTMLDivElement | null>(null);
   const [currentUser, setCurrentUser] = useState<{ fullName?: string; email: string } | null>(null);
   const [selectedRelation, setSelectedRelation] = useState<RelationType>('Loved One');
   const [hoveredTemplate, setHoveredTemplate] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardResponse | null>(null);
+  const [progressStorageVersion, setProgressStorageVersion] = useState(0);
+  const [previewedProgressKeys, setPreviewedProgressKeys] = useState<string[]>(() =>
+    readDiyPreviewedProgressKeys()
+  );
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [backendTemplates, setBackendTemplates] = useState<BiographyTemplate[]>([]);
   const [biographies, setBiographies] = useState<BiographyWebsite[]>([]);
@@ -114,6 +144,7 @@ export default function DIYDashboard() {
           return;
         }
 
+        setDashboardSummary(dashboard);
         if (dashboard.user) {
           setCurrentUser((previousUser) => ({
             email: dashboard.user?.email || previousUser?.email || '',
@@ -165,6 +196,30 @@ export default function DIYDashboard() {
       window.removeEventListener('storage', handleStorage);
     };
   }, [loadBiographies]);
+
+  React.useEffect(() => {
+    const refreshProgressState = () => {
+      setPreviewedProgressKeys(readDiyPreviewedProgressKeys());
+      setProgressStorageVersion((version) => version + 1);
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (
+        event.key === DIY_PREVIEWED_PROGRESS_CHANGED_KEY ||
+        event.key?.startsWith('xinghuoji.website.')
+      ) {
+        refreshProgressState();
+      }
+    };
+
+    window.addEventListener('focus', refreshProgressState);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('focus', refreshProgressState);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
 
   const relations: RelationType[] = ['Myself', 'Parent', 'Grandparent', 'Child', 'Spouse', 'Loved One'];
 
@@ -279,6 +334,15 @@ export default function DIYDashboard() {
     link.remove();
   };
 
+  const handleMarkPreviewed = (progressKey: string) => {
+    markDiyPreviewedProgressKey(progressKey);
+    setPreviewedProgressKeys(readDiyPreviewedProgressKeys());
+  };
+
+  const scrollToTemplateChooser = () => {
+    templateChooserRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleApplyRecommendation = () => {
     const matched = templates.find(t => t.id === recommended.id);
     if (matched) {
@@ -314,6 +378,7 @@ export default function DIYDashboard() {
 
   const handlePreviewTemplate = (template: Template) => {
     if (template.previewPath) {
+      handleMarkPreviewed(getTemplatePreviewProgressKey(template.id));
       openTemplatePage(template.previewPath, { template });
       return;
     }
@@ -399,11 +464,175 @@ export default function DIYDashboard() {
         template: defaultCreateTemplate,
       })
     : '';
-  const latestDraft = biographies.find((website) => website.status.toUpperCase() === 'DRAFT') || biographies[0];
+  const dashboardLatestDraft = dashboardSummary?.actions?.latestDraftId
+    ? biographies.find((website) => website.id === dashboardSummary.actions?.latestDraftId)
+    : undefined;
+  const latestDraft =
+    dashboardLatestDraft ||
+    biographies.find((website) => website.status.toUpperCase() === 'DRAFT') ||
+    biographies[0];
+  const selectedTemplate = selectedTemplateId ? getTemplateByIdentifier(selectedTemplateId) : undefined;
+  const latestDraftTemplate = latestDraft ? getTemplateByIdentifier(latestDraft.templateId) : undefined;
+  const activeProgressTemplate = latestDraftTemplate || selectedTemplate || defaultCreateTemplate;
   const latestDraftEditPath = latestDraft ? getEditorPath(latestDraft.templateId) : '';
   const continueDraftUrl = latestDraft?.id && latestDraftEditPath
     ? buildTemplatePageUrl(latestDraftEditPath, { website: latestDraft })
     : '';
+  const latestDraftPreviewPath = latestDraftTemplate?.previewPath || '';
+  const latestDraftPreviewUrl = latestDraft?.id && latestDraftPreviewPath
+    ? buildTemplatePageUrl(latestDraftPreviewPath, { website: latestDraft })
+    : '';
+  const selectedTemplatePreviewUrl = activeProgressTemplate?.previewPath
+    ? buildTemplatePageUrl(activeProgressTemplate.previewPath, { template: activeProgressTemplate })
+    : '';
+  const previewProgressKey = latestDraft?.id
+    ? getWebsitePreviewProgressKey(latestDraft.id)
+    : activeProgressTemplate?.id
+      ? getTemplatePreviewProgressKey(activeProgressTemplate.id)
+      : '';
+  const hasPreviewedCurrentProgress = previewProgressKey
+    ? previewedProgressKeys.includes(previewProgressKey)
+    : false;
+  const hasLocalSavedDraft = React.useMemo(() => {
+    if (!latestDraft?.id) {
+      return false;
+    }
+
+    try {
+      return Boolean(window.localStorage.getItem(getWebsiteDraftStorageKey(latestDraft.id)));
+    } catch {
+      return false;
+    }
+  }, [latestDraft?.id, progressStorageVersion]);
+  const hasEditedLatestDraft = Boolean(
+    hasLocalSavedDraft ||
+      (latestDraft?.createdAt &&
+        latestDraft?.updatedAt &&
+        new Date(latestDraft.updatedAt).getTime() > new Date(latestDraft.createdAt).getTime())
+  );
+  const totalBiographies = dashboardSummary?.statistics?.totalWebsites ?? biographies.length;
+  const draftBiographies =
+    dashboardSummary?.statistics?.drafts ??
+    biographies.filter((website) => website.status.toUpperCase() === 'DRAFT').length;
+  const publishedBiographies =
+    dashboardSummary?.statistics?.published ??
+    biographies.filter((website) => website.status.toUpperCase() === 'PUBLISHED').length;
+  const hasBiographyRecord = Boolean(
+    latestDraft || dashboardSummary?.actions?.hasDraft || totalBiographies > 0
+  );
+  const hasChosenTemplate = Boolean(selectedTemplateId || latestDraft?.templateId);
+  const previewActionUrl = latestDraftPreviewUrl || selectedTemplatePreviewUrl;
+  const previewActionLabel = latestDraftPreviewUrl ? 'Preview Draft' : 'Preview Template';
+  const progressChecklist: ProgressChecklistItem[] = [
+    {
+      id: 'service',
+      title: 'DIY service selected',
+      description: 'The user is already routed to the DIY workspace.',
+      isComplete: true,
+      icon: Compass,
+    },
+    {
+      id: 'template',
+      title: 'Choose a template',
+      description: hasChosenTemplate && activeProgressTemplate
+        ? `${activeProgressTemplate.title} is ready for this biography.`
+        : 'Select the design that will be used for the biography website.',
+      isComplete: hasChosenTemplate,
+      icon: Star,
+      actionLabel: hasChosenTemplate ? 'Change Template' : 'Choose Template',
+      actionOnClick: scrollToTemplateChooser,
+    },
+    {
+      id: 'draft',
+      title: 'Create a draft',
+      description: hasBiographyRecord
+        ? `${totalBiographies} biography record${totalBiographies === 1 ? '' : 's'} available in My Biographies.`
+        : 'Start a draft so the biography appears in My Biographies.',
+      isComplete: hasBiographyRecord,
+      icon: BookOpen,
+      actionLabel: hasBiographyRecord ? 'Open Latest' : 'Create Draft',
+      actionHref: hasBiographyRecord ? continueDraftUrl : createNewUrl,
+      actionOnClick: hasBiographyRecord && !continueDraftUrl ? handleContinueDraft : undefined,
+      opensInNewTab: Boolean((hasBiographyRecord && continueDraftUrl) || (!hasBiographyRecord && createNewUrl)),
+      disabled: hasBiographyRecord ? !continueDraftUrl && isLoadingBiographies : !createNewUrl,
+    },
+    {
+      id: 'content',
+      title: 'Start editing content',
+      description: hasEditedLatestDraft
+        ? 'Local content changes were detected for the latest draft.'
+        : 'Open the editor and update the biography text, photos, and sections.',
+      isComplete: hasEditedLatestDraft,
+      icon: PenTool,
+      actionLabel: continueDraftUrl ? 'Continue Editing' : 'Open Editor',
+      actionHref: continueDraftUrl || createNewUrl,
+      actionOnClick: !continueDraftUrl && !createNewUrl ? handleContinueDraft : undefined,
+      opensInNewTab: Boolean(continueDraftUrl || createNewUrl),
+      disabled: !continueDraftUrl && !createNewUrl,
+    },
+    {
+      id: 'preview',
+      title: 'Preview the design',
+      description: hasPreviewedCurrentProgress
+        ? 'A preview has been opened for the current template or draft.'
+        : 'Check the website appearance before continuing.',
+      isComplete: hasPreviewedCurrentProgress,
+      icon: Eye,
+      actionLabel: previewActionLabel,
+      actionHref: previewActionUrl,
+      actionOnClick: previewProgressKey ? () => handleMarkPreviewed(previewProgressKey) : undefined,
+      opensInNewTab: Boolean(previewActionUrl),
+      disabled: !previewActionUrl,
+    },
+    {
+      id: 'publish',
+      title: 'Ready for publishing',
+      description: publishedBiographies > 0
+        ? `${publishedBiographies} published biography${publishedBiographies === 1 ? '' : 'ies'} available.`
+        : 'Publishing can be enabled after the publish endpoint is available.',
+      isComplete: publishedBiographies > 0,
+      icon: Award,
+      actionLabel: publishedBiographies > 0 ? 'Published' : 'Coming Soon',
+      disabled: publishedBiographies === 0,
+    },
+  ];
+  const completedProgressItems = progressChecklist.filter((item) => item.isComplete).length;
+  const progressPercent = Math.round((completedProgressItems / progressChecklist.length) * 100);
+
+  const renderProgressAction = (item: ProgressChecklistItem) => {
+    if (!item.actionLabel) {
+      return null;
+    }
+
+    const commonClassName =
+      'inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50';
+
+    if (item.actionHref) {
+      return (
+        <a
+          href={item.actionHref}
+          target={item.opensInNewTab ? '_blank' : undefined}
+          rel={item.opensInNewTab ? 'noopener noreferrer' : undefined}
+          onClick={item.actionOnClick}
+          className={commonClassName}
+          aria-disabled={item.disabled}
+        >
+          {item.actionLabel}
+        </a>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={item.actionOnClick}
+        disabled={item.disabled || !item.actionOnClick}
+        className={commonClassName}
+      >
+        {item.actionLabel}
+      </button>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-between font-sans selection:bg-amber-200">
@@ -532,6 +761,103 @@ export default function DIYDashboard() {
             <span>{dashboardError}</span>
           </div>
         )}
+
+        <section className="space-y-5 rounded-xl border border-slate-100 bg-white p-5 shadow-sm md:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#0A192F] text-[#FED362]">
+                <ClipboardCheck className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="font-serif-display text-2xl font-semibold tracking-tight text-[#0A1128] md:text-3xl">
+                  DIY Progress Checklist
+                </h2>
+                <p className="max-w-2xl text-sm leading-relaxed text-slate-500">
+                  Track the important setup steps before the biography is ready for publishing.
+                </p>
+              </div>
+            </div>
+
+            <div className="w-full max-w-xs space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                <span>{completedProgressItems} of {progressChecklist.length} complete</span>
+                <span>{progressPercent}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-[#FED362] transition-all duration-500"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {progressChecklist.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.id}
+                  className={`flex min-h-[170px] flex-col justify-between rounded-lg border p-4 transition ${
+                    item.isComplete
+                      ? 'border-emerald-100 bg-emerald-50/40'
+                      : 'border-slate-100 bg-slate-50/70'
+                  }`}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
+                          item.isComplete
+                            ? 'border-emerald-200 bg-white text-emerald-600'
+                            : 'border-slate-200 bg-white text-slate-500'
+                        }`}
+                      >
+                        <Icon className="h-4.5 w-4.5" />
+                      </div>
+                      <div
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                          item.isComplete
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-white text-slate-500'
+                        }`}
+                      >
+                        {item.isComplete ? (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        ) : (
+                          <CircleDashed className="h-3.5 w-3.5" />
+                        )}
+                        {item.isComplete ? 'Done' : 'Pending'}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <h3 className="text-sm font-bold text-[#0A1128]">{item.title}</h3>
+                      <p className="text-xs leading-relaxed text-slate-500">{item.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    {renderProgressAction(item)}
+                    {!item.actionLabel && (
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Complete
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Save from the editor first so a new biography appears in My Biographies and can be continued later.
+            </span>
+          </div>
+        </section>
 
         <section className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
@@ -716,7 +1042,7 @@ export default function DIYDashboard() {
         </motion.div>
 
         {/* "Choose a Biography Template" Main Showcase List */}
-        <div className="space-y-6">
+        <div ref={templateChooserRef} className="scroll-mt-24 space-y-6">
           <div className="space-y-1">
             <h2 className="font-serif-display text-2xl md:text-3xl font-semibold text-[#0A1128] tracking-tight">
               Choose a Biography Template
@@ -808,7 +1134,10 @@ export default function DIYDashboard() {
                             href={previewUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            onClick={(event) => event.stopPropagation()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleMarkPreviewed(getTemplatePreviewProgressKey(template.id));
+                            }}
                             className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
                           >
                             <Eye className="w-3.5 h-3.5" />

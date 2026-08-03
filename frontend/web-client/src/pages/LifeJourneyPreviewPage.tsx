@@ -2,8 +2,15 @@ import React from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, PenTool } from 'lucide-react';
 import LifeJourneyTemplate from '../Templates/LifeJourney/LifeJourneyTemplate';
-import { loadDraft } from '../Templates/LifeJourney/draftStorage';
+import { loadDraft, saveDraft } from '../Templates/LifeJourney/draftStorage';
 import { getBiographyTemplateRoute } from '../Templates/LifeJourney/templateRoutes';
+import { hydrateDraftFromBackendSections } from '../Templates/LifeJourney/backendSectionHydration';
+import { authService } from '../services/authService';
+import {
+  getTemplatePreviewProgressKey,
+  getWebsitePreviewProgressKey,
+  markDiyPreviewedProgressKey,
+} from '../utils/diyProgress';
 
 export default function LifeJourneyPreviewPage() {
   const navigate = useNavigate();
@@ -11,11 +18,57 @@ export default function LifeJourneyPreviewPage() {
   const [searchParams] = useSearchParams();
   const templateRoute = getBiographyTemplateRoute(templateId);
   const websiteId = searchParams.get('websiteId') || '';
-  const previewDraft = loadDraft(templateRoute.id, templateRoute.categoryKey, websiteId);
+  const [previewDraft, setPreviewDraft] = React.useState(() =>
+    loadDraft(templateRoute.id, templateRoute.categoryKey, websiteId)
+  );
 
   React.useEffect(() => {
     document.title = `${templateRoute.title} Preview | Xinghuoji`;
   }, [templateRoute.title]);
+
+  React.useEffect(() => {
+    markDiyPreviewedProgressKey(
+      websiteId ? getWebsitePreviewProgressKey(websiteId) : getTemplatePreviewProgressKey(templateRoute.id)
+    );
+  }, [templateRoute.id, websiteId]);
+
+  React.useEffect(() => {
+    setPreviewDraft(loadDraft(templateRoute.id, templateRoute.categoryKey, websiteId));
+  }, [templateRoute.categoryKey, templateRoute.id, websiteId]);
+
+  React.useEffect(() => {
+    if (!websiteId || websiteId.startsWith('local-')) {
+      return;
+    }
+
+    let active = true;
+
+    const loadBackendPreviewContent = async () => {
+      const sections = await authService.getBiographyWebsiteSections(websiteId);
+      const detailedSections = await Promise.all(
+        sections.map(async (section) => {
+          const sectionDetail = await authService.getBiographyWebsiteSection(websiteId, section.id);
+          return sectionDetail || section;
+        })
+      );
+
+      if (!active || detailedSections.length === 0) {
+        return;
+      }
+
+      setPreviewDraft((currentDraft) => {
+        const hydratedDraft = hydrateDraftFromBackendSections(currentDraft, detailedSections);
+        saveDraft(templateRoute.id, hydratedDraft, websiteId);
+        return hydratedDraft;
+      });
+    };
+
+    loadBackendPreviewContent();
+
+    return () => {
+      active = false;
+    };
+  }, [templateRoute.id, websiteId]);
 
   const editorPageUrl = React.useMemo(() => {
     const url = new URL(`/diy-dashboard/templates/${templateRoute.id}/edit`, window.location.origin);
@@ -53,7 +106,11 @@ export default function LifeJourneyPreviewPage() {
         </a>
       </div>
 
-      <LifeJourneyTemplate categoryKey={templateRoute.categoryKey} dataOverride={previewDraft} />
+      <LifeJourneyTemplate
+        categoryKey={templateRoute.categoryKey}
+        dataOverride={previewDraft}
+        websiteId={websiteId}
+      />
     </div>
   );
 }
