@@ -4,13 +4,32 @@ import { ArrowLeft, PenTool } from 'lucide-react';
 import LifeJourneyTemplate from '../Templates/LifeJourney/LifeJourneyTemplate';
 import { loadDraft, saveDraft } from '../Templates/LifeJourney/draftStorage';
 import { getBiographyTemplateRoute } from '../Templates/LifeJourney/templateRoutes';
-import { hydrateDraftFromBackendSections } from '../Templates/LifeJourney/backendSectionHydration';
+import {
+  collectMediaAssetIdsFromBackendSections,
+  hydrateDraftFromBackendSections,
+} from '../Templates/LifeJourney/backendSectionHydration';
 import { authService } from '../services/authService';
+import type { BiographyWebsiteSection } from '../services/authService';
 import {
   getTemplatePreviewProgressKey,
   getWebsitePreviewProgressKey,
   markDiyPreviewedProgressKey,
 } from '../utils/diyProgress';
+
+const loadBackendSectionMediaAccessUrls = async (
+  websiteId: string,
+  sections: BiographyWebsiteSection[]
+) => {
+  const mediaAssetIds = collectMediaAssetIdsFromBackendSections(sections);
+  const entries = await Promise.all(
+    mediaAssetIds.map(async (mediaAssetId) => {
+      const accessUrl = await authService.getBiographyWebsiteMediaAccessUrl(websiteId, mediaAssetId);
+      return accessUrl ? ([mediaAssetId, accessUrl] as const) : null;
+    })
+  );
+
+  return Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => Boolean(entry)));
+};
 
 export default function LifeJourneyPreviewPage() {
   const navigate = useNavigate();
@@ -56,8 +75,14 @@ export default function LifeJourneyPreviewPage() {
         return;
       }
 
+      const mediaAccessUrls = await loadBackendSectionMediaAccessUrls(websiteId, detailedSections);
+
+      if (!active) {
+        return;
+      }
+
       setPreviewDraft((currentDraft) => {
-        const hydratedDraft = hydrateDraftFromBackendSections(currentDraft, detailedSections);
+        const hydratedDraft = hydrateDraftFromBackendSections(currentDraft, detailedSections, mediaAccessUrls);
         saveDraft(templateRoute.id, hydratedDraft, websiteId);
         return hydratedDraft;
       });

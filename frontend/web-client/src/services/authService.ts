@@ -1388,6 +1388,35 @@ export const authService = {
     }
   },
 
+  async getBiographyWebsiteMediaAccessUrl(websiteId: string, mediaAssetId: string): Promise<string | null> {
+    if (!websiteId || !mediaAssetId || websiteId.startsWith('local-')) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        apiUrl(
+          `/api/websites/${encodeURIComponent(websiteId)}/media/${encodeURIComponent(mediaAssetId)}/access-url`
+        ),
+        {
+          method: 'GET',
+          headers: getAuthHeaders(),
+        }
+      );
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        throw new Error(getMessage(data, 'Unable to load media access URL'));
+      }
+
+      return typeof data?.accessUrl === 'string' && data.accessUrl ? data.accessUrl : null;
+    } catch {
+      return null;
+    }
+  },
+
   async deleteBiographyWebsiteMedia(websiteId: string, mediaAssetId: string): Promise<boolean> {
     if (!websiteId || !mediaAssetId || websiteId.startsWith('local-')) {
       return false;

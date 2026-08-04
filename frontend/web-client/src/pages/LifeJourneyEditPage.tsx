@@ -33,7 +33,10 @@ import {
 } from '../Templates/LifeJourney/draftStorage';
 import { getBiographyTemplateRoute } from '../Templates/LifeJourney/templateRoutes';
 import { getSectionCopy } from '../Templates/LifeJourney/sectionCopy';
-import { hydrateDraftFromBackendSections } from '../Templates/LifeJourney/backendSectionHydration';
+import {
+  collectMediaAssetIdsFromBackendSections,
+  hydrateDraftFromBackendSections,
+} from '../Templates/LifeJourney/backendSectionHydration';
 import { authService } from '../services/authService';
 import {
   getTemplatePreviewProgressKey,
@@ -82,6 +85,21 @@ const EMPTY_OMITTED_MEDIA_ASSET_IDS = new Set<string>();
 const IMAGE_UPLOAD_ACCEPT = 'image/png,image/jpeg,image/webp';
 const MOBILE_PREVIEW_SRC_DOC =
   '<!doctype html><html><head></head><body><div id="mobile-preview-root"></div></body></html>';
+
+const loadBackendSectionMediaAccessUrls = async (
+  websiteId: string,
+  sections: BiographyWebsiteSection[]
+) => {
+  const mediaAssetIds = collectMediaAssetIdsFromBackendSections(sections);
+  const entries = await Promise.all(
+    mediaAssetIds.map(async (mediaAssetId) => {
+      const accessUrl = await authService.getBiographyWebsiteMediaAccessUrl(websiteId, mediaAssetId);
+      return accessUrl ? ([mediaAssetId, accessUrl] as const) : null;
+    })
+  );
+
+  return Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => Boolean(entry)));
+};
 
 type PreviewViewport = 'desktop' | 'tablet' | 'phone';
 type FramedPreviewViewport = Exclude<PreviewViewport, 'desktop'>;
@@ -793,10 +811,16 @@ export default function LifeJourneyEditPage() {
         return;
       }
 
+      const mediaAccessUrls = await loadBackendSectionMediaAccessUrls(activeWebsiteId, detailedSections);
+
+      if (!active) {
+        return;
+      }
+
       setWebsiteSections(detailedSections);
       if (detailedSections.length > 0) {
         setDraft((currentDraft) => {
-          const hydratedDraft = hydrateDraftFromBackendSections(currentDraft, detailedSections);
+          const hydratedDraft = hydrateDraftFromBackendSections(currentDraft, detailedSections, mediaAccessUrls);
           saveDraft(templateRoute.id, hydratedDraft, activeWebsiteId);
           return hydratedDraft;
         });

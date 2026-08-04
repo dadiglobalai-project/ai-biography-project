@@ -9,6 +9,8 @@ import type {
 
 type BackendRecord = Record<string, unknown>;
 
+export type MediaAccessUrlMap = Record<string, string>;
+
 const asBackendRecord = (value: unknown): BackendRecord | null =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as BackendRecord) : null;
 
@@ -169,9 +171,45 @@ const getTimelineEra = (index: number, fallback?: TimelineMilestone['era']): Tim
   return 'recent';
 };
 
+const addMediaAssetId = (mediaAssetIds: Set<string>, mediaAssetId?: string) => {
+  if (mediaAssetId) {
+    mediaAssetIds.add(mediaAssetId);
+  }
+};
+
+const getMediaAccessUrl = (mediaAccessUrls: MediaAccessUrlMap, mediaAssetId?: string) =>
+  mediaAssetId ? mediaAccessUrls[mediaAssetId] : undefined;
+
+export const collectMediaAssetIdsFromBackendSections = (sections: BiographyWebsiteSection[]) => {
+  const mediaAssetIds = new Set<string>();
+  const heroSection = getBackendSectionByAliases(['hero', 'hero section'], sections);
+  const pursuitsSection = getBackendSectionByAliases(['pursuits', 'pursuit', 'specialized pursuits'], sections);
+  const timelineSection = getBackendSectionByAliases(['timeline', 'timeline section', 'life journey'], sections);
+  const gallerySection = getBackendSectionByAliases(['gallery', 'gallery section'], sections);
+
+  addMediaAssetId(mediaAssetIds, getSectionStringValue(heroSection, ['profileImageId', 'profile_image_id']));
+  addMediaAssetId(mediaAssetIds, getSectionStringValue(heroSection, ['backgroundImageId', 'background_image_id']));
+
+  sortBackendItems(getSectionArrayValue(pursuitsSection, ['items', 'pursuits'], ['pursuits'])).forEach((item) => {
+    addMediaAssetId(mediaAssetIds, getRecordStringValue(item, ['imageId', 'image_id', 'mediaAssetId', 'media_asset_id']));
+  });
+
+  sortBackendItems(getSectionArrayValue(timelineSection, ['timelineEvents', 'events'], ['timeline'])).forEach((event) => {
+    addMediaAssetId(mediaAssetIds, getRecordStringValue(event, ['imageId', 'image_id', 'mediaAssetId', 'media_asset_id']));
+  });
+
+  sortBackendItems(getSectionArrayValue(gallerySection, ['items', 'galleryItems'], ['gallery'])).forEach((item) => {
+    addMediaAssetId(mediaAssetIds, getRecordStringValue(item, ['mediaAssetId', 'media_asset_id', 'mediaId', 'assetId']));
+    addMediaAssetId(mediaAssetIds, getRecordStringValue(item, ['thumbnailAssetId', 'thumbnail_asset_id', 'thumbnailId']));
+  });
+
+  return Array.from(mediaAssetIds);
+};
+
 export const hydrateDraftFromBackendSections = (
   currentDraft: BiographyCategory,
-  sections: BiographyWebsiteSection[]
+  sections: BiographyWebsiteSection[],
+  mediaAccessUrls: MediaAccessUrlMap = {}
 ): BiographyCategory => {
   let nextDraft = currentDraft;
   const heroSection = getBackendSectionByAliases(['hero', 'hero section'], sections);
@@ -185,6 +223,13 @@ export const hydrateDraftFromBackendSections = (
   const contactSection = getBackendSectionByAliases(['contact', 'contact section'], sections);
 
   if (heroSection) {
+    const profileImageAssetId =
+      getSectionStringValue(heroSection, ['profileImageId', 'profile_image_id']) ??
+      nextDraft.personalDetails.profileImageAssetId;
+    const backgroundImageAssetId =
+      getSectionStringValue(heroSection, ['backgroundImageId', 'background_image_id']) ??
+      nextDraft.personalDetails.backgroundImageAssetId;
+
     nextDraft = {
       ...nextDraft,
       personalDetails: {
@@ -197,12 +242,10 @@ export const hydrateDraftFromBackendSections = (
         shortIntro:
           getSectionStringValue(heroSection, ['shortDescription', 'shortIntro']) ??
           nextDraft.personalDetails.shortIntro,
-        profileImageAssetId:
-          getSectionStringValue(heroSection, ['profileImageId', 'profile_image_id']) ??
-          nextDraft.personalDetails.profileImageAssetId,
-        backgroundImageAssetId:
-          getSectionStringValue(heroSection, ['backgroundImageId', 'background_image_id']) ??
-          nextDraft.personalDetails.backgroundImageAssetId,
+        profileImageUrl:
+          getMediaAccessUrl(mediaAccessUrls, profileImageAssetId) ?? nextDraft.personalDetails.profileImageUrl,
+        profileImageAssetId,
+        backgroundImageAssetId,
       },
     };
   }
@@ -257,6 +300,9 @@ export const hydrateDraftFromBackendSections = (
         ...nextDraft,
         hobbies: pursuitItems.map((item, index) => {
           const fallback = nextDraft.hobbies[index];
+          const imageAssetId =
+            getRecordStringValue(item, ['imageId', 'image_id', 'mediaAssetId', 'media_asset_id']) ??
+            fallback?.imageAssetId;
           return {
             id:
               getRecordStringValue(item, ['id', 'pursuitId']) ||
@@ -266,10 +312,8 @@ export const hydrateDraftFromBackendSections = (
             description:
               getRecordStringValue(item, ['description']) ?? fallback?.description ?? '',
             icon: getRecordStringValue(item, ['icon']) ?? fallback?.icon ?? 'Sparkles',
-            imageUrl: fallback?.imageUrl ?? '',
-            imageAssetId:
-              getRecordStringValue(item, ['imageId', 'image_id', 'mediaAssetId', 'media_asset_id']) ??
-              fallback?.imageAssetId,
+            imageUrl: getMediaAccessUrl(mediaAccessUrls, imageAssetId) ?? fallback?.imageUrl ?? '',
+            imageAssetId,
             imageSettings: fallback?.imageSettings,
             textSettings: fallback?.textSettings,
           };
@@ -290,6 +334,9 @@ export const hydrateDraftFromBackendSections = (
           timelineEvents.length > 0
             ? timelineEvents.map((event, index) => {
                 const fallback = nextDraft.timeline[index];
+                const imageAssetId =
+                  getRecordStringValue(event, ['imageId', 'image_id', 'mediaAssetId', 'media_asset_id']) ??
+                  fallback?.imageAssetId;
                 const highlights = sortBackendItems(
                   (Array.isArray(event.highlights)
                     ? event.highlights
@@ -322,10 +369,8 @@ export const hydrateDraftFromBackendSections = (
                           )
                           .filter((highlight): highlight is string => highlight !== undefined)
                       : fallback?.details ?? [],
-                  imageUrl: fallback?.imageUrl,
-                  imageAssetId:
-                    getRecordStringValue(event, ['imageId', 'image_id', 'mediaAssetId', 'media_asset_id']) ??
-                    fallback?.imageAssetId,
+                  imageUrl: getMediaAccessUrl(mediaAccessUrls, imageAssetId) ?? fallback?.imageUrl,
+                  imageAssetId,
                   imageCaption:
                     getRecordStringValue(event, ['imageCaption']) ?? fallback?.imageCaption,
                   imageSettings: fallback?.imageSettings,
@@ -351,6 +396,12 @@ export const hydrateDraftFromBackendSections = (
           galleryItems.length > 0
             ? galleryItems.map((item, index) => {
                 const fallback = nextDraft.gallery[index];
+                const mediaAssetId =
+                  getRecordStringValue(item, ['mediaAssetId', 'media_asset_id', 'mediaId', 'assetId']) ??
+                  fallback?.mediaAssetId;
+                const thumbnailAssetId =
+                  getRecordStringValue(item, ['thumbnailAssetId', 'thumbnail_asset_id', 'thumbnailId']) ??
+                  fallback?.thumbnailAssetId;
                 return {
                   id:
                     getRecordStringValue(item, ['id', 'galleryItemId', 'itemId']) ||
@@ -360,13 +411,9 @@ export const hydrateDraftFromBackendSections = (
                   category: normalizeGalleryCategory(
                     getRecordStringValue(item, ['category']) ?? fallback?.category
                   ),
-                  imageUrl: fallback?.imageUrl ?? '',
-                  mediaAssetId:
-                    getRecordStringValue(item, ['mediaAssetId', 'media_asset_id', 'mediaId', 'assetId']) ??
-                    fallback?.mediaAssetId,
-                  thumbnailAssetId:
-                    getRecordStringValue(item, ['thumbnailAssetId', 'thumbnail_asset_id', 'thumbnailId']) ??
-                    fallback?.thumbnailAssetId,
+                  imageUrl: getMediaAccessUrl(mediaAccessUrls, mediaAssetId) ?? fallback?.imageUrl ?? '',
+                  mediaAssetId,
+                  thumbnailAssetId,
                   caption:
                     getRecordStringValue(item, ['description', 'caption']) ??
                     fallback?.caption ??
