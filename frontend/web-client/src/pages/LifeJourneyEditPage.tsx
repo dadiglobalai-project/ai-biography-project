@@ -4,8 +4,13 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   BookOpen,
+  CheckCircle2,
   Clock3,
   Eye,
+  ExternalLink,
+  FileText,
+  Globe2,
+  Home,
   Image as ImageIcon,
   Lock,
   Mail,
@@ -14,13 +19,18 @@ import {
   Palette,
   PencilLine,
   RotateCcw,
+  Redo2,
   Save,
+  Settings,
   Sparkles,
   Smartphone,
   Tablet,
   Trash2,
   Type,
+  Undo2,
+  UploadCloud,
   UserRound,
+  WandSparkles,
   X,
 } from 'lucide-react';
 import LifeJourneyTemplate from '../Templates/LifeJourney/LifeJourneyTemplate';
@@ -270,6 +280,21 @@ const editorSections: Array<{
   },
 ];
 
+const sidebarSectionItems: Array<{
+  navKey: string;
+  section: EditableTemplateSection;
+  label: string;
+  icon: React.ElementType;
+}> = [
+  { navKey: 'hero', section: 'hero', label: 'Hero', icon: Home },
+  { navKey: 'chronicle', section: 'about', label: 'Chronicle & Values', icon: Sparkles },
+  { navKey: 'pursuits', section: 'about', label: 'Specialized Pursuits', icon: WandSparkles },
+  { navKey: 'timeline', section: 'timeline', label: 'Life Journey', icon: Clock3 },
+  { navKey: 'gallery', section: 'gallery', label: 'Media Gallery', icon: ImageIcon },
+  { navKey: 'stories', section: 'stories', label: 'Memories & Stories', icon: FileText },
+  { navKey: 'contact', section: 'contact', label: 'Contact', icon: Mail },
+];
+
 const BACKEND_SECTION_ALIASES: Record<ContentEditorSection, string[]> = {
   hero: ['hero', 'hero section'],
   about: ['about', 'about section', 'chronicle', 'chronicle section', 'chronicle overview', 'archival essence'],
@@ -450,6 +475,31 @@ const formatMediaFileSize = (fileSize?: number) => {
   return `${(fileSize / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const getMediaLibraryStorageKey = (websiteId: string) =>
+  `xinghuoji.website.${websiteId}.mediaLibrary`;
+
+const readLocalMediaLibraryAssets = (websiteId: string): BiographyMediaAsset[] => {
+  if (!websiteId) {
+    return [];
+  }
+
+  try {
+    const storedAssets = window.localStorage.getItem(getMediaLibraryStorageKey(websiteId));
+    return storedAssets ? JSON.parse(storedAssets) : [];
+  } catch {
+    window.localStorage.removeItem(getMediaLibraryStorageKey(websiteId));
+    return [];
+  }
+};
+
+const writeLocalMediaLibraryAssets = (websiteId: string, assets: BiographyMediaAsset[]) => {
+  if (!websiteId) {
+    return;
+  }
+
+  window.localStorage.setItem(getMediaLibraryStorageKey(websiteId), JSON.stringify(assets));
+};
+
 const notifyBiographyListChanged = () => {
   window.localStorage.setItem(BIOGRAPHY_LIST_REFRESH_KEY, String(Date.now()));
 };
@@ -470,6 +520,7 @@ export default function LifeJourneyEditPage() {
   const [editorMode, setEditorMode] = useState<EditorMode>('edit');
   const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
   const [activeEditorSection, setActiveEditorSection] = useState<EditableTemplateSection | null>(null);
+  const [activeSidebarItem, setActiveSidebarItem] = useState<string | null>(null);
   const [isMobileEditorOpen, setIsMobileEditorOpen] = useState(false);
   const [websiteSections, setWebsiteSections] = useState<BiographyWebsiteSection[]>([]);
   const [sectionLoadMessage, setSectionLoadMessage] = useState('');
@@ -501,6 +552,7 @@ export default function LifeJourneyEditPage() {
   const [updatingContactMessageId, setUpdatingContactMessageId] = useState<string | null>(null);
   const [pendingDeleteContactMessageId, setPendingDeleteContactMessageId] = useState<string | null>(null);
   const [deletingContactMessageId, setDeletingContactMessageId] = useState<string | null>(null);
+  const mediaLibraryInputRef = React.useRef<HTMLInputElement | null>(null);
   const devicePreviewFrameRef = React.useRef<HTMLIFrameElement | null>(null);
   const hasMountedDraftRef = React.useRef(false);
   const activeWebsiteId = website?.id || websiteId;
@@ -521,8 +573,14 @@ export default function LifeJourneyEditPage() {
 
   const loadMediaAssets = React.useCallback(async () => {
     if (!activeWebsiteId || activeWebsiteId.startsWith('local-')) {
-      setMediaAssets([]);
-      setMediaAssetsMessage('Media assets will load after this biography is saved');
+      const storageId = activeWebsiteId || templateRoute.id;
+      const localAssets = readLocalMediaLibraryAssets(storageId);
+      setMediaAssets(localAssets);
+      setMediaAssetsMessage(
+        localAssets.length > 0
+          ? `Loaded ${localAssets.length} local media item${localAssets.length === 1 ? '' : 's'}`
+          : 'No media in this library yet'
+      );
       return;
     }
 
@@ -530,20 +588,45 @@ export default function LifeJourneyEditPage() {
     setMediaAssetsMessage('Loading media assets...');
 
     const assets = await authService.getBiographyWebsiteMedia(activeWebsiteId);
+    const assetsWithAccessUrls = await Promise.all(
+      assets.map(async (asset) => {
+        if (asset.accessUrl) {
+          return asset;
+        }
+
+        const accessUrl = await authService.getBiographyWebsiteMediaAccessUrl(
+          activeWebsiteId,
+          asset.mediaAssetId
+        );
+
+        return accessUrl ? { ...asset, accessUrl } : asset;
+      })
+    );
 
     setIsLoadingMediaAssets(false);
-    setMediaAssets(assets);
+    setMediaAssets(assetsWithAccessUrls);
     setPendingDeleteMediaAssetId(null);
     setMediaAssetsMessage(
-      assets.length > 0
-        ? `Loaded ${assets.length} media asset${assets.length === 1 ? '' : 's'}`
+      assetsWithAccessUrls.length > 0
+        ? `Loaded ${assetsWithAccessUrls.length} media asset${assetsWithAccessUrls.length === 1 ? '' : 's'}`
         : 'No media assets yet'
     );
-  }, [activeWebsiteId]);
+  }, [activeWebsiteId, templateRoute.id]);
 
   const handleDeleteMediaAsset = async (mediaAssetId: string) => {
     if (!activeWebsiteId || activeWebsiteId.startsWith('local-')) {
-      setMediaAssetsMessage('Media can be deleted after this biography is saved');
+      if (pendingDeleteMediaAssetId !== mediaAssetId) {
+        setPendingDeleteMediaAssetId(mediaAssetId);
+        setMediaAssetsMessage('Click Delete again to remove this local media item');
+        return;
+      }
+
+      const storageId = activeWebsiteId || templateRoute.id;
+      const nextAssets = mediaAssets.filter((asset) => asset.mediaAssetId !== mediaAssetId);
+      writeLocalMediaLibraryAssets(storageId, nextAssets);
+      setMediaAssets(nextAssets);
+      setPendingDeleteMediaAssetId(null);
+      setMediaAssetsMessage('Deleted local media item');
       return;
     }
 
@@ -570,6 +653,180 @@ export default function LifeJourneyEditPage() {
       currentAssets.filter((asset) => asset.mediaAssetId !== mediaAssetId)
     );
     setMediaAssetsMessage('Deleted media asset');
+  };
+
+  const handleUploadMediaLibraryFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.currentTarget.files || []);
+    event.currentTarget.value = '';
+
+    if (files.length === 0) {
+      return;
+    }
+
+    setIsLoadingMediaAssets(true);
+    setMediaAssetsMessage(`Uploading ${files.length} image${files.length === 1 ? '' : 's'}...`);
+
+    try {
+      if (activeWebsiteId && !activeWebsiteId.startsWith('local-')) {
+        const uploadedAssets: BiographyMediaAsset[] = [];
+
+        for (const file of files) {
+          validateImageFile(file);
+          const uploadedMedia = await authService.uploadBiographyWebsiteMedia(
+            activeWebsiteId,
+            file,
+            'GALLERY'
+          );
+
+          if (uploadedMedia) {
+            uploadedAssets.push(uploadedMedia);
+          }
+        }
+
+        setMediaAssets((currentAssets) => [
+          ...uploadedAssets,
+          ...currentAssets.filter(
+            (asset) => !uploadedAssets.some((uploadedAsset) => uploadedAsset.mediaAssetId === asset.mediaAssetId)
+          ),
+        ]);
+        setMediaAssetsMessage(
+          uploadedAssets.length > 0
+            ? `Uploaded ${uploadedAssets.length} image${uploadedAssets.length === 1 ? '' : 's'} to media library`
+            : 'No images were uploaded'
+        );
+        return;
+      }
+
+      const storageId = activeWebsiteId || templateRoute.id;
+      const localAssets: BiographyMediaAsset[] = [];
+
+      for (const file of files) {
+        validateImageFile(file);
+        const accessUrl = await convertImageFileToDataUrl(file);
+        localAssets.push({
+          mediaAssetId: `local-media-${crypto.randomUUID()}`,
+          websiteId: storageId,
+          usageType: 'GALLERY',
+          originalFilename: file.name,
+          mimeType: file.type,
+          fileSize: file.size,
+          accessUrl,
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      const nextAssets = [...localAssets, ...mediaAssets];
+      writeLocalMediaLibraryAssets(storageId, nextAssets);
+      setMediaAssets(nextAssets);
+      setMediaAssetsMessage(
+        `Added ${localAssets.length} local image${localAssets.length === 1 ? '' : 's'} to media library`
+      );
+    } catch (err: any) {
+      setMediaAssetsMessage(err?.message || 'Unable to upload image to media library');
+    } finally {
+      setIsLoadingMediaAssets(false);
+    }
+  };
+
+  const handleUseMediaAsset = (asset: BiographyMediaAsset) => {
+    const imageUrl = asset.accessUrl || '';
+
+    if (!imageUrl) {
+      setMediaAssetsMessage('This media item needs an access URL before it can be used');
+      return;
+    }
+
+    const backendAssetId =
+      activeWebsiteId && !activeWebsiteId.startsWith('local-') && !asset.mediaAssetId.startsWith('local-')
+        ? asset.mediaAssetId
+        : '';
+    const targetSection =
+      activeEditorSection && activeEditorSection !== 'style' && activeEditorSection !== 'contact'
+        ? activeEditorSection
+        : 'gallery';
+
+    setDraft((currentDraft) => {
+      if (targetSection === 'hero') {
+        return {
+          ...currentDraft,
+          personalDetails: {
+            ...currentDraft.personalDetails,
+            profileImageUrl: imageUrl,
+            profileImageAssetId: backendAssetId,
+          },
+        };
+      }
+
+      if (targetSection === 'about' && currentDraft.hobbies.length > 0) {
+        return {
+          ...currentDraft,
+          hobbies: currentDraft.hobbies.map((hobby, index) =>
+            index === 0
+              ? {
+                  ...hobby,
+                  imageUrl,
+                  imageAssetId: backendAssetId,
+                }
+              : hobby
+          ),
+        };
+      }
+
+      if (targetSection === 'timeline' && currentDraft.timeline.length > 0) {
+        return {
+          ...currentDraft,
+          timeline: currentDraft.timeline.map((milestone, index) =>
+            index === 0
+              ? {
+                  ...milestone,
+                  imageUrl,
+                  imageAssetId: backendAssetId,
+                }
+              : milestone
+          ),
+        };
+      }
+
+      if (targetSection === 'stories' && currentDraft.stories.length > 0) {
+        return {
+          ...currentDraft,
+          stories: currentDraft.stories.map((story, index) =>
+            index === 0
+              ? {
+                  ...story,
+                  imageUrl,
+                  imageAssetId: backendAssetId,
+                }
+              : story
+          ),
+        };
+      }
+
+      const title = asset.originalFilename?.replace(/\.[^.]+$/, '') || 'Media Library Image';
+      const nextGalleryItem: GalleryItem = {
+        id: `gallery-${Date.now()}`,
+        title,
+        category: 'creative',
+        imageUrl,
+        mediaAssetId: backendAssetId,
+        thumbnailAssetId: backendAssetId,
+        caption: 'Added from Media Library.',
+        year: String(new Date().getFullYear()),
+      };
+
+      return {
+        ...currentDraft,
+        gallery: [nextGalleryItem, ...currentDraft.gallery],
+      };
+    });
+
+    setActiveEditorSection(targetSection);
+    focusPreviewSection(targetSection);
+    setSaveMessage(
+      targetSection === 'gallery'
+        ? 'Image added to Gallery from Media Library'
+        : `Image applied to ${targetSection} section`
+    );
   };
 
   const loadContactMessages = React.useCallback(async () => {
@@ -672,6 +929,7 @@ export default function LifeJourneyEditPage() {
     }
 
     setActiveEditorSection(section);
+    setActiveSidebarItem(null);
     setPendingDeleteSectionId(null);
     if (shouldUseMobileEditor()) {
       setIsMobileEditorOpen(true);
@@ -684,10 +942,30 @@ export default function LifeJourneyEditPage() {
     }
 
     setActiveEditorSection('style');
+    setActiveSidebarItem('style');
     setPendingDeleteSectionId(null);
     if (shouldUseMobileEditor()) {
       setIsMobileEditorOpen(true);
     }
+  };
+
+  const handleSidebarSectionSelect = (navKey: string, section: EditableTemplateSection) => {
+    if (!isEditingMode) {
+      return;
+    }
+
+    focusPreviewSection(section);
+    setActiveSidebarItem(navKey);
+    setPendingDeleteSectionId(null);
+    if (shouldUseMobileEditor()) {
+      setIsMobileEditorOpen(true);
+    }
+  };
+
+  const handleOpenMediaLibrary = () => {
+    setActiveSidebarItem('media-library');
+    setPendingDeleteMediaAssetId(null);
+    void loadMediaAssets();
   };
 
   const handleDraftChange: React.Dispatch<React.SetStateAction<BiographyCategory>> = (nextDraft) => {
@@ -738,6 +1016,7 @@ export default function LifeJourneyEditPage() {
     );
     setEditorMode('preview');
     setActiveEditorSection(null);
+    setActiveSidebarItem(null);
     setIsMobileEditorOpen(false);
     setPendingDeleteSectionId(null);
   };
@@ -4138,148 +4417,405 @@ export default function LifeJourneyEditPage() {
     );
   };
 
+  const renderSidebarNavigation = () => (
+    <div className="flex h-full min-h-0 flex-col bg-white">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-5">
+        <div className="px-3 pb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          Sections
+        </div>
+        <nav className="space-y-1">
+          {sidebarSectionItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeSidebarItem
+              ? activeSidebarItem === item.navKey
+              : activeEditorSection === item.section && item.navKey !== 'pursuits';
+
+            return (
+              <button
+                key={item.navKey}
+                type="button"
+                onClick={() => handleSidebarSectionSelect(item.navKey, item.section)}
+                className={`group flex w-full items-center gap-3 rounded-lg border-l-2 px-4 py-3 text-left text-sm transition ${
+                  isActive
+                    ? 'border-orange-600 bg-orange-50 text-slate-950 shadow-sm'
+                    : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-950'
+                }`}
+              >
+                <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-orange-700' : 'text-slate-500'}`} />
+                <span className="truncate font-medium">{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="my-5 h-px bg-slate-200" />
+        <div className="px-3 pb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          Tools
+        </div>
+        <div className="space-y-1">
+          <button
+            type="button"
+            onClick={handleOpenMediaLibrary}
+            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm transition ${
+              activeSidebarItem === 'media-library'
+                ? 'bg-slate-100 text-slate-950'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
+            }`}
+          >
+            <ImageIcon className="h-4 w-4 shrink-0 text-slate-500" />
+            <span className="truncate font-medium">Media Library</span>
+          </button>
+        </div>
+
+        <div className="my-5 h-px bg-slate-200" />
+        <div className="px-3 pb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          Settings
+        </div>
+        <div className="space-y-1">
+          <button
+            type="button"
+            onClick={handleOpenStyleEditor}
+            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm transition ${
+              activeSidebarItem === 'style'
+                ? 'bg-slate-100 text-slate-950'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
+            }`}
+          >
+            <Palette className="h-4 w-4 shrink-0 text-slate-500" />
+            <span className="truncate font-medium">Template Style</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleOpenStyleEditor}
+            className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm text-slate-600 transition hover:bg-slate-50 hover:text-slate-950"
+          >
+            <Settings className="h-4 w-4 shrink-0 text-slate-500" />
+            <span className="truncate font-medium">General Settings</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="border-t border-slate-200 p-5">
+        <button
+          type="button"
+          onClick={handleEnterPreviewMode}
+          className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-indigo-800 transition hover:border-indigo-200 hover:bg-indigo-50"
+        >
+          <span>View Published Site</span>
+          <ExternalLink className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderMediaLibraryPanel = () => (
+    <section className="flex h-full min-h-0 flex-col bg-white">
+      <div className="border-b border-slate-200 px-5 py-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Tools
+            </p>
+            <h2 className="mt-1 text-lg font-bold text-slate-950">Media Library</h2>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+              Store reusable images for this biography.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveSidebarItem(null)}
+            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Close media library"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <input
+          ref={mediaLibraryInputRef}
+          type="file"
+          accept={IMAGE_UPLOAD_ACCEPT}
+          multiple
+          onChange={handleUploadMediaLibraryFiles}
+          className="sr-only"
+        />
+
+        <button
+          type="button"
+          onClick={() => mediaLibraryInputRef.current?.click()}
+          disabled={isLoadingMediaAssets}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-700 transition hover:border-slate-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <UploadCloud className="h-4 w-4" />
+          Upload Images
+        </button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            Library
+          </p>
+          <button
+            type="button"
+            onClick={loadMediaAssets}
+            disabled={isLoadingMediaAssets}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-600 transition hover:border-slate-900 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isLoadingMediaAssets ? 'Loading' : 'Refresh'}
+          </button>
+        </div>
+
+        {mediaAssetsMessage && (
+          <p className="mb-4 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+            {mediaAssetsMessage}
+          </p>
+        )}
+
+        {mediaAssets.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+            <ImageIcon className="mx-auto h-7 w-7 text-slate-300" />
+            <h3 className="mt-3 text-sm font-bold text-slate-900">No Images Yet</h3>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+              Upload images here, then reuse them in Hero, Gallery, Stories, and Timeline.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {mediaAssets.map((asset) => {
+              const canUseAsset = Boolean(asset.accessUrl);
+
+              return (
+                <article
+                  key={asset.mediaAssetId}
+                  className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+                >
+                  <button
+                    type="button"
+                    onClick={() => canUseAsset && handleUseMediaAsset(asset)}
+                    disabled={!canUseAsset}
+                    className="block aspect-square w-full bg-slate-100 disabled:cursor-not-allowed"
+                    title={canUseAsset ? 'Use this image' : 'Access URL unavailable'}
+                  >
+                    {asset.accessUrl ? (
+                      <img
+                        src={asset.accessUrl}
+                        alt={asset.originalFilename || 'Media library image'}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-slate-300">
+                        <ImageIcon className="h-7 w-7" />
+                      </div>
+                    )}
+                  </button>
+
+                  <div className="space-y-2 p-3">
+                    <div>
+                      <p className="truncate text-xs font-bold text-slate-900">
+                        {asset.originalFilename || 'Untitled media'}
+                      </p>
+                      <p className="mt-0.5 truncate text-[10px] text-slate-500">
+                        {asset.mimeType || 'Image'} - {formatMediaFileSize(asset.fileSize)}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleUseMediaAsset(asset)}
+                        disabled={!canUseAsset}
+                        className="rounded-lg bg-slate-950 px-2 py-2 text-[10px] font-bold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Use
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMediaAsset(asset.mediaAssetId)}
+                        disabled={deletingMediaAssetId === asset.mediaAssetId}
+                        className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                          pendingDeleteMediaAssetId === asset.mediaAssetId
+                            ? 'border-rose-300 bg-rose-50 text-rose-700'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:text-rose-600'
+                        }`}
+                      >
+                        {deletingMediaAssetId === asset.mediaAssetId
+                          ? 'Deleting'
+                          : pendingDeleteMediaAssetId === asset.mediaAssetId
+                            ? 'Confirm'
+                            : 'Delete'}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-md">
-        <div className="flex min-h-18 flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-[#f5f2ee] text-slate-900">
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur-md">
+        <div className="grid min-h-20 grid-cols-1 items-center gap-3 px-4 py-3 lg:grid-cols-[1fr_auto_1fr] lg:px-6">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
               onClick={() => navigate('/diy-dashboard')}
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-900 hover:text-slate-900"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-900 hover:text-slate-900"
               title="Back to dashboard"
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <div>
-              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
-                {isEditingMode ? 'Template Editor' : 'Template Preview'}
-              </p>
-              <h1 className="font-serif-display text-2xl font-semibold leading-tight text-[#0A1128]">
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-semibold text-slate-950">
                 {templateRoute.title}
               </h1>
+              <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                <span className="truncate">{saveMessage}</span>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+          <div className="flex items-center justify-start gap-2 lg:justify-center">
+            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 shadow-sm">
               <button
                 type="button"
-                onClick={handleEnterEditMode}
-                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
-                  isEditingMode
+                onClick={() => setPreviewViewport('desktop')}
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition ${
+                  previewViewport === 'desktop'
                     ? 'bg-white text-slate-950 shadow-sm'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
-                <PencilLine className="h-4 w-4" />
-                Edit
+                <Monitor className="h-4 w-4" />
+                Desktop
               </button>
               <button
                 type="button"
-                onClick={handleEnterPreviewMode}
-                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
-                  !isEditingMode
+                onClick={() => setPreviewViewport('tablet')}
+                className={`inline-flex items-center justify-center rounded-md px-3 py-2 transition ${
+                  previewViewport === 'tablet'
                     ? 'bg-white text-slate-950 shadow-sm'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
+                aria-label="Tablet preview"
               >
-                <Eye className="h-4 w-4" />
-                Preview
+                <Tablet className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewViewport('phone')}
+                className={`inline-flex items-center justify-center rounded-md px-3 py-2 transition ${
+                  previewViewport === 'phone'
+                    ? 'bg-white text-slate-950 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+                aria-label="Phone preview"
+              >
+                <Smartphone className="h-4 w-4" />
               </button>
             </div>
-            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
-              {saveMessage}
-            </span>
+
+            <div className="hidden items-center gap-1 xl:flex">
+              <button
+                type="button"
+                disabled
+                className="rounded-lg p-2 text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Undo"
+              >
+                <Undo2 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                disabled
+                className="rounded-lg p-2 text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Redo"
+              >
+                <Redo2 className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
+            <button
+              type="button"
+              onClick={isEditingMode ? handleEnterPreviewMode : handleEnterEditMode}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              {isEditingMode ? <Eye className="h-4 w-4" /> : <PencilLine className="h-4 w-4" />}
+              {isEditingMode ? 'Preview' : 'Edit'}
+            </button>
             <button
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Save className="h-4 w-4" />
-              {isSaving ? 'Saving' : 'Save'}
+              {isSaving ? 'Saving' : 'Save Draft'}
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving}
+              className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Globe2 className="h-4 w-4" />
+              Publish
             </button>
           </div>
         </div>
       </header>
 
-      <main className={isEditingMode ? 'grid lg:grid-cols-[360px_minmax(0,1fr)]' : 'grid'}>
+      <main
+        className={
+          isEditingMode
+            ? activeSidebarItem === 'media-library'
+              ? 'grid min-h-[calc(100vh-81px)] grid-cols-1 lg:grid-cols-[264px_360px_minmax(0,1fr)]'
+              : 'grid min-h-[calc(100vh-81px)] grid-cols-1 lg:grid-cols-[264px_minmax(0,1fr)]'
+            : 'min-h-[calc(100vh-81px)]'
+        }
+      >
         {isEditingMode && (
           <aside className="hidden border-r border-slate-200 bg-white lg:block">
-            <div className="p-5 lg:sticky lg:top-[73px] lg:max-h-[calc(100vh-73px)] lg:overflow-y-auto lg:p-6">
-              {renderEditorPanel('desktop')}
+            <div className="sticky top-[81px] h-[calc(100vh-81px)]">
+              {renderSidebarNavigation()}
             </div>
           </aside>
         )}
 
-        <section className="min-w-0 bg-slate-100">
-          <div className="sticky top-[73px] z-30 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-100/95 px-4 py-3 backdrop-blur-md lg:px-6">
-            <div className="flex items-center gap-2">
-              <Type className="h-4 w-4 text-slate-500" />
-              <div>
-                <span className="block text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Live Preview
-                </span>
-                <span className="block text-[11px] text-slate-500">
-                  {previewModeLabel}
-                </span>
-              </div>
+        {isEditingMode && activeSidebarItem === 'media-library' && (
+          <aside className="hidden border-r border-slate-200 bg-white lg:block">
+            <div className="sticky top-[81px] h-[calc(100vh-81px)]">
+              {renderMediaLibraryPanel()}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
-                <button
-                  type="button"
-                  onClick={() => setPreviewViewport('desktop')}
-                  className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
-                    previewViewport === 'desktop'
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  <Monitor className="h-3.5 w-3.5" />
-                  Desktop
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewViewport('tablet')}
-                  className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
-                    previewViewport === 'tablet'
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  <Tablet className="h-3.5 w-3.5" />
-                  Tablet
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewViewport('phone')}
-                  className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold uppercase tracking-wide transition ${
-                    previewViewport === 'phone'
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  <Smartphone className="h-3.5 w-3.5" />
-                  Phone
-                </button>
-              </div>
-              {isEditingMode && (
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 transition hover:border-rose-300 hover:text-rose-600"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Reset
-                </button>
-              )}
-            </div>
+          </aside>
+        )}
+
+        <section className="min-w-0 bg-[#f5f2ee] px-3 py-4 sm:px-5 lg:px-6">
+          <div className="mb-3 flex items-center justify-between gap-3 lg:hidden">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm">
+              <Type className="h-3.5 w-3.5" />
+              {previewModeLabel}
+            </span>
+            {isEditingMode && (
+              <button
+                type="button"
+                onClick={handleReset}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 transition hover:border-rose-300 hover:text-rose-600"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset
+              </button>
+            )}
           </div>
 
           {previewViewport !== 'desktop' ? (
-            <div className="bg-slate-200 px-3 py-6 sm:px-6 lg:px-8">
+            <div className="flex justify-center rounded-2xl border border-slate-200 bg-slate-200 px-3 py-6 shadow-sm sm:px-6 lg:px-8">
               <DevicePreviewFrame iframeRef={devicePreviewFrameRef} viewport={previewViewport}>
                 <LifeJourneyTemplate
                   categoryKey={templateRoute.categoryKey}
@@ -4292,16 +4828,19 @@ export default function LifeJourneyEditPage() {
               </DevicePreviewFrame>
             </div>
           ) : (
-            <LifeJourneyTemplate
-              categoryKey={templateRoute.categoryKey}
-              dataOverride={draft}
-              activeEditSection={isEditingMode ? activeEditorSection : null}
-              onDataChange={isEditingMode ? handleDraftChange : undefined}
-              onEditSectionChange={isEditingMode ? handleEditSectionChange : undefined}
-              websiteId={activeWebsiteId}
-            />
+            <div className="mx-auto max-w-[1060px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <LifeJourneyTemplate
+                categoryKey={templateRoute.categoryKey}
+                dataOverride={draft}
+                activeEditSection={isEditingMode ? activeEditorSection : null}
+                onDataChange={isEditingMode ? handleDraftChange : undefined}
+                onEditSectionChange={isEditingMode ? handleEditSectionChange : undefined}
+                websiteId={activeWebsiteId}
+              />
+            </div>
           )}
         </section>
+
       </main>
 
       {isEditingMode && !isMobileEditorOpen && (

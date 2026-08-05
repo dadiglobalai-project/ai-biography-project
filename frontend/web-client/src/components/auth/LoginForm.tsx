@@ -124,7 +124,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
             <span>{apiError}</span>
           </motion.div>
         )}
-        
+
         {/* Email Input */}
         <div className="relative group">
           <label className="block text-[10px] font-mono tracking-[0.15em] uppercase text-gray-400 group-focus-within:text-legacy-gold transition-colors duration-200">

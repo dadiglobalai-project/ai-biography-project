@@ -24,7 +24,17 @@ import {
   X,
   Sprout,
   Palette,
-  Mountain
+  Mountain,
+  AlignCenter,
+  AlignLeft,
+  Bold,
+  Check,
+  Eraser,
+  Italic,
+  Link2,
+  List,
+  ListOrdered,
+  Type
 } from 'lucide-react';
 import { CATEGORIES_DATA } from './data';
 import { getSectionCopy } from './sectionCopy';
@@ -52,6 +62,147 @@ interface LifeJourneyTemplateProps {
   websiteId?: string;
 }
 
+const ALLOWED_RICH_TEXT_TAGS = new Set([
+  'a',
+  'b',
+  'br',
+  'div',
+  'em',
+  'font',
+  'i',
+  'li',
+  'ol',
+  'p',
+  'span',
+  'strong',
+  'u',
+  'ul',
+]);
+
+const ALLOWED_TEXT_ALIGNMENTS = new Set(['left', 'center', 'right']);
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const sanitizeRichTextUrl = (value: string) => {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return '';
+  }
+
+  if (/^(https?:|mailto:|tel:|#)/i.test(trimmedValue)) {
+    return trimmedValue;
+  }
+
+  return `https://${trimmedValue}`;
+};
+
+const sanitizeRichText = (value: string) => {
+  if (!value) {
+    return '';
+  }
+
+  if (typeof DOMParser === 'undefined') {
+    return escapeHtml(value);
+  }
+
+  const parser = new DOMParser();
+  const documentValue = parser.parseFromString(value, 'text/html');
+  const outputDocument = document.implementation.createHTMLDocument('');
+
+  const cleanNode = (node: Node): Node | null => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return outputDocument.createTextNode(node.textContent || '');
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return null;
+    }
+
+    const element = node as HTMLElement;
+    const tagName = element.tagName.toLowerCase();
+    const safeTagName =
+      tagName === 'b' ? 'strong' :
+        tagName === 'i' ? 'em' :
+          tagName;
+
+    if (!ALLOWED_RICH_TEXT_TAGS.has(tagName)) {
+      const fragment = outputDocument.createDocumentFragment();
+      Array.from(element.childNodes).forEach((child) => {
+        const safeChild = cleanNode(child);
+        if (safeChild) {
+          fragment.appendChild(safeChild);
+        }
+      });
+      return fragment;
+    }
+
+    const safeElement = outputDocument.createElement(safeTagName);
+
+    if (safeTagName === 'a') {
+      const safeHref = sanitizeRichTextUrl(element.getAttribute('href') || '');
+      if (safeHref) {
+        safeElement.setAttribute('href', safeHref);
+        safeElement.setAttribute('target', '_blank');
+        safeElement.setAttribute('rel', 'noreferrer');
+      }
+    }
+
+    if (safeTagName === 'font') {
+      const size = element.getAttribute('size') || '';
+      if (/^[1-7]$/.test(size)) {
+        safeElement.setAttribute('size', size);
+      }
+    }
+
+    const textAlignment = (element.style.textAlign || element.getAttribute('align') || '').toLowerCase();
+    if (ALLOWED_TEXT_ALIGNMENTS.has(textAlignment)) {
+      safeElement.setAttribute('style', `text-align: ${textAlignment};`);
+    }
+
+    Array.from(element.childNodes).forEach((child) => {
+      const safeChild = cleanNode(child);
+      if (safeChild) {
+        safeElement.appendChild(safeChild);
+      }
+    });
+
+    return safeElement;
+  };
+
+  const fragment = outputDocument.createDocumentFragment();
+  Array.from(documentValue.body.childNodes).forEach((child) => {
+    const safeChild = cleanNode(child);
+    if (safeChild) {
+      fragment.appendChild(safeChild);
+    }
+  });
+
+  const container = outputDocument.createElement('div');
+  container.appendChild(fragment);
+  return container.innerHTML;
+};
+
+const getRichTextPlainText = (value: string) => {
+  if (typeof DOMParser === 'undefined') {
+    return value.replace(/<[^>]*>/g, ' ').trim();
+  }
+
+  const parser = new DOMParser();
+  const documentValue = parser.parseFromString(value, 'text/html');
+  return (documentValue.body.textContent || '').replace(/\u00a0/g, ' ').trim();
+};
+
+const normalizeEditableRichText = (value: string) => {
+  const sanitizedValue = sanitizeRichText(value).trim();
+  return getRichTextPlainText(sanitizedValue) ? sanitizedValue : '';
+};
+
 export default function LifeJourneyTemplate({
   categoryKey = 'life',
   dataOverride,
@@ -70,9 +221,118 @@ export default function LifeJourneyTemplate({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [inlineTextEditor, setInlineTextEditor] = useState<{
+    top: number;
+    left: number;
+    section: EditableTemplateSection;
+    multiline: boolean;
+  } | null>(null);
+  const activeEditableTextRef = React.useRef<HTMLElement | null>(null);
   
   const data = dataOverride ?? CATEGORIES_DATA[categoryKey];
   const isInlineEditable = Boolean(onDataChange);
+
+  const updateInlineTextEditorPosition = React.useCallback((
+    element: HTMLElement,
+    section: EditableTemplateSection,
+    multiline: boolean
+  ) => {
+    const rect = element.getBoundingClientRect();
+    const toolbarWidth = 560;
+    const nextLeft = Math.min(
+      Math.max(rect.left, 16),
+      Math.max(window.innerWidth - toolbarWidth - 16, 16)
+    );
+
+    setInlineTextEditor({
+      top: Math.max(rect.top - 52, 88),
+      left: nextLeft,
+      section,
+      multiline,
+    });
+  }, []);
+
+  const focusActiveEditableText = () => {
+    const element = activeEditableTextRef.current;
+    if (!element) {
+      return null;
+    }
+
+    element.focus();
+    return element;
+  };
+
+  const runInlineTextCommand = (command: string, value?: string) => {
+    const element = focusActiveEditableText();
+    if (!element) {
+      return;
+    }
+
+    document.execCommand(command, false, value);
+    updateInlineTextEditorPosition(
+      element,
+      inlineTextEditor?.section || activeEditSection || 'hero',
+      inlineTextEditor?.multiline || false
+    );
+  };
+
+  const handleInlineTextLink = () => {
+    const element = focusActiveEditableText();
+    if (!element) {
+      return;
+    }
+
+    const selectedText = window.getSelection()?.toString().trim();
+    const url = window.prompt(
+      selectedText ? `Add link for "${selectedText}"` : 'Add link URL',
+      ''
+    );
+
+    if (url === null) {
+      return;
+    }
+
+    const safeUrl = sanitizeRichTextUrl(url);
+    if (!safeUrl) {
+      return;
+    }
+
+    document.execCommand('createLink', false, safeUrl);
+    element.querySelectorAll('a').forEach((anchor) => {
+      anchor.setAttribute('target', '_blank');
+      anchor.setAttribute('rel', 'noreferrer');
+    });
+  };
+
+  const handleInlineTextDone = () => {
+    activeEditableTextRef.current?.blur();
+    setInlineTextEditor(null);
+    activeEditableTextRef.current = null;
+  };
+
+  React.useEffect(() => {
+    if (!inlineTextEditor) {
+      return;
+    }
+
+    const repositionEditor = () => {
+      if (activeEditableTextRef.current) {
+        updateInlineTextEditorPosition(
+          activeEditableTextRef.current,
+          inlineTextEditor.section,
+          inlineTextEditor.multiline
+        );
+      }
+    };
+
+    window.addEventListener('resize', repositionEditor);
+    window.addEventListener('scroll', repositionEditor, true);
+
+    return () => {
+      window.removeEventListener('resize', repositionEditor);
+      window.removeEventListener('scroll', repositionEditor, true);
+    };
+  }, [inlineTextEditor, updateInlineTextEditorPosition]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -304,11 +564,24 @@ export default function LifeJourneyTemplate({
     multiline?: boolean;
     onChange: (value: string) => void;
   }) => {
+    const sanitizedValue = sanitizeRichText(value);
+
     const handleBlur = (event: React.FocusEvent<HTMLElement>) => {
-      const nextValue = event.currentTarget.innerText.replace(/\u00a0/g, ' ').trim();
-      if (nextValue !== value) {
+      const nextValue = normalizeEditableRichText(event.currentTarget.innerHTML);
+      const currentValue = normalizeEditableRichText(value);
+      if (nextValue !== currentValue) {
         onChange(nextValue);
       }
+    };
+
+    const handlePaste = (event: React.ClipboardEvent<HTMLElement>) => {
+      if (!isInlineEditable) {
+        return;
+      }
+
+      event.preventDefault();
+      const pastedText = event.clipboardData.getData('text/plain');
+      document.execCommand('insertText', false, pastedText);
     };
 
     return (
@@ -316,17 +589,41 @@ export default function LifeJourneyTemplate({
         className={`${className} ${editableTextClass}`}
         contentEditable={isInlineEditable}
         suppressContentEditableWarning
-        onFocus={() => onEditSectionChange?.(section)}
-        onBlur={isInlineEditable ? handleBlur : undefined}
+        dangerouslySetInnerHTML={{ __html: sanitizedValue }}
+        onFocus={(event) => {
+          onEditSectionChange?.(section);
+          activeEditableTextRef.current = event.currentTarget;
+          updateInlineTextEditorPosition(event.currentTarget, section, multiline);
+        }}
+        onClick={(event) => {
+          if (isInlineEditable) {
+            activeEditableTextRef.current = event.currentTarget;
+            updateInlineTextEditorPosition(event.currentTarget, section, multiline);
+          }
+        }}
+        onKeyUp={(event) => {
+          if (isInlineEditable) {
+            activeEditableTextRef.current = event.currentTarget;
+            updateInlineTextEditorPosition(event.currentTarget, section, multiline);
+          }
+        }}
+        onBlur={isInlineEditable ? (event) => {
+          handleBlur(event);
+          window.setTimeout(() => {
+            if (document.activeElement !== activeEditableTextRef.current) {
+              setInlineTextEditor(null);
+              activeEditableTextRef.current = null;
+            }
+          }, 0);
+        } : undefined}
         onKeyDown={(event) => {
           if (!multiline && event.key === 'Enter') {
             event.preventDefault();
             event.currentTarget.blur();
           }
         }}
-      >
-        {value}
-      </Component>
+        onPaste={handlePaste}
+      />
     );
   };
 
@@ -481,6 +778,141 @@ export default function LifeJourneyTemplate({
     <div className={`min-h-screen ${theme.bg} selection:bg-amber-200 selection:text-amber-900 transition-colors duration-500 font-sans antialiased flex flex-col justify-between ${
       activeEditSection === 'style' ? 'ring-4 ring-inset ring-[#FED362]' : ''
     }`}>
+      {isInlineEditable && inlineTextEditor && (
+        <div
+          className="fixed z-[120] flex max-w-[calc(100vw-32px)] flex-wrap items-center gap-1 rounded-xl border border-stone-200 bg-white/95 p-1 text-xs font-bold text-stone-800 shadow-xl backdrop-blur-md"
+          style={{
+            top: inlineTextEditor.top,
+            left: inlineTextEditor.left,
+          }}
+          onMouseDown={(event) => event.preventDefault()}
+        >
+          <span className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-stone-950 px-3 text-amber-50">
+            <Type className="h-3.5 w-3.5" />
+            Text
+          </span>
+          <button
+            type="button"
+            onClick={() => runInlineTextCommand('bold')}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-amber-50"
+            title="Bold"
+            aria-label="Bold"
+          >
+            <Bold className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => runInlineTextCommand('italic')}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-amber-50"
+            title="Italic"
+            aria-label="Italic"
+          >
+            <Italic className="h-3.5 w-3.5" />
+          </button>
+          <span className="mx-1 h-5 w-px bg-stone-200" />
+          <button
+            type="button"
+            onClick={() => runInlineTextCommand('fontSize', '2')}
+            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-[10px] transition hover:bg-amber-50"
+            title="Small text"
+            aria-label="Small text"
+          >
+            S
+          </button>
+          <button
+            type="button"
+            onClick={() => runInlineTextCommand('fontSize', '3')}
+            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs transition hover:bg-amber-50"
+            title="Default text"
+            aria-label="Default text"
+          >
+            M
+          </button>
+          <button
+            type="button"
+            onClick={() => runInlineTextCommand('fontSize', '4')}
+            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm transition hover:bg-amber-50"
+            title="Large text"
+            aria-label="Large text"
+          >
+            L
+          </button>
+          {inlineTextEditor.multiline && (
+            <>
+              <span className="mx-1 h-5 w-px bg-stone-200" />
+              <button
+                type="button"
+                onClick={() => runInlineTextCommand('insertUnorderedList')}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-amber-50"
+                title="Bullet list"
+                aria-label="Bullet list"
+              >
+                <List className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => runInlineTextCommand('insertOrderedList')}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-amber-50"
+                title="Numbered list"
+                aria-label="Numbered list"
+              >
+                <ListOrdered className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+          <span className="mx-1 h-5 w-px bg-stone-200" />
+          <button
+            type="button"
+            onClick={() => runInlineTextCommand('justifyLeft')}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-amber-50"
+            title="Align left"
+            aria-label="Align left"
+          >
+            <AlignLeft className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => runInlineTextCommand('justifyCenter')}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-amber-50"
+            title="Align center"
+            aria-label="Align center"
+          >
+            <AlignCenter className="h-3.5 w-3.5" />
+          </button>
+          <span className="mx-1 h-5 w-px bg-stone-200" />
+          <button
+            type="button"
+            onClick={handleInlineTextLink}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-amber-50"
+            title="Add link"
+            aria-label="Add link"
+          >
+            <Link2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              runInlineTextCommand('removeFormat');
+              runInlineTextCommand('unlink');
+            }}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-amber-50"
+            title="Clear formatting"
+            aria-label="Clear formatting"
+          >
+            <Eraser className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleInlineTextDone}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-50 px-3 text-emerald-700 transition hover:bg-emerald-100"
+            title="Done editing"
+            aria-label="Done editing"
+          >
+            <Check className="h-3.5 w-3.5 text-emerald-600" />
+            Done
+          </button>
+        </div>
+      )}
       
       {/* Sticky Navigation Bar */}
       <header className={`sticky top-0 z-40 w-full ${theme.navBg} backdrop-blur-md border-b transition-colors duration-500`}>
