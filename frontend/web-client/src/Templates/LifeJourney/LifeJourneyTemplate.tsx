@@ -244,11 +244,25 @@ export default function LifeJourneyTemplate({
       Math.max(window.innerWidth - toolbarWidth - 16, 16)
     );
 
-    setInlineTextEditor({
+    const nextPosition = {
       top: Math.max(rect.top - 52, 88),
       left: nextLeft,
       section,
       multiline,
+    };
+
+    setInlineTextEditor((currentPosition) => {
+      if (
+        currentPosition &&
+        Math.abs(currentPosition.top - nextPosition.top) < 1 &&
+        Math.abs(currentPosition.left - nextPosition.left) < 1 &&
+        currentPosition.section === nextPosition.section &&
+        currentPosition.multiline === nextPosition.multiline
+      ) {
+        return currentPosition;
+      }
+
+      return nextPosition;
     });
   }, []);
 
@@ -269,11 +283,6 @@ export default function LifeJourneyTemplate({
     }
 
     document.execCommand(command, false, value);
-    updateInlineTextEditorPosition(
-      element,
-      inlineTextEditor?.section || activeEditSection || 'hero',
-      inlineTextEditor?.multiline || false
-    );
   };
 
   const handleInlineTextLink = () => {
@@ -403,10 +412,22 @@ export default function LifeJourneyTemplate({
           accentButton: 'bg-indigo-600 hover:bg-indigo-500 text-white',
           accentHover: 'hover:border-indigo-500/50',
           badge: 'bg-indigo-900/30 text-indigo-300 border-indigo-800/40',
+          textPrimary: 'text-zinc-100',
+          textSecondary: 'text-zinc-300',
+          textSubtle: 'text-zinc-500',
           textMuted: 'text-zinc-400',
+          sectionBorder: 'border-zinc-800/70',
           divider: 'bg-zinc-800',
           highlight: 'text-indigo-400',
           innerCard: 'bg-zinc-900/40 border-zinc-800/50',
+          quoteCard: 'bg-zinc-900/70 border-zinc-800/70 text-zinc-200',
+          mutedPanel: 'bg-zinc-900/40 border-zinc-800/60',
+          cardFooter: 'border-zinc-800 bg-zinc-900/50',
+          secondaryButton: 'bg-transparent hover:bg-zinc-800/70 text-zinc-100 border border-zinc-700',
+          socialLink: 'text-zinc-300 hover:text-zinc-50 hover:border-indigo-500/50',
+          iconMuted: 'text-zinc-400',
+          mobileMenu: 'bg-[#121214] border-zinc-800 text-zinc-100',
+          imageFrame: 'bg-zinc-900 border-zinc-800/60',
           footer: 'border-zinc-800 bg-[#0A0A0C]',
           input: 'bg-zinc-900 border-zinc-800 text-zinc-100 focus:ring-indigo-500',
           tag: 'bg-zinc-800/60 border-zinc-700/50 text-zinc-300'
@@ -420,10 +441,22 @@ export default function LifeJourneyTemplate({
           accentButton: 'bg-slate-900 hover:bg-slate-800 text-emerald-50',
           accentHover: 'hover:border-emerald-300',
           badge: 'bg-emerald-100 text-emerald-800 border-emerald-200/50',
+          textPrimary: 'text-slate-900',
+          textSecondary: 'text-slate-600',
+          textSubtle: 'text-slate-400',
           textMuted: 'text-slate-500',
+          sectionBorder: 'border-emerald-900/10',
           divider: 'bg-emerald-900/5',
           highlight: 'text-emerald-700',
           innerCard: 'bg-emerald-50/30 border-emerald-100/50',
+          quoteCard: 'bg-white border-emerald-100/70 text-slate-700',
+          mutedPanel: 'bg-emerald-50/30 border-emerald-100/50',
+          cardFooter: 'border-emerald-900/5 bg-emerald-50/40',
+          secondaryButton: 'bg-transparent hover:bg-emerald-50 text-slate-800 border border-slate-300',
+          socialLink: 'text-slate-600 hover:text-slate-900 hover:border-emerald-500/50',
+          iconMuted: 'text-slate-500',
+          mobileMenu: 'bg-[#F4F7F5] border-emerald-200 text-slate-800',
+          imageFrame: 'bg-slate-100 border-slate-200/50',
           footer: 'border-emerald-900/5 bg-white',
           input: 'bg-white border-slate-200 text-slate-800 focus:ring-emerald-600',
           tag: 'bg-emerald-50/50 border-emerald-100 text-emerald-800'
@@ -438,10 +471,22 @@ export default function LifeJourneyTemplate({
           accentButton: 'bg-stone-900 hover:bg-stone-850 text-amber-50',
           accentHover: 'hover:border-amber-300',
           badge: 'bg-amber-100 text-amber-800 border-amber-200/50',
+          textPrimary: 'text-stone-900',
+          textSecondary: 'text-stone-700',
+          textSubtle: 'text-stone-400',
           textMuted: 'text-stone-500',
+          sectionBorder: 'border-stone-200/60',
           divider: 'bg-stone-200/60',
           highlight: 'text-orange-600',
           innerCard: 'bg-[#FAF8F5] border-stone-200/60',
+          quoteCard: 'bg-[#FFFDF9] border-amber-200/50 text-stone-700',
+          mutedPanel: 'bg-[#FAF8F5]/40 border-stone-100/50',
+          cardFooter: 'border-stone-100 bg-stone-50/50',
+          secondaryButton: 'bg-transparent hover:bg-stone-500/5 text-stone-800 border border-stone-300',
+          socialLink: 'text-stone-600 hover:text-stone-900 hover:border-amber-500/50',
+          iconMuted: 'text-stone-500',
+          mobileMenu: 'bg-[#FAF6F0] border-stone-200 text-stone-800',
+          imageFrame: 'bg-stone-100 border-stone-200/50',
           footer: 'border-stone-200 bg-white',
           input: 'bg-white border-stone-200 text-stone-800 focus:ring-amber-500',
           tag: 'bg-amber-50/60 border-amber-100 text-amber-900'
@@ -546,7 +591,7 @@ export default function LifeJourneyTemplate({
   };
 
   const editableTextClass = isInlineEditable
-    ? 'cursor-text rounded-md outline-none transition hover:bg-[#FED362]/20 focus:bg-[#FED362]/25 focus:ring-2 focus:ring-[#FED362]/80 focus:ring-offset-2 focus:ring-offset-white'
+    ? 'cursor-text rounded-md outline-none transition hover:bg-[#FED362]/10 focus:bg-[#FED362]/15 focus:ring-1 focus:ring-[#FED362]/70 focus:ring-offset-1 focus:ring-offset-white'
     : '';
 
   const renderEditableText = ({
@@ -596,12 +641,6 @@ export default function LifeJourneyTemplate({
           updateInlineTextEditorPosition(event.currentTarget, section, multiline);
         }}
         onClick={(event) => {
-          if (isInlineEditable) {
-            activeEditableTextRef.current = event.currentTarget;
-            updateInlineTextEditorPosition(event.currentTarget, section, multiline);
-          }
-        }}
-        onKeyUp={(event) => {
           if (isInlineEditable) {
             activeEditableTextRef.current = event.currentTarget;
             updateInlineTextEditorPosition(event.currentTarget, section, multiline);
@@ -920,7 +959,7 @@ export default function LifeJourneyTemplate({
           
           {/* Brand Logo */}
           <a href="#hero-section" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center font-serif font-black border transition-all bg-amber-600/10 border-amber-600/20 text-amber-900">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-serif font-black border transition-all ${theme.badge}`}>
               JV
             </div>
             <div className="flex flex-col text-left">
@@ -959,7 +998,7 @@ export default function LifeJourneyTemplate({
 
           {/* Mobile Overlay Menu */}
           {isMobileMenuOpen && (
-            <div className="md:hidden fixed inset-x-0 top-16 bg-[#FAF6F0] border-stone-200 border-b shadow-lg p-6 space-y-5 font-mono text-[10px] font-black uppercase tracking-widest flex flex-col z-50 animate-fade-in">
+            <div className={`md:hidden fixed inset-x-0 top-16 border-b shadow-lg p-6 space-y-5 font-mono text-[10px] font-black uppercase tracking-widest flex flex-col z-50 animate-fade-in ${theme.mobileMenu}`}>
               <a href="#about-section" onClick={() => setIsMobileMenuOpen(false)} className="py-1 border-b border-stone-100/10 pb-2">About</a>
               <a href="#timeline-section" onClick={() => setIsMobileMenuOpen(false)} className="py-1 border-b border-stone-100/10 pb-2">Timeline</a>
               <a href="#gallery-section" onClick={() => setIsMobileMenuOpen(false)} className="py-1 border-b border-stone-100/10 pb-2">Gallery</a>
@@ -985,17 +1024,17 @@ export default function LifeJourneyTemplate({
         {/* ========================================================= */}
         {/* HERITAGE MEMOIR IDENTITY (Visual Category Marker)        */}
         {/* ========================================================= */}
-        <section className="text-center space-y-3 pb-6 border-b border-amber-900/5" id="lens-section">
-          <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-amber-50/70 border border-amber-200/50 shadow-xs">
+        <section className={`text-center space-y-3 pb-6 border-b ${theme.sectionBorder}`} id="lens-section">
+          <div className={`inline-flex items-center gap-3 px-4 py-2 rounded-full border shadow-xs ${theme.accent}`}>
             <span className="relative flex h-2 w-2 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-600"></span>
             </span>
-            <span className="font-mono text-[9px] font-extrabold uppercase tracking-widest text-stone-700">
+            <span className="font-mono text-[9px] font-extrabold uppercase tracking-widest">
               CLASSIC MEMOIR // HERITAGE WOODCRAFT EDITION
             </span>
           </div>
-          <p className="font-serif italic text-xs text-stone-500 max-w-lg mx-auto">
+          <p className={`font-serif italic text-xs max-w-lg mx-auto ${theme.textMuted}`}>
             A visual archive and narrative chronicle honoring traditional timber joinery, maritime shipwright vessels, and coastal memoirs.
           </p>
         </section>
@@ -1049,7 +1088,7 @@ export default function LifeJourneyTemplate({
                 as: 'h1',
                 value: data.personalDetails.fullName,
                 section: 'hero',
-                className: `${getHeadingFont()} text-4xl sm:text-5xl md:text-6xl font-black leading-tight text-stone-900 tracking-tight`,
+                className: `${getHeadingFont()} text-4xl sm:text-5xl md:text-6xl font-black leading-tight ${theme.textPrimary} tracking-tight`,
                 onChange: (value) => updatePersonalDetail('fullName', value),
               })}
               
@@ -1085,7 +1124,7 @@ export default function LifeJourneyTemplate({
               </a>
               <a 
                 href="#contact-section"
-                className="inline-flex items-center gap-2 px-6 py-3.5 bg-transparent hover:bg-stone-500/5 text-stone-800 border border-stone-300 rounded-xl font-bold font-sans text-xs tracking-wider uppercase transition-all"
+                className={`inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-bold font-sans text-xs tracking-wider uppercase transition-all ${theme.secondaryButton}`}
               >
                 <span>Send Message</span>
               </a>
@@ -1108,7 +1147,7 @@ export default function LifeJourneyTemplate({
             <span className="px-2.5 py-0.5 bg-orange-100 text-orange-800 font-mono text-[9px] tracking-widest font-black uppercase rounded-sm inline-block mb-3">
               02 / THE ARCHIVAL ESSENCE
             </span>
-            <h2 className={`${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight text-stone-900`}>
+            <h2 className={`${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight ${theme.textPrimary}`}>
               {sectionCopy.about.title}
             </h2>
             {renderEditableText({
@@ -1116,7 +1155,7 @@ export default function LifeJourneyTemplate({
               value: sectionCopy.about.description,
               section: 'about',
               multiline: true,
-              className: `font-sans ${getTextSizeClass('sectionDescription', sectionCopy.about.descriptionTextSettings)} text-stone-500 mt-1.5`,
+              className: `font-sans ${getTextSizeClass('sectionDescription', sectionCopy.about.descriptionTextSettings)} ${theme.textMuted} mt-1.5`,
               onChange: (value) => updateSectionDescription('about', value),
             })}
           </div>
@@ -1129,11 +1168,11 @@ export default function LifeJourneyTemplate({
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
-                  <h4 className="font-mono text-[9px] font-black uppercase tracking-widest text-stone-400">
+                  <h4 className={`font-mono text-[9px] font-black uppercase tracking-widest ${theme.textSubtle}`}>
                     BIOGRAPHY JOURNAL
                   </h4>
                 </div>
-                <h3 className="font-serif text-2xl font-bold text-stone-900 leading-tight">
+                <h3 className={`font-serif text-2xl font-bold leading-tight ${theme.textPrimary}`}>
                   The Journey of My Hands
                 </h3>
                 <div className={`font-sans ${getTextSizeClass('body', data.personalDetails.bioTextSettings)} opacity-95 leading-relaxed space-y-4`}>
@@ -1156,7 +1195,7 @@ export default function LifeJourneyTemplate({
               </div>
 
               {/* Decorative blockquote */}
-              <div className={`bg-[#FFFDF9] border border-amber-200/50 rounded-2xl p-5 italic ${getTextSizeClass('quote', data.personalDetails.signatureQuoteTextSettings)} text-stone-700 leading-relaxed font-serif relative mt-2`}>
+              <div className={`rounded-2xl border p-5 italic ${getTextSizeClass('quote', data.personalDetails.signatureQuoteTextSettings)} leading-relaxed font-serif relative mt-2 ${theme.quoteCard}`}>
                 <span className="text-amber-500 font-bold block mb-1 text-2xl leading-none">“</span>
                 {renderEditableText({
                   as: 'p',
@@ -1174,7 +1213,7 @@ export default function LifeJourneyTemplate({
               <div className="space-y-6">
                 <div className="flex items-center gap-2 pb-2 border-b border-stone-100/10">
                   <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                  <h4 className="font-mono text-[9px] font-black uppercase tracking-widest text-stone-400">
+                  <h4 className={`font-mono text-[9px] font-black uppercase tracking-widest ${theme.textSubtle}`}>
                     CORE BELIEFS & STANDARDS
                   </h4>
                 </div>
@@ -1190,7 +1229,7 @@ export default function LifeJourneyTemplate({
                           as: 'h5',
                           value: val.title,
                           section: 'about',
-                          className: 'font-serif text-[14px] font-bold text-stone-900',
+                          className: `font-serif text-[14px] font-bold ${theme.textPrimary}`,
                           onChange: (value) => updateValueItem(index, 'title', value),
                         })}
                         {renderEditableText({
@@ -1198,7 +1237,7 @@ export default function LifeJourneyTemplate({
                           value: val.description,
                           section: 'about',
                           multiline: true,
-                          className: `font-sans ${getTextSizeClass('cardDescription', val.textSettings)} text-stone-500 leading-relaxed mt-1`,
+                          className: `font-sans ${getTextSizeClass('cardDescription', val.textSettings)} ${theme.textMuted} leading-relaxed mt-1`,
                           onChange: (value) => updateValueItem(index, 'description', value),
                         })}
                       </div>
@@ -1214,7 +1253,7 @@ export default function LifeJourneyTemplate({
           <div className={`rounded-3xl border p-8 md:p-10 text-left space-y-6 ${theme.card}`}>
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-              <h4 className="font-mono text-[9px] font-black uppercase tracking-widest text-stone-400">
+              <h4 className={`font-mono text-[9px] font-black uppercase tracking-widest ${theme.textSubtle}`}>
                 SPECIALIZED PURSUITS
               </h4>
             </div>
@@ -1240,7 +1279,7 @@ export default function LifeJourneyTemplate({
                     as: 'h5',
                     value: hob.title,
                     section: 'about',
-                    className: 'font-serif text-xs font-black text-stone-900 pt-1 group-hover:text-amber-700 transition-colors',
+                    className: `font-serif text-xs font-black pt-1 transition-colors ${theme.textPrimary}`,
                     onChange: (value) => updateHobbyItem(index, 'title', value),
                   })}
                   {renderEditableText({
@@ -1248,7 +1287,7 @@ export default function LifeJourneyTemplate({
                     value: hob.description,
                     section: 'about',
                     multiline: true,
-                    className: `font-sans ${getTextSizeClass('cardDescription', hob.textSettings)} text-stone-500 leading-relaxed line-clamp-3`,
+                    className: `font-sans ${getTextSizeClass('cardDescription', hob.textSettings)} ${theme.textMuted} leading-relaxed line-clamp-3`,
                     onChange: (value) => updateHobbyItem(index, 'description', value),
                   })}
                 </div>
@@ -1271,7 +1310,7 @@ export default function LifeJourneyTemplate({
             <span className="px-2.5 py-0.5 bg-indigo-100 text-indigo-800 font-mono text-[9px] tracking-widest font-black uppercase rounded-sm inline-block mb-3">
               03 / CHRONOLOGY OF ERAS
             </span>
-            <h2 className={`${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight text-stone-900`}>
+            <h2 className={`${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight ${theme.textPrimary}`}>
               {sectionCopy.timeline.title}
             </h2>
             {renderEditableText({
@@ -1279,7 +1318,7 @@ export default function LifeJourneyTemplate({
               value: sectionCopy.timeline.description,
               section: 'timeline',
               multiline: true,
-              className: `font-sans ${getTextSizeClass('sectionDescription', sectionCopy.timeline.descriptionTextSettings)} text-stone-500 mt-1.5`,
+              className: `font-sans ${getTextSizeClass('sectionDescription', sectionCopy.timeline.descriptionTextSettings)} ${theme.textMuted} mt-1.5`,
               onChange: (value) => updateSectionDescription('timeline', value),
             })}
           </div>
@@ -1310,7 +1349,7 @@ export default function LifeJourneyTemplate({
                       as: 'h3',
                       value: milestone.title,
                       section: 'timeline',
-                      className: 'font-serif text-lg md:text-xl font-bold text-stone-900 leading-tight',
+                      className: `font-serif text-lg md:text-xl font-bold leading-tight ${theme.textPrimary}`,
                       onChange: (value) => updateTimelineItem(idx, { title: value }),
                     })}
                     <div className="flex items-center gap-1 opacity-70 text-[10px] font-mono uppercase tracking-widest">
@@ -1325,7 +1364,7 @@ export default function LifeJourneyTemplate({
                     {/* Integrated Historical Image (if provided) */}
                     {milestone.imageUrl && (
                       <div className="pt-2">
-                        <div className={`${getImageSizeClass('timeline', milestone.imageSettings)} rounded-xl overflow-hidden bg-stone-100 border border-stone-200/50 p-1 bg-white shadow-xs`}>
+                        <div className={`${getImageSizeClass('timeline', milestone.imageSettings)} rounded-xl overflow-hidden p-1 shadow-xs ${theme.imageFrame}`}>
                           <img 
                             src={milestone.imageUrl} 
                             alt={milestone.title} 
@@ -1338,7 +1377,7 @@ export default function LifeJourneyTemplate({
                             value: milestone.imageCaption,
                             section: 'timeline',
                             multiline: true,
-                            className: 'font-mono text-[8px] text-stone-400 mt-1 leading-normal italic',
+                            className: `font-mono text-[8px] ${theme.textSubtle} mt-1 leading-normal italic`,
                             onChange: (value) => updateTimelineItem(idx, { imageCaption: value }),
                           })}
                       </div>
@@ -1346,23 +1385,23 @@ export default function LifeJourneyTemplate({
                   </div>
 
                   {/* Right block of Milestone Card */}
-                  <div className={`${milestone.imageUrl ? 'lg:col-span-8' : 'lg:col-span-9'} ${getTextSizeClass('timelineBody', milestone.textSettings)} leading-relaxed text-stone-600 border-t lg:border-t-0 lg:border-l border-stone-200/40 pt-4 lg:pt-0 lg:pl-6 flex flex-col justify-start lg:justify-between space-y-3 lg:space-y-0 lg:h-full`}>
+                  <div className={`${milestone.imageUrl ? 'lg:col-span-8' : 'lg:col-span-9'} ${getTextSizeClass('timelineBody', milestone.textSettings)} leading-relaxed ${theme.textSecondary} border-t lg:border-t-0 lg:border-l ${theme.sectionBorder} pt-4 lg:pt-0 lg:pl-6 flex flex-col justify-start lg:justify-between space-y-3 lg:space-y-0 lg:h-full`}>
                     {renderEditableText({
                       as: 'p',
                       value: milestone.description,
                       section: 'timeline',
                       multiline: true,
-                      className: 'italic text-stone-800',
+                      className: `italic ${theme.textPrimary}`,
                       onChange: (value) => updateTimelineItem(idx, { description: value }),
                     })}
                     
-                    <div className="space-y-2 bg-[#FAF8F5]/40 rounded-xl p-4 border border-stone-100/50">
-                      <h4 className="font-mono text-[9px] font-extrabold tracking-widest text-stone-450 uppercase">
+                    <div className={`space-y-2 rounded-xl border p-4 ${theme.mutedPanel}`}>
+                      <h4 className={`font-mono text-[9px] font-extrabold tracking-widest uppercase ${theme.textSubtle}`}>
                         ACHIEVEMENTS / RECOLLECTIONS
                       </h4>
                       <ul className={`list-none space-y-1.5 font-sans ${getTextSizeClass('detail', milestone.textSettings)}`}>
                         {milestone.details.map((detail, dIdx) => (
-                          <li key={dIdx} className="flex gap-2 items-start text-stone-700">
+                          <li key={dIdx} className={`flex gap-2 items-start ${theme.textSecondary}`}>
                             <span className="text-amber-600 font-bold shrink-0 mt-0.5">▪</span>
                             {renderEditableText({
                               value: detail,
@@ -1401,7 +1440,7 @@ export default function LifeJourneyTemplate({
             <span className="px-2.5 py-0.5 bg-orange-100 text-orange-800 font-mono text-[9px] tracking-widest font-black uppercase rounded-sm inline-block mb-3">
               04 / MULTIMEDIA ARCHIVES
             </span>
-            <h2 className={`${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight text-stone-900`}>
+            <h2 className={`${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight ${theme.textPrimary}`}>
               {sectionCopy.gallery.title}
             </h2>
             {renderEditableText({
@@ -1409,7 +1448,7 @@ export default function LifeJourneyTemplate({
               value: sectionCopy.gallery.description,
               section: 'gallery',
               multiline: true,
-              className: `font-sans ${getTextSizeClass('sectionDescription', sectionCopy.gallery.descriptionTextSettings)} text-stone-500 mt-1.5`,
+              className: `font-sans ${getTextSizeClass('sectionDescription', sectionCopy.gallery.descriptionTextSettings)} ${theme.textMuted} mt-1.5`,
               onChange: (value) => updateSectionDescription('gallery', value),
             })}
           </div>
@@ -1441,7 +1480,7 @@ export default function LifeJourneyTemplate({
                       {item.category} RECORD
                     </span>
                     {item.year && (
-                      <span className="font-mono text-[9px] text-stone-400 font-bold">
+                      <span className={`font-mono text-[9px] font-bold ${theme.textSubtle}`}>
                         EST.{' '}
                         {renderEditableText({
                           value: item.year,
@@ -1456,7 +1495,7 @@ export default function LifeJourneyTemplate({
                     as: 'h4',
                     value: item.title,
                     section: 'gallery',
-                    className: 'font-serif text-base font-bold text-stone-900',
+                    className: `font-serif text-base font-bold ${theme.textPrimary}`,
                     onChange: (value) => updateGalleryItem(idx, { title: value }),
                   })}
                 </div>
@@ -1466,7 +1505,7 @@ export default function LifeJourneyTemplate({
                   value: item.caption,
                   section: 'gallery',
                   multiline: true,
-                  className: `font-sans ${getTextSizeClass('caption', item.textSettings)} text-stone-500 mt-1 leading-relaxed border-t border-stone-100/50 pt-2.5 mt-3`,
+                  className: `font-sans ${getTextSizeClass('caption', item.textSettings)} ${theme.textMuted} mt-1 leading-relaxed border-t ${theme.sectionBorder} pt-2.5 mt-3`,
                   onChange: (value) => updateGalleryItem(idx, { caption: value }),
                 })}
               </div>
@@ -1488,7 +1527,7 @@ export default function LifeJourneyTemplate({
             <span className="px-2.5 py-0.5 bg-indigo-100 text-indigo-800 font-mono text-[9px] tracking-widest font-black uppercase rounded-sm inline-block mb-3">
               05 / CHRONICLE NARRATIVES
             </span>
-            <h2 className={`${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight text-stone-900`}>
+            <h2 className={`${getHeadingFont()} text-3xl md:text-4xl font-black tracking-tight ${theme.textPrimary}`}>
               {sectionCopy.stories.title}
             </h2>
             {renderEditableText({
@@ -1496,7 +1535,7 @@ export default function LifeJourneyTemplate({
               value: sectionCopy.stories.description,
               section: 'stories',
               multiline: true,
-              className: `font-sans ${getTextSizeClass('sectionDescription', sectionCopy.stories.descriptionTextSettings)} text-stone-500 mt-1.5`,
+              className: `font-sans ${getTextSizeClass('sectionDescription', sectionCopy.stories.descriptionTextSettings)} ${theme.textMuted} mt-1.5`,
               onChange: (value) => updateSectionDescription('stories', value),
             })}
           </div>
@@ -1529,7 +1568,7 @@ export default function LifeJourneyTemplate({
 
                   {/* Text content area */}
                   <div className="p-6 space-y-3">
-                    <div className="flex items-center justify-between text-[9px] font-mono text-stone-400">
+                    <div className={`flex items-center justify-between text-[9px] font-mono ${theme.textSubtle}`}>
                       {renderEditableText({
                         value: story.readTime,
                         section: 'stories',
@@ -1547,7 +1586,7 @@ export default function LifeJourneyTemplate({
                       as: 'h3',
                       value: story.title,
                       section: 'stories',
-                      className: 'font-serif text-lg font-bold text-stone-950 leading-tight group-hover:text-amber-800 transition-colors',
+                      className: `font-serif text-lg font-bold leading-tight transition-colors ${theme.textPrimary}`,
                       onChange: (value) => updateStoryItem(index, 'title', value),
                     })}
 
@@ -1556,18 +1595,18 @@ export default function LifeJourneyTemplate({
                       value: story.shortDescription,
                       section: 'stories',
                       multiline: true,
-                      className: `font-sans text-stone-600 ${getTextSizeClass('detail', story.textSettings)} leading-relaxed line-clamp-4`,
+                      className: `font-sans ${theme.textSecondary} ${getTextSizeClass('detail', story.textSettings)} leading-relaxed line-clamp-4`,
                       onChange: (value) => updateStoryItem(index, 'shortDescription', value),
                     })}
                   </div>
                 </div>
 
                 {/* Footer action link */}
-                <div className="px-6 py-4 border-t border-stone-100 bg-stone-50/50 flex items-center justify-between mt-4">
-                  <span className="font-mono text-[8px] text-stone-400 font-bold uppercase tracking-widest">
+                <div className={`px-6 py-4 border-t flex items-center justify-between mt-4 ${theme.cardFooter}`}>
+                  <span className={`font-mono text-[8px] font-bold uppercase tracking-widest ${theme.textSubtle}`}>
                     CHRONICLE ARCHIVE
                   </span>
-                  <div className="flex items-center gap-1.5 text-stone-700 font-sans font-bold text-xs uppercase tracking-wider group-hover:text-amber-600 transition-colors">
+                  <div className={`flex items-center gap-1.5 font-sans font-bold text-xs uppercase tracking-wider transition-colors ${theme.textSecondary}`}>
                     <span>Archived Log</span>
                     <ChevronRight className="w-3.5 h-3.5 text-amber-500" />
                   </div>
@@ -1597,7 +1636,7 @@ export default function LifeJourneyTemplate({
                   <span className="px-2.5 py-0.5 bg-indigo-100 text-indigo-800 font-mono text-[9px] tracking-widest font-black uppercase rounded-sm inline-block">
                     06 / REACH OUT
                   </span>
-                  <h2 className={`${getHeadingFont()} text-3xl font-black text-stone-900`}>
+                  <h2 className={`${getHeadingFont()} text-3xl font-black ${theme.textPrimary}`}>
                     {sectionCopy.contact.title}
                   </h2>
                   {renderEditableText({
@@ -1605,7 +1644,7 @@ export default function LifeJourneyTemplate({
                     value: sectionCopy.contact.description,
                     section: 'contact',
                     multiline: true,
-                    className: `font-sans ${getTextSizeClass('detail', sectionCopy.contact.descriptionTextSettings)} text-stone-500 leading-relaxed`,
+                    className: `font-sans ${getTextSizeClass('detail', sectionCopy.contact.descriptionTextSettings)} ${theme.textMuted} leading-relaxed`,
                     onChange: (value) => updateSectionDescription('contact', value),
                   })}
                 </div>
@@ -1616,11 +1655,11 @@ export default function LifeJourneyTemplate({
                     <Mail className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="font-mono text-[8px] text-stone-400 block font-bold">CABIN MAILBOX</span>
+                    <span className={`font-mono text-[8px] block font-bold ${theme.textSubtle}`}>CABIN MAILBOX</span>
                     {renderEditableText({
                       value: contactEmail,
                       section: 'contact',
-                      className: 'font-sans text-xs font-bold text-stone-850 hover:underline cursor-pointer',
+                      className: `font-sans text-xs font-bold hover:underline cursor-pointer ${theme.textPrimary}`,
                       onChange: (value) => updatePersonalDetail('contactEmail', value),
                     })}
                   </div>
@@ -1629,12 +1668,12 @@ export default function LifeJourneyTemplate({
 
               {/* Social Channels List */}
               <div className="space-y-3">
-                <h4 className="font-mono text-[9px] text-stone-400 uppercase tracking-widest font-extrabold">
+                <h4 className={`font-mono text-[9px] uppercase tracking-widest font-extrabold ${theme.textSubtle}`}>
                   CONNECT ON SOCIAL STATIONS
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <span className={`p-3 rounded-xl border flex items-center gap-2.5 text-stone-600 transition-all duration-300 hover:border-amber-500/50 hover:text-stone-900 cursor-pointer ${theme.innerCard}`}>
-                    <Instagram className="w-4 h-4 text-stone-500" />
+                  <span className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all duration-300 cursor-pointer ${theme.innerCard} ${theme.socialLink}`}>
+                    <Instagram className={`w-4 h-4 ${theme.iconMuted}`} />
                     {renderEditableText({
                       value: instagramHandle,
                       section: 'contact',
@@ -1643,8 +1682,8 @@ export default function LifeJourneyTemplate({
                     })}
                   </span>
                   
-                  <span className={`p-3 rounded-xl border flex items-center gap-2.5 text-stone-600 transition-all duration-300 hover:border-amber-500/50 hover:text-stone-900 cursor-pointer ${theme.innerCard}`}>
-                    <Twitter className="w-4 h-4 text-stone-500" />
+                  <span className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all duration-300 cursor-pointer ${theme.innerCard} ${theme.socialLink}`}>
+                    <Twitter className={`w-4 h-4 ${theme.iconMuted}`} />
                     {renderEditableText({
                       value: twitterHandle,
                       section: 'contact',
@@ -1653,8 +1692,8 @@ export default function LifeJourneyTemplate({
                     })}
                   </span>
 
-                  <span className={`p-3 rounded-xl border flex items-center gap-2.5 text-stone-600 transition-all duration-300 hover:border-amber-500/50 hover:text-stone-900 cursor-pointer ${theme.innerCard}`}>
-                    <Facebook className="w-4 h-4 text-stone-500" />
+                  <span className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all duration-300 cursor-pointer ${theme.innerCard} ${theme.socialLink}`}>
+                    <Facebook className={`w-4 h-4 ${theme.iconMuted}`} />
                     {renderEditableText({
                       value: facebookLabel,
                       section: 'contact',
@@ -1663,8 +1702,8 @@ export default function LifeJourneyTemplate({
                     })}
                   </span>
 
-                  <span className={`p-3 rounded-xl border flex items-center gap-2.5 text-stone-600 transition-all duration-300 hover:border-amber-500/50 hover:text-stone-900 cursor-pointer ${theme.innerCard}`}>
-                    <Linkedin className="w-4 h-4 text-stone-500" />
+                  <span className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all duration-300 cursor-pointer ${theme.innerCard} ${theme.socialLink}`}>
+                    <Linkedin className={`w-4 h-4 ${theme.iconMuted}`} />
                     {renderEditableText({
                       value: linkedinLabel,
                       section: 'contact',
@@ -1678,14 +1717,14 @@ export default function LifeJourneyTemplate({
             </div>
 
             {/* Contact Form Container */}
-            <div className={`lg:col-span-7 bg-[#FFFDF9] border border-amber-200/40 p-6 md:p-8 rounded-2xl relative flex flex-col justify-center h-full`}>
+            <div className={`lg:col-span-7 border p-6 md:p-8 rounded-2xl relative flex flex-col justify-center h-full ${theme.quoteCard}`}>
               {isSubmitted ? (
                 <div className="bg-emerald-50/50 border border-emerald-200/60 p-8 rounded-xl text-center space-y-4 my-8">
                   <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto">
                     <Send className="w-5 h-5 text-emerald-600" />
                   </div>
-                  <h3 className="font-serif text-xl font-bold text-stone-900">Message Sent!</h3>
-                  <p className="font-sans text-xs text-stone-600 max-w-sm mx-auto leading-relaxed">
+                  <h3 className={`font-serif text-xl font-bold ${theme.textPrimary}`}>Message Sent!</h3>
+                  <p className={`font-sans text-xs max-w-sm mx-auto leading-relaxed ${theme.textSecondary}`}>
                     Thank you for writing. Your message has been received at the shore cabin mailbox. Julian will respond as soon as his hands are clear of saw work.
                   </p>
                   <button 
@@ -1698,7 +1737,7 @@ export default function LifeJourneyTemplate({
                 </div>
               ) : (
                 <>
-                  <h3 className="font-serif text-lg font-bold text-stone-900 mb-6">
+                  <h3 className={`font-serif text-lg font-bold mb-6 ${theme.textPrimary}`}>
                     Send a Message to the Cabin
                   </h3>
                   
@@ -1706,7 +1745,7 @@ export default function LifeJourneyTemplate({
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="font-mono text-[9px] text-stone-400 font-extrabold uppercase">
+                        <label className={`font-mono text-[9px] font-extrabold uppercase ${theme.textSubtle}`}>
                           YOUR FULL NAME *
                         </label>
                         <input 
@@ -1720,7 +1759,7 @@ export default function LifeJourneyTemplate({
                       </div>
                       
                       <div className="space-y-1.5">
-                        <label className="font-mono text-[9px] text-stone-400 font-extrabold uppercase">
+                        <label className={`font-mono text-[9px] font-extrabold uppercase ${theme.textSubtle}`}>
                           YOUR EMAIL ADDRESS *
                         </label>
                         <input 
@@ -1735,7 +1774,7 @@ export default function LifeJourneyTemplate({
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="font-mono text-[9px] text-stone-400 font-extrabold uppercase">
+                      <label className={`font-mono text-[9px] font-extrabold uppercase ${theme.textSubtle}`}>
                         SUBJECT OF INQUIRY
                       </label>
                       <input 
@@ -1748,7 +1787,7 @@ export default function LifeJourneyTemplate({
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="font-mono text-[9px] text-stone-400 font-extrabold uppercase">
+                      <label className={`font-mono text-[9px] font-extrabold uppercase ${theme.textSubtle}`}>
                         YOUR LETTER MESSAGE *
                       </label>
                       <textarea 

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "mock-api": "node mock-api-server.mjs",
     "build": "vite build",
     "start": "vite preview --host 0.0.0.0",
     "clean": "rm -rf dist server.js",

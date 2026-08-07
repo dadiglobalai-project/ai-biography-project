@@ -230,6 +230,75 @@ const TEXT_SIZE_OPTIONS = [
   { value: 'large', label: 'Large' },
 ];
 
+const THEME_STYLE_PRESETS: Array<{
+  value: CustomizerSettings['theme'];
+  label: string;
+  description: string;
+  swatches: string[];
+}> = [
+  {
+    value: 'cream',
+    label: 'Classic Gold',
+    description: 'Warm paper, dark text, gold accents.',
+    swatches: ['#FAF6F0', '#1C1917', '#FED362'],
+  },
+  {
+    value: 'sage',
+    label: 'Sage Archive',
+    description: 'Soft green, slate text, calm accents.',
+    swatches: ['#F4F7F5', '#1E293B', '#047857'],
+  },
+  {
+    value: 'charcoal',
+    label: 'Charcoal Legacy',
+    description: 'Dark canvas, light text, vivid accents.',
+    swatches: ['#121214', '#F4F4F5', '#818CF8'],
+  },
+];
+
+const FONT_STYLE_PRESETS: Array<{
+  value: CustomizerSettings['fontPairing'];
+  label: string;
+  description: string;
+  sampleClass: string;
+}> = [
+  {
+    value: 'classic',
+    label: 'Classic Serif',
+    description: 'Traditional biography tone.',
+    sampleClass: 'font-serif',
+  },
+  {
+    value: 'modern',
+    label: 'Modern Sans',
+    description: 'Clean and direct reading.',
+    sampleClass: 'font-sans',
+  },
+  {
+    value: 'editorial',
+    label: 'Editorial',
+    description: 'Expressive magazine feel.',
+    sampleClass: 'font-serif italic',
+  },
+];
+
+const SPACING_STYLE_PRESETS: Array<{
+  value: CustomizerSettings['spacing'];
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'spacious',
+    label: 'Spacious',
+    description: 'More breathing room between sections.',
+  },
+  {
+    value: 'compact',
+    label: 'Compact',
+    description: 'Tighter layout for faster scanning.',
+  },
+];
+
 const editorSections: Array<{
   key: EditableTemplateSection;
   label: string;
@@ -3639,56 +3708,145 @@ export default function LifeJourneyEditPage() {
 
       case 'style':
         return (
-          <div className="space-y-4">
-            <label className="block space-y-1.5">
-              <span className="text-xs font-bold text-slate-500">Theme</span>
-              <select
-                value={draft.settings.theme}
-                onFocus={() => focusPreviewSection('style')}
-                onChange={(event) =>
-                  updateSettings('theme', event.target.value as CustomizerSettings['theme'])
-                }
-                className={inputClass}
-              >
-                <option value="cream">Cream memoir</option>
-                <option value="sage">Sage archive</option>
-                <option value="charcoal">Charcoal legacy</option>
-              </select>
-            </label>
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Theme Preset
+              </span>
+              <div className="space-y-2">
+                {THEME_STYLE_PRESETS.map((preset) => {
+                  const isSelected = draft.settings.theme === preset.value;
 
-            <label className="block space-y-1.5">
-              <span className="text-xs font-bold text-slate-500">Typography</span>
-              <select
-                value={draft.settings.fontPairing}
-                onFocus={() => focusPreviewSection('style')}
-                onChange={(event) =>
-                  updateSettings(
-                    'fontPairing',
-                    event.target.value as CustomizerSettings['fontPairing'],
-                  )
-                }
-                className={inputClass}
-              >
-                <option value="classic">Classic serif</option>
-                <option value="modern">Modern sans</option>
-                <option value="editorial">Editorial italic</option>
-              </select>
-            </label>
+                  return (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onFocus={() => focusPreviewSection('style')}
+                      onClick={() => {
+                        focusPreviewSection('style');
+                        updateSettings('theme', preset.value);
+                      }}
+                      aria-pressed={isSelected}
+                      className={`w-full rounded-xl border p-3 text-left transition ${
+                        isSelected
+                          ? 'border-[#FED362] bg-amber-50/70 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-amber-200 hover:bg-amber-50/30'
+                      }`}
+                    >
+                      <span className="flex items-start justify-between gap-3">
+                        <span>
+                          <span className="block text-sm font-bold text-slate-950">
+                            {preset.label}
+                          </span>
+                          <span className="mt-1 block text-xs leading-relaxed text-slate-500">
+                            {preset.description}
+                          </span>
+                        </span>
+                        {isSelected && <CheckCircle2 className="h-4.5 w-4.5 shrink-0 text-emerald-600" />}
+                      </span>
+                      <span className="mt-3 flex gap-1.5">
+                        {preset.swatches.map((swatch) => (
+                          <span
+                            key={swatch}
+                            className="h-6 w-6 rounded-full border border-white shadow ring-1 ring-slate-200"
+                            style={{ backgroundColor: swatch }}
+                          />
+                        ))}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-            <label className="block space-y-1.5">
-              <span className="text-xs font-bold text-slate-500">Spacing</span>
-              <select
-                value={draft.settings.spacing}
-                onFocus={() => focusPreviewSection('style')}
-                onChange={(event) =>
-                  updateSettings('spacing', event.target.value as CustomizerSettings['spacing'])
-                }
-                className={inputClass}
-              >
-                <option value="spacious">Spacious</option>
-                <option value="compact">Compact</option>
-              </select>
-            </label>
+            <div className="space-y-3">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Typography
+              </span>
+              <div className="grid grid-cols-1 gap-2">
+                {FONT_STYLE_PRESETS.map((preset) => {
+                  const isSelected = draft.settings.fontPairing === preset.value;
+
+                  return (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onFocus={() => focusPreviewSection('style')}
+                      onClick={() => {
+                        focusPreviewSection('style');
+                        updateSettings('fontPairing', preset.value);
+                      }}
+                      aria-pressed={isSelected}
+                      className={`rounded-xl border p-3 text-left transition ${
+                        isSelected
+                          ? 'border-[#FED362] bg-amber-50/70 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-amber-200 hover:bg-amber-50/30'
+                      }`}
+                    >
+                      <span className="flex items-start justify-between gap-3">
+                        <span>
+                          <span className={`block text-lg font-semibold text-slate-950 ${preset.sampleClass}`}>
+                            Aa
+                          </span>
+                          <span className="mt-1 block text-sm font-bold text-slate-950">
+                            {preset.label}
+                          </span>
+                          <span className="mt-1 block text-xs leading-relaxed text-slate-500">
+                            {preset.description}
+                          </span>
+                        </span>
+                        {isSelected && <CheckCircle2 className="h-4.5 w-4.5 shrink-0 text-emerald-600" />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Spacing
+              </span>
+              <div className="grid grid-cols-1 gap-2">
+                {SPACING_STYLE_PRESETS.map((preset) => {
+                  const isSelected = draft.settings.spacing === preset.value;
+
+                  return (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onFocus={() => focusPreviewSection('style')}
+                      onClick={() => {
+                        focusPreviewSection('style');
+                        updateSettings('spacing', preset.value);
+                      }}
+                      aria-pressed={isSelected}
+                      className={`rounded-xl border p-3 text-left transition ${
+                        isSelected
+                          ? 'border-[#FED362] bg-amber-50/70 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-amber-200 hover:bg-amber-50/30'
+                      }`}
+                    >
+                      <span className="flex items-center justify-between gap-3">
+                        <span>
+                          <span className="block text-sm font-bold text-slate-950">
+                            {preset.label}
+                          </span>
+                          <span className="mt-1 block text-xs leading-relaxed text-slate-500">
+                            {preset.description}
+                          </span>
+                        </span>
+                        <span className="flex h-10 w-12 shrink-0 flex-col justify-center gap-1 rounded-lg bg-slate-50 px-2">
+                          <span className={`h-1 rounded-full bg-slate-300 ${preset.value === 'spacious' ? 'w-full' : 'w-8'}`} />
+                          <span className={`h-1 rounded-full bg-slate-300 ${preset.value === 'spacious' ? 'w-9' : 'w-6'}`} />
+                          <span className={`h-1 rounded-full bg-slate-300 ${preset.value === 'spacious' ? 'w-11' : 'w-7'}`} />
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         );
 
@@ -4508,6 +4666,36 @@ export default function LifeJourneyEditPage() {
     </div>
   );
 
+  const renderTemplateStylePanel = () => (
+    <section className="flex h-full min-h-0 flex-col bg-white">
+      <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-5">
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-[#B18625]">
+            <Palette className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
+              Template Style
+            </p>
+            <h2 className="text-base font-bold text-slate-950">Design Presets</h2>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setActiveSidebarItem(null)}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-slate-900 hover:text-slate-900"
+          aria-label="Close template style panel"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+        {renderSectionEditor()}
+      </div>
+    </section>
+  );
+
   const renderMediaLibraryPanel = () => (
     <section className="flex h-full min-h-0 flex-col bg-white">
       <div className="border-b border-slate-200 px-5 py-5">
@@ -4774,7 +4962,7 @@ export default function LifeJourneyEditPage() {
       <main
         className={
           isEditingMode
-            ? activeSidebarItem === 'media-library'
+            ? activeSidebarItem === 'media-library' || activeSidebarItem === 'style'
               ? 'grid min-h-[calc(100vh-81px)] grid-cols-1 lg:grid-cols-[264px_360px_minmax(0,1fr)]'
               : 'grid min-h-[calc(100vh-81px)] grid-cols-1 lg:grid-cols-[264px_minmax(0,1fr)]'
             : 'min-h-[calc(100vh-81px)]'
@@ -4792,6 +4980,14 @@ export default function LifeJourneyEditPage() {
           <aside className="hidden border-r border-slate-200 bg-white lg:block">
             <div className="sticky top-[81px] h-[calc(100vh-81px)]">
               {renderMediaLibraryPanel()}
+            </div>
+          </aside>
+        )}
+
+        {isEditingMode && activeSidebarItem === 'style' && (
+          <aside className="hidden border-r border-slate-200 bg-white lg:block">
+            <div className="sticky top-[81px] h-[calc(100vh-81px)]">
+              {renderTemplateStylePanel()}
             </div>
           </aside>
         )}
