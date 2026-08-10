@@ -22,4 +22,16 @@
   "name": "app.storage.supabase.signed-url-ttl-seconds",
   "type": "java.lang.Long",
   "description": "Lifetime for generated private media signed URLs."
+}, {
+  "name": "deepseek.base-url",
+  "type": "java.lang.String",
+  "description": "DeepSeek API base URL."
+}, {
+  "name": "deepseek.api-key",
+  "type": "java.lang.String",
+  "description": "DeepSeek API key supplied from the environment."
+}, {
+  "name": "deepseek.model",
+  "type": "java.lang.String",
+  "description": "DeepSeek chat completion model used for AI writing."
 }]}
