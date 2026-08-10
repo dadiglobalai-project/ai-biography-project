@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
+  AlertCircle,
   ArrowLeft,
   BookOpen,
   CheckCircle2,
@@ -16,6 +17,7 @@ import {
   Mail,
   MessageSquare,
   Monitor,
+  MoreHorizontal,
   Palette,
   PencilLine,
   RotateCcw,
@@ -73,6 +75,7 @@ import type {
 } from '../services/authService';
 import type {
   BiographyCategory,
+  EditableImageTarget,
   EditableSectionCopyKey,
   CustomizerSettings,
   EditableTemplateSection,
@@ -88,6 +91,14 @@ import type {
 
 const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
 const SUBJECT_TYPES: SubjectType[] = ['SELF', 'PARENT', 'GRANDPARENT', 'CHILD', 'SPOUSE', 'LOVED_ONE'];
+const SUBJECT_TYPE_LABELS: Record<SubjectType, string> = {
+  SELF: 'Myself',
+  PARENT: 'Parent',
+  GRANDPARENT: 'Grandparent',
+  CHILD: 'Child',
+  SPOUSE: 'Spouse',
+  LOVED_ONE: 'Loved One',
+};
 const AUTO_SAVE_DELAY_MS = 1500;
 const IMAGE_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 const IMAGE_UPLOAD_MAX_DIMENSION = 1600;
@@ -120,6 +131,16 @@ const DEVICE_PREVIEW_CONFIG: Record<FramedPreviewViewport, { label: string; widt
   tablet: { label: 'Tablet', width: 768, height: 900 },
   phone: { label: 'Phone', width: 390, height: 780 },
 };
+
+const PREVIEW_VIEWPORT_OPTIONS: Array<{
+  value: PreviewViewport;
+  label: string;
+  icon: React.ElementType;
+}> = [
+  { value: 'desktop', label: 'Desktop', icon: Monitor },
+  { value: 'tablet', label: 'Tablet', icon: Tablet },
+  { value: 'phone', label: 'Phone', icon: Smartphone },
+];
 
 function DevicePreviewFrame({
   children,
@@ -201,6 +222,24 @@ type SelectFieldConfig = {
   options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
   section?: EditableTemplateSection;
+};
+
+type PublishChecklistItem = {
+  id: string;
+  label: string;
+  description: string;
+  isComplete: boolean;
+  required: boolean;
+};
+
+type AiWritingAction = 'generate' | 'rewrite' | 'improve' | 'expand';
+
+type AiWritingTarget = {
+  id: string;
+  label: string;
+  section: EditableTemplateSection;
+  value: string;
+  onReplace: (value: string) => void;
 };
 
 type PersonalTextFieldKey = {
@@ -296,6 +335,33 @@ const SPACING_STYLE_PRESETS: Array<{
     value: 'compact',
     label: 'Compact',
     description: 'Tighter layout for faster scanning.',
+  },
+];
+
+const AI_WRITING_ACTIONS: Array<{
+  value: AiWritingAction;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'generate',
+    label: 'Generate',
+    description: 'Create a fresh draft for this field.',
+  },
+  {
+    value: 'rewrite',
+    label: 'Rewrite',
+    description: 'Rephrase while keeping the same meaning.',
+  },
+  {
+    value: 'improve',
+    label: 'Improve',
+    description: 'Clean up grammar, clarity, and flow.',
+  },
+  {
+    value: 'expand',
+    label: 'Expand',
+    description: 'Add more meaningful detail.',
   },
 ];
 
@@ -511,6 +577,11 @@ const convertImageFileToDataUrl = async (file: File) => {
 };
 
 const getBiographyTitle = (draft: BiographyCategory, templateTitle: string) => {
+  const siteTitle = draft.settings.siteTitle?.trim();
+  if (siteTitle) {
+    return siteTitle;
+  }
+
   const name = draft.personalDetails.fullName.trim();
   return name ? `${name}'s ${templateTitle}` : `${templateTitle} Biography`;
 };
@@ -544,6 +615,105 @@ const formatMediaFileSize = (fileSize?: number) => {
   return `${(fileSize / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const stripRichText = (value?: string) =>
+  (value || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const hasText = (value?: string) => stripRichText(value).length > 0;
+
+const hasValidEmail = (value?: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((value || '').trim());
+
+const sentenceCase = (value: string) => {
+  const trimmedValue = value.trim();
+  return trimmedValue ? trimmedValue.charAt(0).toUpperCase() + trimmedValue.slice(1) : '';
+};
+
+const ensureSentenceEnding = (value: string) =>
+  /[.!?]$/.test(value.trim()) ? value.trim() : `${value.trim()}.`;
+
+const lowercaseFirst = (value: string) => {
+  const trimmedValue = value.trim();
+  return trimmedValue ? trimmedValue.charAt(0).toLowerCase() + trimmedValue.slice(1) : '';
+};
+
+const getAiStarterDraft = (subjectName: string, targetLabel: string) => {
+  const subject = subjectName.trim() || 'this life story';
+  const normalizedLabel = targetLabel.toLowerCase();
+
+  if (normalizedLabel.includes('full name')) {
+    return subjectName.trim() || 'Full Name';
+  }
+
+  if (normalizedLabel.includes('tagline')) {
+    return 'A life shaped by meaningful memories, steady growth, and a legacy worth preserving.';
+  }
+
+  if (normalizedLabel.includes('story') && normalizedLabel.includes('title')) {
+    return 'A Chapter Worth Remembering';
+  }
+
+  if (normalizedLabel.includes('title')) {
+    return 'A Meaningful Chapter';
+  }
+
+  if (normalizedLabel.includes('section description') || normalizedLabel.includes('summary')) {
+    return `A thoughtful look at the memories, values, and moments that shaped ${subject}'s journey.`;
+  }
+
+  return `This part of the biography shares the experiences, values, and memories that shaped ${subject}'s story.`;
+};
+
+const getAiWritingSuggestion = (
+  value: string,
+  action: AiWritingAction,
+  instructions: string,
+  subjectName: string,
+  targetLabel: string
+) => {
+  const cleanValue = sentenceCase(stripRichText(value));
+  const instructionText = instructions.trim();
+
+  const withInstruction = (text: string) =>
+    instructionText
+      ? `${text}\n\nAdditional direction applied: ${instructionText}`
+      : text;
+
+  if (!cleanValue) {
+    return withInstruction(getAiStarterDraft(subjectName, targetLabel));
+  }
+
+  if (action === 'generate') {
+    return withInstruction(
+      `${ensureSentenceEnding(cleanValue)} This can introduce the story with warmth, context, and a clear sense of legacy.`
+    );
+  }
+
+  if (action === 'rewrite') {
+    return withInstruction(
+      `In this chapter, ${lowercaseFirst(ensureSentenceEnding(cleanValue))}`
+    );
+  }
+
+  if (action === 'expand') {
+    return withInstruction(
+      `${ensureSentenceEnding(cleanValue)} This detail adds depth to the biography by connecting the moment to the values, relationships, and memories that shaped ${subjectName || 'this life story'}.`
+    );
+  }
+
+  return withInstruction(
+    ensureSentenceEnding(
+      cleanValue
+        .replace(/\s+/g, ' ')
+        .replace(/\s+([,.!?])/g, '$1')
+        .trim()
+    )
+  );
+};
+
 const getMediaLibraryStorageKey = (websiteId: string) =>
   `xinghuoji.website.${websiteId}.mediaLibrary`;
 
@@ -573,6 +743,35 @@ const notifyBiographyListChanged = () => {
   window.localStorage.setItem(BIOGRAPHY_LIST_REFRESH_KEY, String(Date.now()));
 };
 
+const getImageTargetLabel = (target: EditableImageTarget | null) => {
+  if (!target) {
+    return 'Gallery';
+  }
+
+  switch (target.section) {
+    case 'hero':
+      return 'Hero profile image';
+    case 'about':
+      return target.itemIndex != null
+        ? `Pursuit image ${target.itemIndex + 1}`
+        : 'Pursuit image';
+    case 'timeline':
+      return target.itemIndex != null
+        ? `Life Journey image ${target.itemIndex + 1}`
+        : 'Life Journey image';
+    case 'gallery':
+      return target.itemIndex != null
+        ? `Gallery image ${target.itemIndex + 1}`
+        : 'Gallery image';
+    case 'stories':
+      return target.itemIndex != null
+        ? `Story image ${target.itemIndex + 1}`
+        : 'Story image';
+    default:
+      return 'Image';
+  }
+};
+
 export default function LifeJourneyEditPage() {
   const navigate = useNavigate();
   const { templateId } = useParams();
@@ -590,7 +789,17 @@ export default function LifeJourneyEditPage() {
   const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
   const [activeEditorSection, setActiveEditorSection] = useState<EditableTemplateSection | null>(null);
   const [activeSidebarItem, setActiveSidebarItem] = useState<string | null>(null);
+  const [activeImageTarget, setActiveImageTarget] = useState<EditableImageTarget | null>(null);
   const [isMobileEditorOpen, setIsMobileEditorOpen] = useState(false);
+  const [isMobileAiWritingOpen, setIsMobileAiWritingOpen] = useState(false);
+  const [isMobileMediaLibraryOpen, setIsMobileMediaLibraryOpen] = useState(false);
+  const [isMobileToolbarMenuOpen, setIsMobileToolbarMenuOpen] = useState(false);
+  const [isPublishChecklistOpen, setIsPublishChecklistOpen] = useState(false);
+  const [aiWritingAction, setAiWritingAction] = useState<AiWritingAction>('generate');
+  const [aiWritingTargetId, setAiWritingTargetId] = useState('');
+  const [aiWritingInstructions, setAiWritingInstructions] = useState('');
+  const [aiWritingResult, setAiWritingResult] = useState('');
+  const [aiWritingMessage, setAiWritingMessage] = useState('');
   const [websiteSections, setWebsiteSections] = useState<BiographyWebsiteSection[]>([]);
   const [sectionLoadMessage, setSectionLoadMessage] = useState('');
   const [activeBackendSection, setActiveBackendSection] = useState<BiographyWebsiteSection | null>(null);
@@ -615,6 +824,7 @@ export default function LifeJourneyEditPage() {
   const [isLoadingContactMessages, setIsLoadingContactMessages] = useState(false);
   const [mediaAssets, setMediaAssets] = useState<BiographyMediaAsset[]>([]);
   const [mediaAssetsMessage, setMediaAssetsMessage] = useState('');
+  const [recentlyUploadedMediaAssetIds, setRecentlyUploadedMediaAssetIds] = useState<string[]>([]);
   const [isLoadingMediaAssets, setIsLoadingMediaAssets] = useState(false);
   const [pendingDeleteMediaAssetId, setPendingDeleteMediaAssetId] = useState<string | null>(null);
   const [deletingMediaAssetId, setDeletingMediaAssetId] = useState<string | null>(null);
@@ -630,6 +840,18 @@ export default function LifeJourneyEditPage() {
     previewViewport === 'desktop'
       ? 'Desktop width'
       : `${DEVICE_PREVIEW_CONFIG[previewViewport].label} width (${DEVICE_PREVIEW_CONFIG[previewViewport].width}px)`;
+  const normalizedSaveMessage = saveMessage.toLowerCase();
+  const mobileSaveStatus = isSaving
+    ? 'Saving'
+    : normalizedSaveMessage.includes('failed') || normalizedSaveMessage.includes('error')
+      ? 'Save issue'
+      : normalizedSaveMessage.includes('unsaved')
+        ? 'Unsaved'
+        : 'Saved';
+  const selectedMobileEditorSection = activeEditorSection
+    ? editorSections.find((section) => section.key === activeEditorSection)
+    : null;
+  const SelectedMobileEditorIcon = selectedMobileEditorSection?.icon || Sparkles;
   const matchingBackendSection = React.useMemo(
     () => getBackendSectionForEditorSection(activeEditorSection, websiteSections),
     [activeEditorSection, websiteSections]
@@ -639,6 +861,124 @@ export default function LifeJourneyEditPage() {
     [websiteSections]
   );
   const currentBackendSection = activeBackendSection || matchingBackendSection;
+  const publishChecklistItems = React.useMemo<PublishChecklistItem[]>(() => {
+    const sectionCopy = getSectionCopy(draft.sectionCopy);
+    const showContactSection = draft.settings.showContactSection !== false;
+    const allowContactMessages = draft.settings.allowContactMessages !== false;
+    const hasTimelineContent = draft.timeline.some((milestone) =>
+      hasText(milestone.year) && hasText(milestone.title) && hasText(milestone.description)
+    );
+    const hasGalleryContent = draft.gallery.some((item) =>
+      hasText(item.title) && (hasText(item.imageUrl) || Boolean(item.mediaAssetId))
+    );
+    const hasStoryContent = draft.stories.some((story) =>
+      hasText(story.title) && hasText(story.shortDescription)
+    );
+    const hasPersonalProfileImage =
+      Boolean(draft.personalDetails.profileImageAssetId) || hasText(draft.personalDetails.profileImageUrl);
+
+    return [
+      {
+        id: 'saved-website',
+        label: 'Saved in My Biographies',
+        description: activeWebsiteId
+          ? 'This draft has a biography website record.'
+          : 'Save the draft first so it appears in My Biographies.',
+        isComplete: Boolean(activeWebsiteId),
+        required: true,
+      },
+      {
+        id: 'site-title',
+        label: 'Biography title',
+        description: 'Used in the dashboard and browser title.',
+        isComplete: hasText(getBiographyTitle(draft, templateRoute.title)),
+        required: true,
+      },
+      {
+        id: 'full-name',
+        label: 'Full name',
+        description: 'The Hero section needs the biography subject name.',
+        isComplete: hasText(draft.personalDetails.fullName),
+        required: true,
+      },
+      {
+        id: 'tagline',
+        label: 'Short tagline',
+        description: 'A short line helps the Hero section explain the person quickly.',
+        isComplete: hasText(draft.personalDetails.tagline),
+        required: true,
+      },
+      {
+        id: 'introduction',
+        label: 'Short introduction',
+        description: 'The Hero section should include an opening introduction.',
+        isComplete: hasText(draft.personalDetails.shortIntro),
+        required: true,
+      },
+      {
+        id: 'biography-summary',
+        label: 'Biography summary',
+        description: 'The About section should include the main biography story.',
+        isComplete: hasText(draft.personalDetails.bioFull),
+        required: true,
+      },
+      {
+        id: 'timeline',
+        label: 'Life Journey timeline',
+        description: 'At least one timeline milestone needs a year, title, and description.',
+        isComplete: hasTimelineContent,
+        required: true,
+      },
+      {
+        id: 'section-copy',
+        label: 'Section descriptions',
+        description: 'Main section descriptions should not be empty.',
+        isComplete:
+          hasText(sectionCopy.about.description) &&
+          hasText(sectionCopy.timeline.description) &&
+          hasText(sectionCopy.gallery.description) &&
+          hasText(sectionCopy.stories.description),
+        required: true,
+      },
+      {
+        id: 'contact-email',
+        label: 'Contact email',
+        description: showContactSection && allowContactMessages
+          ? 'Required when the public contact form is enabled.'
+          : 'Skipped because contact messages are disabled.',
+        isComplete:
+          !showContactSection ||
+          !allowContactMessages ||
+          hasValidEmail(draft.personalDetails.contactEmail),
+        required: true,
+      },
+      {
+        id: 'profile-image',
+        label: 'Personal profile image',
+        description: 'Recommended so the published biography does not rely on sample imagery.',
+        isComplete: hasPersonalProfileImage,
+        required: false,
+      },
+      {
+        id: 'gallery',
+        label: 'Gallery media',
+        description: 'Recommended so visitors can see supporting images or memories.',
+        isComplete: hasGalleryContent,
+        required: false,
+      },
+      {
+        id: 'stories',
+        label: 'Memory stories',
+        description: 'Recommended for a richer biography experience.',
+        isComplete: hasStoryContent,
+        required: false,
+      },
+    ];
+  }, [activeWebsiteId, draft, templateRoute.title]);
+  const requiredPublishItems = publishChecklistItems.filter((item) => item.required);
+  const recommendedPublishItems = publishChecklistItems.filter((item) => !item.required);
+  const incompleteRequiredPublishItems = requiredPublishItems.filter((item) => !item.isComplete);
+  const isPublishReady = incompleteRequiredPublishItems.length === 0;
 
   const loadMediaAssets = React.useCallback(async () => {
     if (!activeWebsiteId || activeWebsiteId.startsWith('local-')) {
@@ -675,6 +1015,7 @@ export default function LifeJourneyEditPage() {
     setIsLoadingMediaAssets(false);
     setMediaAssets(assetsWithAccessUrls);
     setPendingDeleteMediaAssetId(null);
+    setRecentlyUploadedMediaAssetIds([]);
     setMediaAssetsMessage(
       assetsWithAccessUrls.length > 0
         ? `Loaded ${assetsWithAccessUrls.length} media asset${assetsWithAccessUrls.length === 1 ? '' : 's'}`
@@ -694,6 +1035,9 @@ export default function LifeJourneyEditPage() {
       const nextAssets = mediaAssets.filter((asset) => asset.mediaAssetId !== mediaAssetId);
       writeLocalMediaLibraryAssets(storageId, nextAssets);
       setMediaAssets(nextAssets);
+      setRecentlyUploadedMediaAssetIds((currentIds) =>
+        currentIds.filter((assetId) => assetId !== mediaAssetId)
+      );
       setPendingDeleteMediaAssetId(null);
       setMediaAssetsMessage('Deleted local media item');
       return;
@@ -721,6 +1065,9 @@ export default function LifeJourneyEditPage() {
     setMediaAssets((currentAssets) =>
       currentAssets.filter((asset) => asset.mediaAssetId !== mediaAssetId)
     );
+    setRecentlyUploadedMediaAssetIds((currentIds) =>
+      currentIds.filter((assetId) => assetId !== mediaAssetId)
+    );
     setMediaAssetsMessage('Deleted media asset');
   };
 
@@ -732,6 +1079,8 @@ export default function LifeJourneyEditPage() {
       return;
     }
 
+    const replacementTargetLabel = getImageTargetLabel(activeImageTarget);
+    const isReplacementUpload = Boolean(activeImageTarget);
     setIsLoadingMediaAssets(true);
     setMediaAssetsMessage(`Uploading ${files.length} image${files.length === 1 ? '' : 's'}...`);
 
@@ -758,9 +1107,12 @@ export default function LifeJourneyEditPage() {
             (asset) => !uploadedAssets.some((uploadedAsset) => uploadedAsset.mediaAssetId === asset.mediaAssetId)
           ),
         ]);
+        setRecentlyUploadedMediaAssetIds(uploadedAssets.map((asset) => asset.mediaAssetId));
         setMediaAssetsMessage(
           uploadedAssets.length > 0
-            ? `Uploaded ${uploadedAssets.length} image${uploadedAssets.length === 1 ? '' : 's'} to media library`
+            ? isReplacementUpload
+              ? `Uploaded ${uploadedAssets.length} image${uploadedAssets.length === 1 ? '' : 's'}. Click Replace on a new image to update ${replacementTargetLabel}`
+              : `Uploaded ${uploadedAssets.length} image${uploadedAssets.length === 1 ? '' : 's'} to media library`
             : 'No images were uploaded'
         );
         return;
@@ -787,8 +1139,11 @@ export default function LifeJourneyEditPage() {
       const nextAssets = [...localAssets, ...mediaAssets];
       writeLocalMediaLibraryAssets(storageId, nextAssets);
       setMediaAssets(nextAssets);
+      setRecentlyUploadedMediaAssetIds(localAssets.map((asset) => asset.mediaAssetId));
       setMediaAssetsMessage(
-        `Added ${localAssets.length} local image${localAssets.length === 1 ? '' : 's'} to media library`
+        isReplacementUpload
+          ? `Added ${localAssets.length} local image${localAssets.length === 1 ? '' : 's'}. Click Replace on a new image to update ${replacementTargetLabel}`
+          : `Added ${localAssets.length} local image${localAssets.length === 1 ? '' : 's'} to media library`
       );
     } catch (err: any) {
       setMediaAssetsMessage(err?.message || 'Unable to upload image to media library');
@@ -809,10 +1164,20 @@ export default function LifeJourneyEditPage() {
       activeWebsiteId && !activeWebsiteId.startsWith('local-') && !asset.mediaAssetId.startsWith('local-')
         ? asset.mediaAssetId
         : '';
-    const targetSection =
-      activeEditorSection && activeEditorSection !== 'style' && activeEditorSection !== 'contact'
+    const fallbackSection: EditableImageTarget['section'] =
+      activeEditorSection === 'hero' ||
+      activeEditorSection === 'about' ||
+      activeEditorSection === 'timeline' ||
+      activeEditorSection === 'gallery' ||
+      activeEditorSection === 'stories'
         ? activeEditorSection
         : 'gallery';
+    const imageTarget = activeImageTarget;
+    const targetSection = imageTarget?.section || fallbackSection;
+    const targetIndex = imageTarget?.itemIndex ?? 0;
+    const targetLabel = getImageTargetLabel(imageTarget);
+    const isTargetItem = (item: { id: string }, index: number) =>
+      imageTarget?.itemId ? item.id === imageTarget.itemId : index === targetIndex;
 
     setDraft((currentDraft) => {
       if (targetSection === 'hero') {
@@ -830,7 +1195,7 @@ export default function LifeJourneyEditPage() {
         return {
           ...currentDraft,
           hobbies: currentDraft.hobbies.map((hobby, index) =>
-            index === 0
+            isTargetItem(hobby, index)
               ? {
                   ...hobby,
                   imageUrl,
@@ -845,7 +1210,7 @@ export default function LifeJourneyEditPage() {
         return {
           ...currentDraft,
           timeline: currentDraft.timeline.map((milestone, index) =>
-            index === 0
+            isTargetItem(milestone, index)
               ? {
                   ...milestone,
                   imageUrl,
@@ -860,13 +1225,29 @@ export default function LifeJourneyEditPage() {
         return {
           ...currentDraft,
           stories: currentDraft.stories.map((story, index) =>
-            index === 0
+            isTargetItem(story, index)
               ? {
                   ...story,
                   imageUrl,
                   imageAssetId: backendAssetId,
                 }
               : story
+          ),
+        };
+      }
+
+      if (targetSection === 'gallery' && imageTarget && currentDraft.gallery.length > 0) {
+        return {
+          ...currentDraft,
+          gallery: currentDraft.gallery.map((item, index) =>
+            isTargetItem(item, index)
+              ? {
+                  ...item,
+                  imageUrl,
+                  mediaAssetId: backendAssetId,
+                  thumbnailAssetId: backendAssetId,
+                }
+              : item
           ),
         };
       }
@@ -891,10 +1272,14 @@ export default function LifeJourneyEditPage() {
 
     setActiveEditorSection(targetSection);
     focusPreviewSection(targetSection);
+    setActiveImageTarget(null);
+    setIsMobileMediaLibraryOpen(false);
     setSaveMessage(
-      targetSection === 'gallery'
-        ? 'Image added to Gallery from Media Library'
-        : `Image applied to ${targetSection} section`
+      imageTarget
+        ? `${targetLabel} updated from Media Library`
+        : targetSection === 'gallery'
+          ? 'Image added to Gallery from Media Library'
+          : `Image applied to ${targetSection} section`
     );
   };
 
@@ -1001,7 +1386,9 @@ export default function LifeJourneyEditPage() {
     setActiveSidebarItem(null);
     setPendingDeleteSectionId(null);
     if (shouldUseMobileEditor()) {
-      setIsMobileEditorOpen(true);
+      setIsMobileEditorOpen(false);
+      setIsMobileAiWritingOpen(false);
+      setIsMobileMediaLibraryOpen(false);
     }
   };
 
@@ -1014,8 +1401,20 @@ export default function LifeJourneyEditPage() {
     setActiveSidebarItem('style');
     setPendingDeleteSectionId(null);
     if (shouldUseMobileEditor()) {
+      setIsMobileAiWritingOpen(false);
+      setIsMobileMediaLibraryOpen(false);
       setIsMobileEditorOpen(true);
     }
+  };
+
+  const handleOpenGeneralSettings = () => {
+    if (!isEditingMode) {
+      return;
+    }
+
+    setActiveEditorSection(null);
+    setActiveSidebarItem('general-settings');
+    setPendingDeleteSectionId(null);
   };
 
   const handleSidebarSectionSelect = (navKey: string, section: EditableTemplateSection) => {
@@ -1027,14 +1426,72 @@ export default function LifeJourneyEditPage() {
     setActiveSidebarItem(navKey);
     setPendingDeleteSectionId(null);
     if (shouldUseMobileEditor()) {
+      setIsMobileAiWritingOpen(false);
+      setIsMobileMediaLibraryOpen(false);
       setIsMobileEditorOpen(true);
     }
   };
 
   const handleOpenMediaLibrary = () => {
+    setActiveImageTarget(null);
     setActiveSidebarItem('media-library');
     setPendingDeleteMediaAssetId(null);
+    setIsMobileEditorOpen(false);
+    setIsMobileAiWritingOpen(false);
+    if (shouldUseMobileEditor()) {
+      setIsMobileMediaLibraryOpen(true);
+    }
     void loadMediaAssets();
+  };
+
+  const handleImageChangeRequest = (target: EditableImageTarget) => {
+    if (!isEditingMode) {
+      return;
+    }
+
+    setActiveImageTarget(target);
+    setActiveEditorSection(target.section);
+    setActiveSidebarItem(shouldUseMobileEditor() ? null : 'media-library');
+    setPendingDeleteMediaAssetId(null);
+    setMediaAssetsMessage(`Choose or upload an image for ${getImageTargetLabel(target)}`);
+    setIsMobileEditorOpen(false);
+    setIsMobileAiWritingOpen(false);
+
+    if (shouldUseMobileEditor()) {
+      setIsMobileMediaLibraryOpen(true);
+    }
+
+    void loadMediaAssets();
+  };
+
+  const handleOpenAiWriting = () => {
+    if (!isEditingMode) {
+      return;
+    }
+
+    const targetSection =
+      !activeEditorSection || activeEditorSection === 'style'
+        ? 'hero'
+        : activeEditorSection;
+    const target = getAiWritingTargets().find((item) => item.section === targetSection);
+
+    setActiveEditorSection(targetSection);
+    if (target) {
+      setAiWritingTargetId(target.id);
+    }
+
+    setAiWritingMessage('');
+    setAiWritingResult('');
+
+    if (shouldUseMobileEditor()) {
+      setActiveSidebarItem(null);
+      setIsMobileEditorOpen(false);
+      setIsMobileMediaLibraryOpen(false);
+      setIsMobileAiWritingOpen(true);
+      return;
+    }
+
+    setActiveSidebarItem('ai-writing');
   };
 
   const handleDraftChange: React.Dispatch<React.SetStateAction<BiographyCategory>> = (nextDraft) => {
@@ -1087,6 +1544,8 @@ export default function LifeJourneyEditPage() {
     setActiveEditorSection(null);
     setActiveSidebarItem(null);
     setIsMobileEditorOpen(false);
+    setIsMobileAiWritingOpen(false);
+    setIsMobileMediaLibraryOpen(false);
     setPendingDeleteSectionId(null);
   };
 
@@ -2064,7 +2523,9 @@ export default function LifeJourneyEditPage() {
         label: 'CABIN MAILBOX',
         email: contactEmail,
       },
-      socialLinks: socialLinks
+      socialLinks: draft.settings.showSocialLinks === false
+        ? []
+        : socialLinks
         .filter((link) => link.displayName.trim())
         .map((link, index) => ({
           ...link,
@@ -2083,7 +2544,7 @@ export default function LifeJourneyEditPage() {
         errorMessage: 'Unable to send your message. Please try again.',
       },
       sortOrder: 7,
-      isVisible: true,
+      isVisible: draft.settings.showContactSection !== false,
     };
   };
 
@@ -2099,7 +2560,7 @@ export default function LifeJourneyEditPage() {
         ...link,
       })),
       sortOrder: section.sortOrder ?? section.order ?? 7,
-      isVisible: section.isVisible ?? true,
+      isVisible: draft.settings.showContactSection !== false,
     };
   };
 
@@ -2601,7 +3062,7 @@ export default function LifeJourneyEditPage() {
       title: contactSection.title || 'Contact',
       sortOrder: contactSection.sortOrder ?? contactSection.order ?? 7,
       order: contactSection.order ?? contactSection.sortOrder ?? 7,
-      isVisible: contactSection.isVisible ?? true,
+      isVisible: contactSection.isVisible ?? (draft.settings.showContactSection !== false),
     };
 
     setWebsiteSections((currentSections) =>
@@ -2657,7 +3118,7 @@ export default function LifeJourneyEditPage() {
         updatedContactSection.title && updatedContactSection.title !== section.id
           ? updatedContactSection.title
           : section.title,
-      isVisible: section.isVisible ?? true,
+      isVisible: updatedContactSection.isVisible ?? (draft.settings.showContactSection !== false),
       sortOrder: section.sortOrder ?? section.order ?? 7,
       order: section.order ?? section.sortOrder ?? 7,
     };
@@ -2833,7 +3294,13 @@ export default function LifeJourneyEditPage() {
 
     await syncSection(
       'Contact',
-      { key: 'contact', title: 'Contact', sortOrder: 7, order: 7, isVisible: true },
+      {
+        key: 'contact',
+        title: 'Contact',
+        sortOrder: 7,
+        order: 7,
+        isVisible: draft.settings.showContactSection !== false,
+      },
       (sections) => getBackendSectionForEditorSection('contact', sections),
       () => authService.createContactSection(targetWebsiteId, buildContactSectionPayload()),
       async (section) => {
@@ -3006,6 +3473,153 @@ export default function LifeJourneyEditPage() {
       },
     }));
     setSaveMessage('Unsaved changes');
+  };
+
+  const getAiWritingTargets = (): AiWritingTarget[] => {
+    const sectionCopy = getSectionCopy(draft.sectionCopy);
+    const targets: AiWritingTarget[] = [
+      {
+        id: 'hero.tagline',
+        label: 'Hero - Short tagline',
+        section: 'hero',
+        value: draft.personalDetails.tagline,
+        onReplace: (value) => updatePersonalDetail('tagline', value),
+      },
+      {
+        id: 'hero.shortIntro',
+        label: 'Hero - Short introduction',
+        section: 'hero',
+        value: draft.personalDetails.shortIntro,
+        onReplace: (value) => updatePersonalDetail('shortIntro', value),
+      },
+      {
+        id: 'about.description',
+        label: 'Chronicle & Values - Section description',
+        section: 'about',
+        value: sectionCopy.about.description,
+        onReplace: (value) => updateSectionDescription('about', value),
+      },
+      {
+        id: 'about.bioFull',
+        label: 'Chronicle & Values - Biography summary',
+        section: 'about',
+        value: draft.personalDetails.bioFull,
+        onReplace: (value) => updatePersonalDetail('bioFull', value),
+      },
+      {
+        id: 'about.signatureQuote',
+        label: 'Chronicle & Values - Signature quote',
+        section: 'about',
+        value: draft.personalDetails.signatureQuote,
+        onReplace: (value) => updatePersonalDetail('signatureQuote', value),
+      },
+      {
+        id: 'timeline.description',
+        label: 'Life Journey - Section description',
+        section: 'timeline',
+        value: sectionCopy.timeline.description,
+        onReplace: (value) => updateSectionDescription('timeline', value),
+      },
+      ...draft.timeline.map((milestone, index) => ({
+        id: `timeline.${milestone.id}.description`,
+        label: `Life Journey - Milestone ${index + 1} description`,
+        section: 'timeline' as EditableTemplateSection,
+        value: milestone.description,
+        onReplace: (value: string) => updateTimelineItem(index, { description: value }),
+      })),
+      {
+        id: 'gallery.description',
+        label: 'Media Gallery - Section description',
+        section: 'gallery',
+        value: sectionCopy.gallery.description,
+        onReplace: (value) => updateSectionDescription('gallery', value),
+      },
+      ...draft.gallery.map((item, index) => ({
+        id: `gallery.${item.id}.caption`,
+        label: `Media Gallery - Item ${index + 1} caption`,
+        section: 'gallery' as EditableTemplateSection,
+        value: item.caption,
+        onReplace: (value: string) => updateGalleryItem(index, { caption: value }),
+      })),
+      {
+        id: 'stories.description',
+        label: 'Memories & Stories - Section description',
+        section: 'stories',
+        value: sectionCopy.stories.description,
+        onReplace: (value) => updateSectionDescription('stories', value),
+      },
+      ...draft.stories.map((story, index) => ({
+        id: `stories.${story.id}.shortDescription`,
+        label: `Memories & Stories - Story ${index + 1} summary`,
+        section: 'stories' as EditableTemplateSection,
+        value: story.shortDescription,
+        onReplace: (value: string) => updateStoryItem(index, 'shortDescription', value),
+      })),
+      {
+        id: 'contact.description',
+        label: 'Contact - Section description',
+        section: 'contact',
+        value: sectionCopy.contact.description,
+        onReplace: (value) => updateSectionDescription('contact', value),
+      },
+    ];
+
+    return targets;
+  };
+
+  const getSelectedAiWritingTarget = () => {
+    const targets = getAiWritingTargets();
+    return (
+      targets.find((target) => target.id === aiWritingTargetId) ||
+      targets.find((target) => activeEditorSection && target.section === activeEditorSection) ||
+      targets[0] ||
+      null
+    );
+  };
+
+  const handleGenerateAiWriting = () => {
+    const target = getSelectedAiWritingTarget();
+
+    if (!target) {
+      setAiWritingMessage('No editable writing target found');
+      return;
+    }
+
+    if (!hasText(target.value) && aiWritingAction !== 'generate') {
+      setAiWritingTargetId(target.id);
+      setAiWritingResult('');
+      setAiWritingMessage('Add some text to this field first, then use Rewrite, Improve, or Expand');
+      return;
+    }
+
+    const suggestion = getAiWritingSuggestion(
+      target.value,
+      aiWritingAction,
+      aiWritingInstructions,
+      draft.personalDetails.fullName,
+      target.label
+    );
+
+    setAiWritingTargetId(target.id);
+    setAiWritingResult(suggestion);
+    setAiWritingMessage('Suggestion generated. Review it before applying');
+  };
+
+  const handleApplyAiWriting = (mode: 'replace' | 'insert') => {
+    const target = getSelectedAiWritingTarget();
+
+    if (!target || !hasText(aiWritingResult)) {
+      setAiWritingMessage('Generate a suggestion before applying');
+      return;
+    }
+
+    const nextValue =
+      mode === 'insert' && hasText(target.value)
+        ? `${target.value.trim()}\n\n${aiWritingResult.trim()}`
+        : aiWritingResult.trim();
+
+    target.onReplace(nextValue);
+    setAiWritingMessage(mode === 'insert' ? 'Suggestion inserted below' : 'Suggestion replaced the selected field');
   };
 
   const renderTextField = ({
@@ -3880,7 +4494,7 @@ export default function LifeJourneyEditPage() {
       const savedWebsite = await authService.createBiographyWebsite({
         title: getBiographyTitle(draft, templateRoute.title),
         templateId: backendTemplateId || templateRoute.id,
-        subjectType: getSubjectType(searchParams.get('subjectType') || website?.subjectType),
+        subjectType: getSubjectType(draft.settings.subjectType || searchParams.get('subjectType') || website?.subjectType),
       });
 
       setWebsite(savedWebsite);
@@ -3907,6 +4521,20 @@ export default function LifeJourneyEditPage() {
     }
   };
 
+  const handleOpenPublishChecklist = () => {
+    setIsPublishChecklistOpen(true);
+  };
+
+  const handleSaveReadyDraft = async () => {
+    if (!isPublishReady) {
+      return;
+    }
+
+    await handleSave();
+    setIsPublishChecklistOpen(false);
+    setSaveMessage('Publish checklist passed. Draft saved for publish review');
+  };
+
   const handleReset = () => {
     const originalDraft = cloneTemplateData(templateRoute.categoryKey);
     removeDraft(templateRoute.id, activeWebsiteId);
@@ -3924,11 +4552,17 @@ export default function LifeJourneyEditPage() {
       <section className="space-y-5">
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-[#B18625]" />
+            <Icon className="h-4 w-4 text-[#B18625]" />
             <div>
-              <h2 className="text-sm font-bold text-slate-900">Section Editor</h2>
+              <h2 className="text-sm font-bold text-slate-900">
+                {variant === 'mobile' && selectedSection ? selectedSection.label : 'Section Editor'}
+              </h2>
               <p className="text-[11px] text-slate-500">
-                Click any section in the live preview to edit it here.
+                {variant === 'mobile'
+                  ? selectedSection
+                    ? 'Edit this section, then tap Done to return to the preview.'
+                    : 'Close this panel, then tap a biography section to select it.'
+                  : 'Click any section in the live preview to edit it here.'}
               </p>
             </div>
           </div>
@@ -3936,10 +4570,10 @@ export default function LifeJourneyEditPage() {
             <button
               type="button"
               onClick={() => setIsMobileEditorOpen(false)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-slate-900 hover:text-slate-900"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 transition hover:border-slate-900 hover:text-slate-900"
               aria-label="Close editor"
             >
-              <X className="h-4 w-4" />
+              Done
             </button>
           )}
         </div>
@@ -4613,6 +5247,18 @@ export default function LifeJourneyEditPage() {
         <div className="space-y-1">
           <button
             type="button"
+            onClick={handleOpenAiWriting}
+            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm transition ${
+              activeSidebarItem === 'ai-writing'
+                ? 'bg-slate-100 text-slate-950'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
+            }`}
+          >
+            <Sparkles className="h-4 w-4 shrink-0 text-slate-500" />
+            <span className="truncate font-medium">AI Writing</span>
+          </button>
+          <button
+            type="button"
             onClick={handleOpenMediaLibrary}
             className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm transition ${
               activeSidebarItem === 'media-library'
@@ -4644,8 +5290,12 @@ export default function LifeJourneyEditPage() {
           </button>
           <button
             type="button"
-            onClick={handleOpenStyleEditor}
-            className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm text-slate-600 transition hover:bg-slate-50 hover:text-slate-950"
+            onClick={handleOpenGeneralSettings}
+            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm transition ${
+              activeSidebarItem === 'general-settings'
+                ? 'bg-slate-100 text-slate-950'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
+            }`}
           >
             <Settings className="h-4 w-4 shrink-0 text-slate-500" />
             <span className="truncate font-medium">General Settings</span>
@@ -4696,8 +5346,426 @@ export default function LifeJourneyEditPage() {
     </section>
   );
 
-  const renderMediaLibraryPanel = () => (
-    <section className="flex h-full min-h-0 flex-col bg-white">
+  const renderAiWritingPanel = (variant: 'desktop' | 'mobile' = 'desktop') => {
+    const targets = getAiWritingTargets();
+    const selectedTarget = getSelectedAiWritingTarget();
+    const selectedAction = AI_WRITING_ACTIONS.find((action) => action.value === aiWritingAction);
+
+    return (
+      <section className={variant === 'mobile' ? 'bg-white' : 'flex h-full min-h-0 flex-col bg-white'}>
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-5">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700">
+              <Sparkles className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
+                Tools
+              </p>
+              <h2 className="text-base font-bold text-slate-950">AI Writing Assistant</h2>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                {variant === 'mobile'
+                  ? 'Generate, rewrite, improve, or expand the selected writing target.'
+                  : 'Generate writing suggestions for the selected biography field.'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (variant === 'mobile') {
+                setIsMobileAiWritingOpen(false);
+                return;
+              }
+
+              setActiveSidebarItem(null);
+            }}
+            className={
+              variant === 'mobile'
+                ? 'inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 transition hover:border-slate-900 hover:text-slate-900'
+                : 'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-slate-900 hover:text-slate-900'
+            }
+            aria-label="Close AI writing assistant"
+          >
+            {variant === 'mobile' ? 'Done' : <X className="h-4 w-4" />}
+          </button>
+        </div>
+
+        <div
+          className={
+            variant === 'mobile'
+              ? 'space-y-5 px-5 py-5'
+              : 'min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5'
+          }
+        >
+          <div className="space-y-3 rounded-2xl border border-indigo-100 bg-indigo-50/40 p-4">
+            <label className="block space-y-1.5">
+              <span className="text-xs font-bold text-slate-500">Writing target</span>
+              <select
+                value={selectedTarget?.id || ''}
+                onChange={(event) => {
+                  setAiWritingTargetId(event.currentTarget.value);
+                  setAiWritingResult('');
+                  setAiWritingMessage('');
+                }}
+                className={inputClass}
+              >
+                {targets.map((target) => (
+                  <option key={target.id} value={target.id}>
+                    {target.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {selectedTarget && (
+              <label className="block space-y-1.5">
+                <span className="text-xs font-bold text-slate-500">Your content</span>
+                <textarea
+                  rows={6}
+                  value={selectedTarget.value}
+                  onChange={(event) => {
+                    selectedTarget.onReplace(event.currentTarget.value);
+                    setAiWritingResult('');
+                    setAiWritingMessage('Content updated');
+                  }}
+                  className={`${inputClass} resize-y leading-relaxed`}
+                />
+              </label>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Writing action</p>
+              {selectedAction && (
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                  {selectedAction.description}
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {AI_WRITING_ACTIONS.map((action) => {
+                const isActive = aiWritingAction === action.value;
+
+                return (
+                  <button
+                    key={action.value}
+                    type="button"
+                    onClick={() => {
+                      setAiWritingAction(action.value);
+                      setAiWritingResult('');
+                      setAiWritingMessage('');
+                    }}
+                    className={`rounded-xl border px-3 py-3 text-left transition ${
+                      isActive
+                        ? 'border-[#FED362] bg-amber-50 text-slate-950 shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-amber-200 hover:bg-amber-50/30'
+                    }`}
+                  >
+                    <span className="block text-xs font-bold">{action.label}</span>
+                    <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">
+                      {action.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <label className="block space-y-1.5">
+            <span className="text-xs font-bold text-slate-500">Additional instructions</span>
+            <textarea
+              rows={3}
+              value={aiWritingInstructions}
+              onChange={(event) => setAiWritingInstructions(event.currentTarget.value)}
+              className={`${inputClass} resize-y leading-relaxed`}
+              placeholder="e.g. Make it warmer, more personal, or shorter."
+            />
+          </label>
+
+          <button
+            type="button"
+            onClick={handleGenerateAiWriting}
+            disabled={!selectedTarget || (aiWritingAction !== 'generate' && !hasText(selectedTarget.value))}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <WandSparkles className="h-4 w-4" />
+            Create Suggestion
+          </button>
+
+          {aiWritingMessage && (
+            <p className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+              {aiWritingMessage}
+            </p>
+          )}
+
+          {aiWritingResult && (
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">AI result</p>
+                <span className="text-[10px] font-semibold text-slate-400">
+                  Review before applying
+                </span>
+              </div>
+              <textarea
+                rows={7}
+                value={aiWritingResult}
+                onChange={(event) => setAiWritingResult(event.currentTarget.value)}
+                className={`${inputClass} resize-y bg-indigo-50/30 leading-relaxed`}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleApplyAiWriting('replace')}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-slate-800"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Replace
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyAiWriting('insert')}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
+                >
+                  Insert Below
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGenerateAiWriting}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
+                >
+                  Regenerate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAiWritingResult('');
+                    setAiWritingMessage('Suggestion discarded');
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-500 transition hover:border-rose-200 hover:text-rose-600"
+                >
+                  Discard
+                </button>
+              </div>
+            </div>
+          )}
+
+          <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
+            This is a local writing assistant for now. It can be connected to a real AI endpoint later without changing the editor workflow.
+          </p>
+        </div>
+      </section>
+    );
+  };
+
+  const renderSettingsToggle = ({
+    label,
+    description,
+    checked,
+    onChange,
+    disabled = false,
+  }: {
+    label: string;
+    description: string;
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+    disabled?: boolean;
+  }) => (
+    <label
+      className={`flex items-start justify-between gap-4 rounded-xl border px-4 py-3 transition ${
+        disabled
+          ? 'border-slate-100 bg-slate-50 text-slate-400'
+          : 'border-slate-200 bg-white text-slate-900 hover:border-amber-200'
+      }`}
+    >
+      <span>
+        <span className="block text-sm font-bold">{label}</span>
+        <span className="mt-1 block text-xs leading-relaxed text-slate-500">{description}</span>
+      </span>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.currentTarget.checked)}
+        className="mt-1 h-4 w-4 shrink-0 accent-[#B18625] disabled:cursor-not-allowed"
+      />
+    </label>
+  );
+
+  const renderGeneralSettingsPanel = () => {
+    const subjectType = getSubjectType(
+      draft.settings.subjectType || searchParams.get('subjectType') || website?.subjectType
+    );
+    const canEditBackendIdentity = !activeWebsiteId || activeWebsiteId.startsWith('local-');
+    const siteTitleValue = draft.settings.siteTitle ?? website?.title ?? getBiographyTitle(draft, templateRoute.title);
+    const showContactSection = draft.settings.showContactSection !== false;
+    const showSocialLinks = draft.settings.showSocialLinks !== false;
+    const allowContactMessages = draft.settings.allowContactMessages !== false;
+
+    return (
+      <section className="flex h-full min-h-0 flex-col bg-white">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-5">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+              <Settings className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
+                Website
+              </p>
+              <h2 className="text-base font-bold text-slate-950">General Settings</h2>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveSidebarItem(null)}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-slate-900 hover:text-slate-900"
+            aria-label="Close general settings panel"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
+          <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
+                Identity
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                Controls how this biography is identified in the dashboard.
+              </p>
+            </div>
+
+            <label className="block space-y-1.5">
+              <span className="text-xs font-bold text-slate-500">Biography title</span>
+              <input
+                type="text"
+                value={siteTitleValue}
+                disabled={!canEditBackendIdentity}
+                onChange={(event) => updateSettings('siteTitle', event.currentTarget.value)}
+                className={inputClass}
+                placeholder="e.g. My Life Story"
+              />
+              <span className="block text-[11px] leading-relaxed text-slate-500">
+                {canEditBackendIdentity
+                  ? 'Used when this biography is first saved to My Biographies.'
+                  : 'Read-only for saved backend biographies until the website update endpoint is available.'}
+              </span>
+            </label>
+
+            <label className="block space-y-1.5">
+              <span className="text-xs font-bold text-slate-500">Subject type</span>
+              <select
+                value={subjectType}
+                disabled={!canEditBackendIdentity}
+                onChange={(event) => updateSettings('subjectType', getSubjectType(event.currentTarget.value))}
+                className={inputClass}
+              >
+                {SUBJECT_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {SUBJECT_TYPE_LABELS[type]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
+                Backend Info
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                Metadata returned by the biography website endpoint.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 text-xs">
+              <div className="rounded-xl bg-slate-50 px-3 py-2">
+                <span className="block font-bold text-slate-500">Status</span>
+                <span className="mt-0.5 block text-sm font-semibold text-slate-900">
+                  {website?.status || 'Unsaved draft'}
+                </span>
+              </div>
+              <div className="rounded-xl bg-slate-50 px-3 py-2">
+                <span className="block font-bold text-slate-500">Subdomain</span>
+                <span className="mt-0.5 block break-all text-sm font-semibold text-slate-900">
+                  {website?.subdomain || 'No subdomain yet'}
+                </span>
+              </div>
+              <div className="rounded-xl bg-slate-50 px-3 py-2">
+                <span className="block font-bold text-slate-500">Website ID</span>
+                <span className="mt-0.5 block break-all text-[11px] font-semibold text-slate-700">
+                  {activeWebsiteId || 'Created after Save Draft'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
+                Public Contact
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                Controls the Contact section in the live preview and saved draft.
+              </p>
+            </div>
+
+            {renderSettingsToggle({
+              label: 'Show contact section',
+              description: 'Display the Contact section and Send Message links.',
+              checked: showContactSection,
+              onChange: (checked) => updateSettings('showContactSection', checked),
+            })}
+            {renderSettingsToggle({
+              label: 'Show social links',
+              description: 'Display Instagram, X, Facebook, and LinkedIn rows.',
+              checked: showSocialLinks,
+              disabled: !showContactSection,
+              onChange: (checked) => updateSettings('showSocialLinks', checked),
+            })}
+            {renderSettingsToggle({
+              label: 'Allow contact messages',
+              description: 'Display the public message form inside Contact.',
+              checked: allowContactMessages,
+              disabled: !showContactSection,
+              onChange: (checked) => updateSettings('allowContactMessages', checked),
+            })}
+
+            <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
+              Contact visibility syncs with the section settings when you save. Message-form availability is currently a template setting until backend adds a dedicated field.
+            </p>
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-rose-100 bg-rose-50/40 p-4">
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-rose-600">
+                Danger Zone
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                Delete biography will be enabled only after backend provides DELETE /api/websites/{'{websiteId}'}.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-rose-100 bg-white px-4 py-3 text-xs font-bold uppercase tracking-wide text-rose-300 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Biography Unavailable
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  };
+
+  const renderMediaLibraryPanel = (variant: 'desktop' | 'mobile' = 'desktop') => (
+    <section className={variant === 'mobile' ? 'bg-white' : 'flex h-full min-h-0 flex-col bg-white'}>
       <div className="border-b border-slate-200 px-5 py-5">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -4706,16 +5774,30 @@ export default function LifeJourneyEditPage() {
             </p>
             <h2 className="mt-1 text-lg font-bold text-slate-950">Media Library</h2>
             <p className="mt-1 text-xs leading-relaxed text-slate-500">
-              Store reusable images for this biography.
+              {activeImageTarget
+                ? `Replacing ${getImageTargetLabel(activeImageTarget)}. Choose an existing image or upload a new one.`
+                : 'Store reusable images for this biography.'}
             </p>
           </div>
           <button
             type="button"
-            onClick={() => setActiveSidebarItem(null)}
-            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            onClick={() => {
+              setActiveImageTarget(null);
+              if (variant === 'mobile') {
+                setIsMobileMediaLibraryOpen(false);
+                return;
+              }
+
+              setActiveSidebarItem(null);
+            }}
+            className={
+              variant === 'mobile'
+                ? 'inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 transition hover:border-slate-900 hover:text-slate-900'
+                : 'rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700'
+            }
             aria-label="Close media library"
           >
-            <X className="h-4 w-4" />
+            {variant === 'mobile' ? 'Done' : <X className="h-4 w-4" />}
           </button>
         </div>
 
@@ -4735,11 +5817,11 @@ export default function LifeJourneyEditPage() {
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-700 transition hover:border-slate-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
         >
           <UploadCloud className="h-4 w-4" />
-          Upload Images
+          {activeImageTarget ? 'Upload Replacement Image' : 'Upload Images'}
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <div className={variant === 'mobile' ? 'px-5 py-4' : 'min-h-0 flex-1 overflow-y-auto px-5 py-4'}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
             Library
@@ -4772,18 +5854,23 @@ export default function LifeJourneyEditPage() {
           <div className="grid grid-cols-2 gap-3">
             {mediaAssets.map((asset) => {
               const canUseAsset = Boolean(asset.accessUrl);
+              const isRecentlyUploaded = recentlyUploadedMediaAssetIds.includes(asset.mediaAssetId);
 
               return (
                 <article
                   key={asset.mediaAssetId}
-                  className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+                  className={`overflow-hidden rounded-xl border bg-white shadow-sm transition ${
+                    isRecentlyUploaded
+                      ? 'border-amber-300 ring-2 ring-amber-100'
+                      : 'border-slate-200'
+                  }`}
                 >
                   <button
                     type="button"
                     onClick={() => canUseAsset && handleUseMediaAsset(asset)}
                     disabled={!canUseAsset}
                     className="block aspect-square w-full bg-slate-100 disabled:cursor-not-allowed"
-                    title={canUseAsset ? 'Use this image' : 'Access URL unavailable'}
+                    title={canUseAsset ? (activeImageTarget ? 'Replace with this image' : 'Use this image') : 'Access URL unavailable'}
                   >
                     {asset.accessUrl ? (
                       <img
@@ -4800,9 +5887,16 @@ export default function LifeJourneyEditPage() {
 
                   <div className="space-y-2 p-3">
                     <div>
-                      <p className="truncate text-xs font-bold text-slate-900">
-                        {asset.originalFilename || 'Untitled media'}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="min-w-0 flex-1 truncate text-xs font-bold text-slate-900">
+                          {asset.originalFilename || 'Untitled media'}
+                        </p>
+                        {isRecentlyUploaded && (
+                          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-800">
+                            New
+                          </span>
+                        )}
+                      </div>
                       <p className="mt-0.5 truncate text-[10px] text-slate-500">
                         {asset.mimeType || 'Image'} - {formatMediaFileSize(asset.fileSize)}
                       </p>
@@ -4815,7 +5909,7 @@ export default function LifeJourneyEditPage() {
                         disabled={!canUseAsset}
                         className="rounded-lg bg-slate-950 px-2 py-2 text-[10px] font-bold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        Use
+                        {activeImageTarget ? 'Replace' : 'Use'}
                       </button>
                       <button
                         type="button"
@@ -4844,68 +5938,257 @@ export default function LifeJourneyEditPage() {
     </section>
   );
 
+  const renderPublishChecklistGroup = (title: string, items: PublishChecklistItem[]) => (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">{title}</h3>
+        <span className="text-xs font-semibold text-slate-500">
+          {items.filter((item) => item.isComplete).length}/{items.length}
+        </span>
+      </div>
+      <div className="space-y-2">
+        {items.map((item) => {
+          const isMissingRequired = item.required && !item.isComplete;
+
+          return (
+            <div
+              key={item.id}
+              className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${
+                item.isComplete
+                  ? 'border-emerald-100 bg-emerald-50/50'
+                  : isMissingRequired
+                    ? 'border-rose-100 bg-rose-50/60'
+                    : 'border-amber-100 bg-amber-50/50'
+              }`}
+            >
+              <span
+                className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                  item.isComplete
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : isMissingRequired
+                      ? 'bg-rose-100 text-rose-700'
+                      : 'bg-amber-100 text-amber-700'
+                }`}
+              >
+                {item.isComplete ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-slate-950">{item.label}</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-slate-600">
+                  {item.description}
+                </span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderPublishChecklistModal = () => {
+    if (!isPublishChecklistOpen) {
+      return null;
+    }
+
+    const completedRequiredCount = requiredPublishItems.filter((item) => item.isComplete).length;
+    const completedRecommendedCount = recommendedPublishItems.filter((item) => item.isComplete).length;
+
+    return (
+      <div className="fixed inset-0 z-[120] flex items-center justify-center px-4 py-6">
+        <button
+          type="button"
+          onClick={() => setIsPublishChecklistOpen(false)}
+          className="absolute inset-0 h-full w-full bg-slate-950/55 backdrop-blur-sm"
+          aria-label="Close publish checklist"
+        />
+        <section className="relative z-10 flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+          <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white">
+                <Globe2 className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
+                  Publish Review
+                </p>
+                <h2 className="text-lg font-bold text-slate-950">Publish Checklist</h2>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                  Review required content before this biography moves toward publishing.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsPublishChecklistOpen(false)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-slate-900 hover:text-slate-900"
+              aria-label="Close publish checklist"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+            <div
+              className={`rounded-2xl border px-4 py-4 ${
+                isPublishReady
+                  ? 'border-emerald-100 bg-emerald-50/60'
+                  : 'border-amber-100 bg-amber-50/70'
+              }`}
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-950">
+                    {isPublishReady ? 'Ready for publish review' : 'Needs required fixes'}
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                    Required: {completedRequiredCount}/{requiredPublishItems.length} complete.
+                    {' '}Recommended: {completedRecommendedCount}/{recommendedPublishItems.length} complete.
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                    isPublishReady
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}
+                >
+                  {isPublishReady ? 'Passed' : `${incompleteRequiredPublishItems.length} Missing`}
+                </span>
+              </div>
+            </div>
+
+            {renderPublishChecklistGroup('Required Before Publishing', requiredPublishItems)}
+            {renderPublishChecklistGroup('Recommended Polish', recommendedPublishItems)}
+
+            <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+              Backend publish endpoint is not available yet. When the checklist passes, this button saves the draft as ready for publish review.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setIsPublishChecklistOpen(false)}
+              className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={isSaving}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Save className="h-4 w-4" />
+              {isSaving ? 'Saving' : 'Save Draft'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSaveReadyDraft()}
+              disabled={!isPublishReady || isSaving}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <Globe2 className="h-4 w-4" />
+              Save Ready Draft
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-[#f5f2ee] text-slate-900">
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur-md">
-        <div className="grid min-h-20 grid-cols-1 items-center gap-3 px-4 py-3 lg:grid-cols-[1fr_auto_1fr] lg:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/diy-dashboard')}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-900 hover:text-slate-900"
-              title="Back to dashboard"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-            <div className="min-w-0">
-              <h1 className="truncate text-lg font-semibold text-slate-950">
-                {templateRoute.title}
-              </h1>
-              <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                <span className="truncate">{saveMessage}</span>
+        <div className="grid min-h-20 grid-cols-1 items-center gap-2 px-3 py-2 sm:px-4 lg:grid-cols-[1fr_auto_1fr] lg:gap-3 lg:px-6 lg:py-3">
+          <div className="flex min-w-0 items-center justify-between gap-3 lg:justify-start">
+            <div className="flex min-w-0 items-center gap-2 lg:gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/diy-dashboard')}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-900 hover:text-slate-900 lg:h-11 lg:w-11"
+                title="Back to dashboard"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <div className="min-w-0">
+                <h1 className="truncate text-base font-semibold text-slate-950 lg:text-lg">
+                  {templateRoute.title}
+                </h1>
+                <div className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-slate-500 lg:mt-1">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                  <span className="truncate sm:hidden">{mobileSaveStatus}</span>
+                  <span className="hidden truncate sm:inline">{saveMessage}</span>
+                </div>
               </div>
+            </div>
+
+            <div className="relative lg:hidden">
+              <button
+                type="button"
+                onClick={() => setIsMobileToolbarMenuOpen((isOpen) => !isOpen)}
+                className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-950"
+                aria-label="Open mobile editor menu"
+                aria-expanded={isMobileToolbarMenuOpen}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+
+              {isMobileToolbarMenuOpen && (
+                <div className="absolute right-0 top-12 z-50 w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                  <p className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                    Device Preview
+                  </p>
+                  <div className="space-y-1">
+                    {PREVIEW_VIEWPORT_OPTIONS.map(({ value, label, icon: Icon }) => {
+                      const isActive = previewViewport === value;
+
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => {
+                            setPreviewViewport(value);
+                            setIsMobileToolbarMenuOpen(false);
+                          }}
+                          className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                            isActive
+                              ? 'bg-slate-950 text-white'
+                              : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950'
+                          }`}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Icon className="h-4 w-4" />
+                            {label}
+                          </span>
+                          {isActive && <CheckCircle2 className="h-4 w-4" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center justify-start gap-2 lg:justify-center">
+          <div className="hidden items-center justify-start gap-2 lg:flex lg:justify-center">
             <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 shadow-sm">
-              <button
-                type="button"
-                onClick={() => setPreviewViewport('desktop')}
-                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition ${
-                  previewViewport === 'desktop'
-                    ? 'bg-white text-slate-950 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                <Monitor className="h-4 w-4" />
-                Desktop
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewViewport('tablet')}
-                className={`inline-flex items-center justify-center rounded-md px-3 py-2 transition ${
-                  previewViewport === 'tablet'
-                    ? 'bg-white text-slate-950 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-                aria-label="Tablet preview"
-              >
-                <Tablet className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewViewport('phone')}
-                className={`inline-flex items-center justify-center rounded-md px-3 py-2 transition ${
-                  previewViewport === 'phone'
-                    ? 'bg-white text-slate-950 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-                aria-label="Phone preview"
-              >
-                <Smartphone className="h-4 w-4" />
-              </button>
+              {PREVIEW_VIEWPORT_OPTIONS.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setPreviewViewport(value)}
+                  className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition ${
+                    previewViewport === value
+                      ? 'bg-white text-slate-950 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                  aria-label={`${label} preview`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {value === 'desktop' && label}
+                </button>
+              ))}
             </div>
 
             <div className="hidden items-center gap-1 xl:flex">
@@ -4928,11 +6211,11 @@ export default function LifeJourneyEditPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
+          <div className="grid grid-cols-3 items-center gap-2 lg:flex lg:flex-wrap lg:justify-end">
             <button
               type="button"
               onClick={isEditingMode ? handleEnterPreviewMode : handleEnterEditMode}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:gap-2 sm:text-sm lg:px-4 lg:py-2.5"
             >
               {isEditingMode ? <Eye className="h-4 w-4" /> : <PencilLine className="h-4 w-4" />}
               {isEditingMode ? 'Preview' : 'Edit'}
@@ -4941,16 +6224,17 @@ export default function LifeJourneyEditPage() {
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 sm:gap-2 sm:text-sm lg:px-4 lg:py-2.5"
             >
               <Save className="h-4 w-4" />
-              {isSaving ? 'Saving' : 'Save Draft'}
+              <span className="hidden min-[360px]:inline">{isSaving ? 'Saving' : 'Save Draft'}</span>
+              <span className="min-[360px]:hidden">{isSaving ? 'Saving' : 'Save'}</span>
             </button>
             <button
               type="button"
-              onClick={handleSave}
+              onClick={handleOpenPublishChecklist}
               disabled={isSaving}
-              className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-950 px-2.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:gap-2 sm:text-sm lg:px-4 lg:py-2.5"
             >
               <Globe2 className="h-4 w-4" />
               Publish
@@ -4962,7 +6246,9 @@ export default function LifeJourneyEditPage() {
       <main
         className={
           isEditingMode
-            ? activeSidebarItem === 'media-library' || activeSidebarItem === 'style'
+            ? activeSidebarItem === 'ai-writing'
+              ? 'grid min-h-[calc(100vh-81px)] grid-cols-1 lg:grid-cols-[264px_minmax(0,1fr)_360px]'
+              : activeSidebarItem === 'media-library' || activeSidebarItem === 'style' || activeSidebarItem === 'general-settings'
               ? 'grid min-h-[calc(100vh-81px)] grid-cols-1 lg:grid-cols-[264px_360px_minmax(0,1fr)]'
               : 'grid min-h-[calc(100vh-81px)] grid-cols-1 lg:grid-cols-[264px_minmax(0,1fr)]'
             : 'min-h-[calc(100vh-81px)]'
@@ -4992,12 +6278,40 @@ export default function LifeJourneyEditPage() {
           </aside>
         )}
 
+        {isEditingMode && activeSidebarItem === 'general-settings' && (
+          <aside className="hidden border-r border-slate-200 bg-white lg:block">
+            <div className="sticky top-[81px] h-[calc(100vh-81px)]">
+              {renderGeneralSettingsPanel()}
+            </div>
+          </aside>
+        )}
+
         <section className="min-w-0 bg-[#f5f2ee] px-3 py-4 sm:px-5 lg:px-6">
           <div className="mb-3 flex items-center justify-between gap-3 lg:hidden">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm">
-              <Type className="h-3.5 w-3.5" />
-              {previewModeLabel}
-            </span>
+            <div className="min-w-0 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm">
+                <Type className="h-3.5 w-3.5" />
+                {previewModeLabel}
+              </span>
+              {isEditingMode && (
+                <span
+                  className={`inline-flex max-w-full items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold shadow-sm ${
+                    selectedMobileEditorSection
+                      ? 'bg-amber-50 text-amber-800 ring-1 ring-amber-200'
+                      : 'bg-white text-slate-500'
+                  }`}
+                >
+                  {selectedMobileEditorSection ? (
+                    <>
+                      <SelectedMobileEditorIcon className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Selected: {selectedMobileEditorSection.label}</span>
+                    </>
+                  ) : (
+                    <span>Tap a section to edit</span>
+                  )}
+                </span>
+              )}
+            </div>
             {isEditingMode && (
               <button
                 type="button"
@@ -5019,6 +6333,7 @@ export default function LifeJourneyEditPage() {
                   activeEditSection={isEditingMode ? activeEditorSection : null}
                   onDataChange={isEditingMode ? handleDraftChange : undefined}
                   onEditSectionChange={isEditingMode ? handleEditSectionChange : undefined}
+                  onImageChangeRequest={isEditingMode ? handleImageChangeRequest : undefined}
                   websiteId={activeWebsiteId}
                 />
               </DevicePreviewFrame>
@@ -5031,25 +6346,47 @@ export default function LifeJourneyEditPage() {
                 activeEditSection={isEditingMode ? activeEditorSection : null}
                 onDataChange={isEditingMode ? handleDraftChange : undefined}
                 onEditSectionChange={isEditingMode ? handleEditSectionChange : undefined}
+                onImageChangeRequest={isEditingMode ? handleImageChangeRequest : undefined}
                 websiteId={activeWebsiteId}
               />
             </div>
           )}
         </section>
 
+        {isEditingMode && activeSidebarItem === 'ai-writing' && (
+          <aside className="hidden border-l border-slate-200 bg-white lg:block">
+            <div className="sticky top-[81px] h-[calc(100vh-81px)]">
+              {renderAiWritingPanel()}
+            </div>
+          </aside>
+        )}
+
       </main>
 
-      {isEditingMode && !isMobileEditorOpen && (
-        <button
-          type="button"
-          onClick={() => setIsMobileEditorOpen(true)}
-          className="fixed bottom-5 right-5 z-[70] inline-flex items-center gap-2 rounded-full bg-black px-5 py-3 text-xs font-bold uppercase tracking-wide text-white shadow-xl transition active:scale-[0.98] lg:hidden"
-        >
-          <PencilLine className="h-4 w-4" />
-          {activeEditorSection
-            ? `Edit ${editorSections.find((section) => section.key === activeEditorSection)?.label || 'Section'}`
-            : 'Edit Section'}
-        </button>
+      {isEditingMode && !isMobileEditorOpen && !isMobileAiWritingOpen && !isMobileMediaLibraryOpen && selectedMobileEditorSection && (
+        <div className="fixed inset-x-4 bottom-5 z-[70] flex justify-end lg:hidden">
+          <div className="flex max-w-full flex-col items-end gap-2">
+            <button
+              type="button"
+              onClick={handleOpenAiWriting}
+              className="inline-flex max-w-full items-center gap-2 rounded-full border border-indigo-100 bg-white px-4 py-3 text-xs font-bold uppercase tracking-wide text-indigo-800 shadow-xl transition active:scale-[0.98]"
+            >
+              <Sparkles className="h-4 w-4 shrink-0" />
+              <span className="truncate">AI Write</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsMobileAiWritingOpen(false);
+                setIsMobileEditorOpen(true);
+              }}
+              className="inline-flex max-w-full items-center gap-2 rounded-full bg-black px-5 py-3 text-xs font-bold uppercase tracking-wide text-white shadow-xl transition active:scale-[0.98]"
+            >
+              <PencilLine className="h-4 w-4 shrink-0" />
+              <span className="max-w-[230px] truncate">Edit {selectedMobileEditorSection.label}</span>
+            </button>
+          </div>
+        </div>
       )}
 
       {isEditingMode && isMobileEditorOpen && (
@@ -5066,6 +6403,41 @@ export default function LifeJourneyEditPage() {
           </div>
         </div>
       )}
+
+      {isEditingMode && isMobileAiWritingOpen && (
+        <div className="fixed inset-0 z-[90] lg:hidden">
+          <button
+            type="button"
+            onClick={() => setIsMobileAiWritingOpen(false)}
+            className="absolute inset-0 h-full w-full bg-slate-950/45 backdrop-blur-[2px]"
+            aria-label="Close AI writing backdrop"
+          />
+          <div className="absolute inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto rounded-t-[1.75rem] border border-slate-200 bg-white pb-8 shadow-2xl">
+            <div className="mx-auto mb-1 mt-4 h-1.5 w-12 rounded-full bg-slate-200" />
+            {renderAiWritingPanel('mobile')}
+          </div>
+        </div>
+      )}
+
+      {isEditingMode && isMobileMediaLibraryOpen && (
+        <div className="fixed inset-0 z-[90] lg:hidden">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveImageTarget(null);
+              setIsMobileMediaLibraryOpen(false);
+            }}
+            className="absolute inset-0 h-full w-full bg-slate-950/45 backdrop-blur-[2px]"
+            aria-label="Close media library backdrop"
+          />
+          <div className="absolute inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto rounded-t-[1.75rem] border border-slate-200 bg-white pb-8 shadow-2xl">
+            <div className="mx-auto mb-1 mt-4 h-1.5 w-12 rounded-full bg-slate-200" />
+            {renderMediaLibraryPanel('mobile')}
+          </div>
+        </div>
+      )}
+
+      {renderPublishChecklistModal()}
     </div>
   );
 }

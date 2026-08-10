@@ -31,6 +31,7 @@ import {
   Check,
   Eraser,
   Italic,
+  Image as ImageIcon,
   Link2,
   List,
   ListOrdered,
@@ -41,6 +42,7 @@ import { getSectionCopy } from './sectionCopy';
 import { authService } from '../../services/authService';
 import type {
   BiographyCategory,
+  EditableImageTarget,
   EditableSectionCopyKey,
   EditableTemplateSection,
   GalleryItem,
@@ -59,6 +61,7 @@ interface LifeJourneyTemplateProps {
   activeEditSection?: EditableTemplateSection | null;
   onDataChange?: React.Dispatch<React.SetStateAction<BiographyCategory>>;
   onEditSectionChange?: (section: EditableTemplateSection) => void;
+  onImageChangeRequest?: (target: EditableImageTarget) => void;
   websiteId?: string;
 }
 
@@ -209,6 +212,7 @@ export default function LifeJourneyTemplate({
   activeEditSection = null,
   onDataChange,
   onEditSectionChange,
+  onImageChangeRequest,
   websiteId = '',
 }: LifeJourneyTemplateProps) {
   const [formData, setFormData] = useState({
@@ -231,6 +235,9 @@ export default function LifeJourneyTemplate({
   
   const data = dataOverride ?? CATEGORIES_DATA[categoryKey];
   const isInlineEditable = Boolean(onDataChange);
+  const showContactSection = data.settings.showContactSection !== false;
+  const showSocialLinks = data.settings.showSocialLinks !== false;
+  const allowContactMessages = data.settings.allowContactMessages !== false;
 
   const updateInlineTextEditorPosition = React.useCallback((
     element: HTMLElement,
@@ -345,6 +352,11 @@ export default function LifeJourneyTemplate({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!allowContactMessages) {
+      setSubmitError('Contact messages are disabled for this biography.');
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError('');
 
@@ -518,6 +530,38 @@ export default function LifeJourneyTemplate({
       onEditSectionChange?.(section);
     },
   });
+
+  const handleImageChangeRequest = (target: EditableImageTarget) => (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!isInlineEditable) {
+      return;
+    }
+
+    onEditSectionChange?.(target.section);
+    onImageChangeRequest?.(target);
+  };
+
+  const renderChangePictureButton = (target: EditableImageTarget) => {
+    if (!isInlineEditable) {
+      return null;
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={handleImageChangeRequest(target)}
+        className="pointer-events-auto absolute bottom-3 left-1/2 z-20 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-stone-950/90 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-white opacity-100 shadow-lg backdrop-blur-sm transition hover:bg-stone-900 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#FED362] sm:pointer-events-none sm:opacity-0 sm:group-hover/image:pointer-events-auto sm:group-hover/image:opacity-100 sm:group-focus-within/image:pointer-events-auto sm:group-focus-within/image:opacity-100"
+        aria-label="Change picture"
+      >
+        <ImageIcon className="h-3.5 w-3.5" />
+        Change Picture
+      </button>
+    );
+  };
 
   type EditableTextTag = 'span' | 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'div';
 
@@ -978,12 +1022,14 @@ export default function LifeJourneyTemplate({
             <a href="#timeline-section" className="hover:opacity-75 transition-opacity">Timeline</a>
             <a href="#gallery-section" className="hover:opacity-75 transition-opacity">Gallery</a>
             <a href="#stories-section" className="hover:opacity-75 transition-opacity">Stories</a>
-            <a 
-              href="#contact-section" 
-              className={`px-4 py-2 rounded-xl transition-all font-mono font-bold tracking-widest uppercase text-[9px] border ${theme.accentButton}`}
-            >
-              Send Letter
-            </a>
+            {showContactSection && (
+              <a 
+                href="#contact-section" 
+                className={`px-4 py-2 rounded-xl transition-all font-mono font-bold tracking-widest uppercase text-[9px] border ${theme.accentButton}`}
+              >
+                Send Letter
+              </a>
+            )}
           </nav>
 
           {/* Mobile Navigation Toggle */}
@@ -1003,13 +1049,15 @@ export default function LifeJourneyTemplate({
               <a href="#timeline-section" onClick={() => setIsMobileMenuOpen(false)} className="py-1 border-b border-stone-100/10 pb-2">Timeline</a>
               <a href="#gallery-section" onClick={() => setIsMobileMenuOpen(false)} className="py-1 border-b border-stone-100/10 pb-2">Gallery</a>
               <a href="#stories-section" onClick={() => setIsMobileMenuOpen(false)} className="py-1 border-b border-stone-100/10 pb-2">Stories</a>
-              <a 
-                href="#contact-section" 
-                onClick={() => setIsMobileMenuOpen(false)} 
-                className={`w-full text-center font-bold tracking-widest uppercase p-3 rounded-xl border ${theme.accentButton}`}
-              >
-                Send Letter
-              </a>
+              {showContactSection && (
+                <a 
+                  href="#contact-section" 
+                  onClick={() => setIsMobileMenuOpen(false)} 
+                  className={`w-full text-center font-bold tracking-widest uppercase p-3 rounded-xl border ${theme.accentButton}`}
+                >
+                  Send Letter
+                </a>
+              )}
             </div>
           )}
 
@@ -1053,7 +1101,7 @@ export default function LifeJourneyTemplate({
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-tr from-amber-500 to-indigo-500 rounded-3xl blur-2xl opacity-15 group-hover:opacity-25 transition-all duration-700 -z-10 scale-[1.01]" />
               
-              <div className={`${getImageSizeClass('profile', data.personalDetails.profileImageSettings)} rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-stone-150 relative`}>
+              <div className={`${getImageSizeClass('profile', data.personalDetails.profileImageSettings)} group/image rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-stone-150 relative`}>
                 <img 
                   src={profileImageUrl} 
                   alt={data.personalDetails.fullName} 
@@ -1061,6 +1109,7 @@ export default function LifeJourneyTemplate({
                   referrerPolicy="no-referrer"
                   id="hero-portrait"
                 />
+                {renderChangePictureButton({ section: 'hero' })}
                 
                 {/* Visual Category Label Badge */}
                 <div className="absolute top-4 left-4">
@@ -1122,12 +1171,14 @@ export default function LifeJourneyTemplate({
                 <span>Read My Story</span>
                 <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
               </a>
-              <a 
-                href="#contact-section"
-                className={`inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-bold font-sans text-xs tracking-wider uppercase transition-all ${theme.secondaryButton}`}
-              >
-                <span>Send Message</span>
-              </a>
+              {showContactSection && (
+                <a 
+                  href="#contact-section"
+                  className={`inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-bold font-sans text-xs tracking-wider uppercase transition-all ${theme.secondaryButton}`}
+                >
+                  <span>Send Message</span>
+                </a>
+              )}
             </div>
           </div>
 
@@ -1261,7 +1312,7 @@ export default function LifeJourneyTemplate({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-1">
               {data.hobbies.map((hob, index) => (
                 <div key={hob.id} className="text-left space-y-2 group">
-                  <div className={`${getImageSizeClass('hobby', hob.imageSettings)} rounded-2xl overflow-hidden bg-stone-100 relative border border-stone-200/40 shadow-xs`}>
+                  <div className={`${getImageSizeClass('hobby', hob.imageSettings)} group/image rounded-2xl overflow-hidden bg-stone-100 relative border border-stone-200/40 shadow-xs`}>
                     {hob.imageUrl && (
                       <img
                         src={hob.imageUrl}
@@ -1274,6 +1325,7 @@ export default function LifeJourneyTemplate({
                     <div className="absolute top-3 left-3 bg-stone-900/85 backdrop-blur-xs w-6 h-6 rounded-md flex items-center justify-center text-amber-100 border border-stone-800 shadow-xs">
                       {renderIcon(hob.icon, "w-3.5 h-3.5 text-amber-400")}
                     </div>
+                    {renderChangePictureButton({ section: 'about', itemIndex: index, itemId: hob.id })}
                   </div>
                   {renderEditableText({
                     as: 'h5',
@@ -1364,13 +1416,14 @@ export default function LifeJourneyTemplate({
                     {/* Integrated Historical Image (if provided) */}
                     {milestone.imageUrl && (
                       <div className="pt-2">
-                        <div className={`${getImageSizeClass('timeline', milestone.imageSettings)} rounded-xl overflow-hidden p-1 shadow-xs ${theme.imageFrame}`}>
+                        <div className={`${getImageSizeClass('timeline', milestone.imageSettings)} group/image rounded-xl overflow-hidden p-1 shadow-xs relative ${theme.imageFrame}`}>
                           <img 
                             src={milestone.imageUrl} 
                             alt={milestone.title} 
                             className={`w-full h-full ${getImageFitClass(milestone.imageSettings)} ${getImagePositionClass(milestone.imageSettings)} rounded-lg filter sepia-[0.1]`}
                             referrerPolicy="no-referrer"
                           />
+                          {renderChangePictureButton({ section: 'timeline', itemIndex: idx, itemId: milestone.id })}
                         </div>
                         {milestone.imageCaption && renderEditableText({
                             as: 'p',
@@ -1461,7 +1514,7 @@ export default function LifeJourneyTemplate({
                 className={`rounded-2xl border p-4 text-left group transition-all duration-300 flex flex-col justify-between ${theme.card} ${theme.accentHover} hover:shadow-md`}
               >
                 <div>
-                  <div className={`${getImageSizeClass('gallery', item.imageSettings)} rounded-xl overflow-hidden bg-stone-100 mb-4 border border-stone-200/20 relative`}>
+                  <div className={`${getImageSizeClass('gallery', item.imageSettings)} group/image rounded-xl overflow-hidden bg-stone-100 mb-4 border border-stone-200/20 relative`}>
                     {item.imageUrl && (
                       <img
                         src={item.imageUrl}
@@ -1473,6 +1526,7 @@ export default function LifeJourneyTemplate({
                     <span className="absolute top-3 right-3 bg-stone-900/80 backdrop-blur-xs px-2 py-0.5 text-[8px] font-mono text-white rounded-md tracking-wider">
                       {item.category.toUpperCase()}
                     </span>
+                    {renderChangePictureButton({ section: 'gallery', itemIndex: idx, itemId: item.id })}
                   </div>
                   
                   <div className="flex items-center justify-between mb-1.5">
@@ -1549,7 +1603,7 @@ export default function LifeJourneyTemplate({
               >
                 <div>
                   {/* Image Preview */}
-                  <div className={`${getImageSizeClass('story', story.imageSettings)} overflow-hidden bg-stone-100 relative shrink-0`}>
+                  <div className={`${getImageSizeClass('story', story.imageSettings)} group/image overflow-hidden bg-stone-100 relative shrink-0`}>
                     {story.imageUrl && (
                       <img
                         src={story.imageUrl}
@@ -1564,6 +1618,7 @@ export default function LifeJourneyTemplate({
                       className: 'absolute top-3 left-3 bg-stone-900/80 backdrop-blur-xs px-2.5 py-1 text-[8px] font-mono text-amber-200 rounded-md tracking-wider uppercase font-black',
                       onChange: (value) => updateStoryItem(index, 'category', value),
                     })}
+                    {renderChangePictureButton({ section: 'stories', itemIndex: index, itemId: story.id })}
                   </div>
 
                   {/* Text content area */}
@@ -1618,10 +1673,12 @@ export default function LifeJourneyTemplate({
 
         </section>
 
-        {/* ========================================================= */}
-        {/* 6. CONTACT SECTION (Rustic Oregon Cabin Postbox Theme)    */}
-        {/* ========================================================= */}
-        <section
+        {showContactSection && (
+        <>
+          {/* ========================================================= */}
+          {/* 6. CONTACT SECTION (Rustic Oregon Cabin Postbox Theme)    */}
+          {/* ========================================================= */}
+          <section
           className={`rounded-3xl border p-8 md:p-12 ${theme.card} ${getEditHighlightClass('contact')}`}
           id="contact-section"
           {...getSectionInteractionProps('contact')}
@@ -1667,58 +1724,70 @@ export default function LifeJourneyTemplate({
               </div>
 
               {/* Social Channels List */}
-              <div className="space-y-3">
-                <h4 className={`font-mono text-[9px] uppercase tracking-widest font-extrabold ${theme.textSubtle}`}>
-                  CONNECT ON SOCIAL STATIONS
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <span className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all duration-300 cursor-pointer ${theme.innerCard} ${theme.socialLink}`}>
-                    <Instagram className={`w-4 h-4 ${theme.iconMuted}`} />
-                    {renderEditableText({
-                      value: instagramHandle,
-                      section: 'contact',
-                      className: 'font-sans text-xs font-semibold',
-                      onChange: (value) => updatePersonalDetail('instagramHandle', value),
-                    })}
-                  </span>
-                  
-                  <span className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all duration-300 cursor-pointer ${theme.innerCard} ${theme.socialLink}`}>
-                    <Twitter className={`w-4 h-4 ${theme.iconMuted}`} />
-                    {renderEditableText({
-                      value: twitterHandle,
-                      section: 'contact',
-                      className: 'font-sans text-xs font-semibold',
-                      onChange: (value) => updatePersonalDetail('twitterHandle', value),
-                    })}
-                  </span>
+              {showSocialLinks && (
+                <div className="space-y-3">
+                  <h4 className={`font-mono text-[9px] uppercase tracking-widest font-extrabold ${theme.textSubtle}`}>
+                    CONNECT ON SOCIAL STATIONS
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <span className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all duration-300 cursor-pointer ${theme.innerCard} ${theme.socialLink}`}>
+                      <Instagram className={`w-4 h-4 ${theme.iconMuted}`} />
+                      {renderEditableText({
+                        value: instagramHandle,
+                        section: 'contact',
+                        className: 'font-sans text-xs font-semibold',
+                        onChange: (value) => updatePersonalDetail('instagramHandle', value),
+                      })}
+                    </span>
+                    
+                    <span className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all duration-300 cursor-pointer ${theme.innerCard} ${theme.socialLink}`}>
+                      <Twitter className={`w-4 h-4 ${theme.iconMuted}`} />
+                      {renderEditableText({
+                        value: twitterHandle,
+                        section: 'contact',
+                        className: 'font-sans text-xs font-semibold',
+                        onChange: (value) => updatePersonalDetail('twitterHandle', value),
+                      })}
+                    </span>
 
-                  <span className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all duration-300 cursor-pointer ${theme.innerCard} ${theme.socialLink}`}>
-                    <Facebook className={`w-4 h-4 ${theme.iconMuted}`} />
-                    {renderEditableText({
-                      value: facebookLabel,
-                      section: 'contact',
-                      className: 'font-sans text-xs font-semibold',
-                      onChange: (value) => updatePersonalDetail('facebookLabel', value),
-                    })}
-                  </span>
+                    <span className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all duration-300 cursor-pointer ${theme.innerCard} ${theme.socialLink}`}>
+                      <Facebook className={`w-4 h-4 ${theme.iconMuted}`} />
+                      {renderEditableText({
+                        value: facebookLabel,
+                        section: 'contact',
+                        className: 'font-sans text-xs font-semibold',
+                        onChange: (value) => updatePersonalDetail('facebookLabel', value),
+                      })}
+                    </span>
 
-                  <span className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all duration-300 cursor-pointer ${theme.innerCard} ${theme.socialLink}`}>
-                    <Linkedin className={`w-4 h-4 ${theme.iconMuted}`} />
-                    {renderEditableText({
-                      value: linkedinLabel,
-                      section: 'contact',
-                      className: 'font-sans text-xs font-semibold',
-                      onChange: (value) => updatePersonalDetail('linkedinLabel', value),
-                    })}
-                  </span>
+                    <span className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all duration-300 cursor-pointer ${theme.innerCard} ${theme.socialLink}`}>
+                      <Linkedin className={`w-4 h-4 ${theme.iconMuted}`} />
+                      {renderEditableText({
+                        value: linkedinLabel,
+                        section: 'contact',
+                        className: 'font-sans text-xs font-semibold',
+                        onChange: (value) => updatePersonalDetail('linkedinLabel', value),
+                      })}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
             </div>
 
             {/* Contact Form Container */}
             <div className={`lg:col-span-7 border p-6 md:p-8 rounded-2xl relative flex flex-col justify-center h-full ${theme.quoteCard}`}>
-              {isSubmitted ? (
+              {!allowContactMessages ? (
+                <div className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-8 text-center">
+                  <Mail className="mx-auto h-7 w-7 text-amber-600" />
+                  <h3 className={`mt-4 font-serif text-xl font-bold ${theme.textPrimary}`}>
+                    Contact Messages Are Closed
+                  </h3>
+                  <p className={`mx-auto mt-2 max-w-sm font-sans text-xs leading-relaxed ${theme.textSecondary}`}>
+                    This biography is not accepting public contact messages right now.
+                  </p>
+                </div>
+              ) : isSubmitted ? (
                 <div className="bg-emerald-50/50 border border-emerald-200/60 p-8 rounded-xl text-center space-y-4 my-8">
                   <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto">
                     <Send className="w-5 h-5 text-emerald-600" />
@@ -1821,7 +1890,9 @@ export default function LifeJourneyTemplate({
             </div>
 
           </div>
-        </section>
+          </section>
+        </>
+        )}
 
       </div>
 

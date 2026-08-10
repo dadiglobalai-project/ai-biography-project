@@ -13,6 +13,8 @@ import {
   PenTool,
   Eye,
   AlertCircle,
+  CalendarClock,
+  Clock3,
 } from 'lucide-react';
 import { authService, BiographyTemplate, BiographyWebsite, DashboardResponse, SubjectType } from '../services/authService';
 import BrandLogo from '../components/BrandLogo';
@@ -20,6 +22,7 @@ import lifeJourneyPreviewImage from '../Templates/LifeJourney/assets/images/life
 
 type RelationType = 'Myself' | 'Parent' | 'Grandparent' | 'Child' | 'Spouse' | 'Loved One';
 const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
+const BIOGRAPHY_LAST_OPENED_STORAGE_KEY = 'xinghuoji.biographies.lastOpenedAt';
 
 const SUBJECT_TYPE_BY_RELATION: Record<RelationType, SubjectType> = {
   Myself: 'SELF',
@@ -42,6 +45,72 @@ interface Template {
   editPath?: string;
 }
 
+const readBiographyLastOpened = (): Record<string, string> => {
+  try {
+    const storedValue = window.localStorage.getItem(BIOGRAPHY_LAST_OPENED_STORAGE_KEY);
+    if (!storedValue) {
+      return {};
+    }
+
+    const parsedValue = JSON.parse(storedValue);
+    return parsedValue && typeof parsedValue === 'object' && !Array.isArray(parsedValue)
+      ? parsedValue as Record<string, string>
+      : {};
+  } catch {
+    window.localStorage.removeItem(BIOGRAPHY_LAST_OPENED_STORAGE_KEY);
+    return {};
+  }
+};
+
+const writeBiographyLastOpened = (history: Record<string, string>) => {
+  window.localStorage.setItem(BIOGRAPHY_LAST_OPENED_STORAGE_KEY, JSON.stringify(history));
+};
+
+const getDateTime = (value?: string) => {
+  if (!value) {
+    return 0;
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
+const formatBiographyDateTime = (value?: string) => {
+  const timestamp = getDateTime(value);
+  if (!timestamp) {
+    return 'Not available yet';
+  }
+
+  const date = new Date(timestamp);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const isSameDay = (left: Date, right: Date) =>
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate();
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+
+  if (isSameDay(date, today)) {
+    return `Today, ${time}`;
+  }
+
+  if (isSameDay(date, yesterday)) {
+    return `Yesterday, ${time}`;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: date.getFullYear() === today.getFullYear() ? undefined : 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+};
+
 export default function DIYDashboard() {
   const navigate = useNavigate();
   const templateChooserRef = React.useRef<HTMLDivElement | null>(null);
@@ -56,6 +125,9 @@ export default function DIYDashboard() {
   const [isLoadingBiographies, setIsLoadingBiographies] = useState(false);
   const [biographyError, setBiographyError] = useState<string | null>(null);
   const [openingWebsiteId, setOpeningWebsiteId] = useState<string | null>(null);
+  const [lastOpenedByWebsiteId, setLastOpenedByWebsiteId] = useState<Record<string, string>>(
+    () => readBiographyLastOpened()
+  );
   
   // Custom dialog or modal states
   const [modalContent, setModalContent] = useState<{ title: string; desc: string } | null>(null);
@@ -333,6 +405,22 @@ export default function DIYDashboard() {
     return getTemplateByIdentifier(templateId)?.editPath || '';
   };
 
+  const recordBiographyOpened = (website: BiographyWebsite) => {
+    if (!website.id) {
+      return;
+    }
+
+    const openedAt = new Date().toISOString();
+    setLastOpenedByWebsiteId((currentHistory) => {
+      const nextHistory = {
+        ...currentHistory,
+        [website.id]: openedAt,
+      };
+      writeBiographyLastOpened(nextHistory);
+      return nextHistory;
+    });
+  };
+
   const handleOpenBiography = (website: BiographyWebsite) => {
     if (!website.id) {
       setModalContent({
@@ -353,6 +441,7 @@ export default function DIYDashboard() {
     }
 
     setOpeningWebsiteId(website.id);
+    recordBiographyOpened(website);
     openTemplatePage(editPath, { website });
     setOpeningWebsiteId(null);
   };
@@ -409,6 +498,22 @@ export default function DIYDashboard() {
   const continueDraftUrl = latestDraft?.id && latestDraftEditPath
     ? buildTemplatePageUrl(latestDraftEditPath, { website: latestDraft })
     : '';
+  const displayedBiographies = React.useMemo(() => {
+    return [...biographies].sort((firstWebsite, secondWebsite) => {
+      const firstActivityDate = Math.max(
+        getDateTime(firstWebsite.updatedAt),
+        getDateTime(firstWebsite.createdAt),
+        getDateTime(lastOpenedByWebsiteId[firstWebsite.id])
+      );
+      const secondActivityDate = Math.max(
+        getDateTime(secondWebsite.updatedAt),
+        getDateTime(secondWebsite.createdAt),
+        getDateTime(lastOpenedByWebsiteId[secondWebsite.id])
+      );
+
+      return secondActivityDate - firstActivityDate;
+    });
+  }, [biographies, lastOpenedByWebsiteId]);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-between font-sans selection:bg-amber-200">
@@ -511,6 +616,7 @@ export default function DIYDashboard() {
                 rel="noopener noreferrer"
                 onClick={() => {
                   if (latestDraft?.id) {
+                    recordBiographyOpened(latestDraft);
                     setOpeningWebsiteId(latestDraft.id);
                     window.setTimeout(() => setOpeningWebsiteId(null), 300);
                   }
@@ -569,13 +675,16 @@ export default function DIYDashboard() {
             <div className="rounded-xl border border-slate-100 bg-white px-5 py-5 text-sm text-slate-500 shadow-sm">
               Loading biographies...
             </div>
-          ) : biographies.length > 0 ? (
+          ) : displayedBiographies.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {biographies.map((website) => {
+              {displayedBiographies.map((website) => {
                 const isOpening = openingWebsiteId === website.id;
                 const websiteTemplate = getTemplateByIdentifier(website.templateId);
                 const editPath = website.id ? getEditorPath(website.templateId) : '';
                 const biographyUrl = editPath ? buildTemplatePageUrl(editPath, { website }) : '';
+                const lastEditedValue = website.updatedAt || website.createdAt;
+                const lastEditedLabel = website.updatedAt ? 'Last edited' : 'Created';
+                const lastOpenedValue = lastOpenedByWebsiteId[website.id];
                 const biographyCard = (
                   <>
                     <div className="flex items-start justify-between gap-4">
@@ -590,12 +699,32 @@ export default function DIYDashboard() {
                           {website.title}
                         </h3>
                         <p className="text-xs text-slate-500">
-                          {website.subjectType} · {website.subdomain || 'No subdomain yet'}
+                          {website.subjectType} - {website.subdomain || 'No subdomain yet'}
                         </p>
                       </div>
                       <span className="shrink-0 rounded-full bg-slate-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">
                         {isOpening ? 'Opening' : website.status}
                       </span>
+                    </div>
+                    <div className="mt-4 grid grid-cols-1 gap-2 border-t border-slate-100 pt-4 text-xs text-slate-500 sm:grid-cols-2">
+                      <span className="inline-flex items-center gap-2">
+                        <CalendarClock className="h-3.5 w-3.5 shrink-0 text-[#B18625]" />
+                        <span>
+                          <span className="font-semibold text-slate-700">{lastEditedLabel}:</span>{' '}
+                          {formatBiographyDateTime(lastEditedValue)}
+                        </span>
+                      </span>
+                      <span className="inline-flex items-center gap-2">
+                        <Clock3 className="h-3.5 w-3.5 shrink-0 text-[#B18625]" />
+                        <span>
+                          <span className="font-semibold text-slate-700">Last opened:</span>{' '}
+                          {lastOpenedValue ? formatBiographyDateTime(lastOpenedValue) : 'Not opened yet'}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                      <span>Open Editor</span>
+                      <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:text-[#B18625]" />
                     </div>
                   </>
                 );
@@ -608,6 +737,7 @@ export default function DIYDashboard() {
                     rel="noopener noreferrer"
                     onClick={() => {
                       if (website.id) {
+                        recordBiographyOpened(website);
                         setOpeningWebsiteId(website.id);
                         window.setTimeout(() => setOpeningWebsiteId(null), 300);
                       }

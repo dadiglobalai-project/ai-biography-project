@@ -78,6 +78,11 @@ export interface CustomizerSettings {
   theme: 'cream' | 'sage' | 'charcoal';
   fontPairing: 'classic' | 'modern' | 'editorial';
   spacing: 'spacious' | 'compact';
+  siteTitle?: string;
+  subjectType?: 'SELF' | 'PARENT' | 'GRANDPARENT' | 'CHILD' | 'SPOUSE' | 'LOVED_ONE';
+  showContactSection?: boolean;
+  showSocialLinks?: boolean;
+  allowContactMessages?: boolean;
 }
 
 export interface PersonalDetails {
@@ -115,6 +120,14 @@ export type EditableTemplateSection =
   | 'stories'
   | 'contact'
   | 'style';
+
+export type EditableImageSection = 'hero' | 'about' | 'timeline' | 'gallery' | 'stories';
+
+export interface EditableImageTarget {
+  section: EditableImageSection;
+  itemIndex?: number;
+  itemId?: string;
+}
 
 export type EditableSectionCopyKey = 'about' | 'timeline' | 'gallery' | 'stories' | 'contact';
 
