@@ -242,9 +242,12 @@ type AiWritingTarget = {
   onReplace: (value: string) => void;
 };
 
-type PersonalTextFieldKey = {
-  [K in keyof PersonalDetails]: PersonalDetails[K] extends string | undefined ? K : never;
-}[keyof PersonalDetails];
+type PersonalTextFieldKey = Extract<
+  {
+    [K in keyof PersonalDetails]-?: PersonalDetails[K] extends string | undefined ? K : never;
+  }[keyof PersonalDetails],
+  string
+>;
 
 const IMAGE_SIZE_OPTIONS = [
   { value: 'compact', label: 'Compact' },
@@ -800,6 +803,7 @@ export default function LifeJourneyEditPage() {
   const [aiWritingInstructions, setAiWritingInstructions] = useState('');
   const [aiWritingResult, setAiWritingResult] = useState('');
   const [aiWritingMessage, setAiWritingMessage] = useState('');
+  const [isGeneratingAiWriting, setIsGeneratingAiWriting] = useState(false);
   const [websiteSections, setWebsiteSections] = useState<BiographyWebsiteSection[]>([]);
   const [sectionLoadMessage, setSectionLoadMessage] = useState('');
   const [activeBackendSection, setActiveBackendSection] = useState<BiographyWebsiteSection | null>(null);
@@ -3577,7 +3581,7 @@ export default function LifeJourneyEditPage() {
     );
   };
 
-  const handleGenerateAiWriting = () => {
+  const handleGenerateAiWriting = async () => {
     const target = getSelectedAiWritingTarget();
 
     if (!target) {
@@ -3585,24 +3589,73 @@ export default function LifeJourneyEditPage() {
       return;
     }
 
-    if (!hasText(target.value) && aiWritingAction !== 'generate') {
+    const sourceText = stripRichText(target.value).trim();
+    const userInstruction = aiWritingInstructions.trim();
+
+    if (!sourceText && aiWritingAction !== 'generate') {
       setAiWritingTargetId(target.id);
       setAiWritingResult('');
       setAiWritingMessage('Add some text to this field first, then use Rewrite, Improve, or Expand');
       return;
     }
 
-    const suggestion = getAiWritingSuggestion(
-      target.value,
-      aiWritingAction,
-      aiWritingInstructions,
-      draft.personalDetails.fullName,
-      target.label
-    );
+    if (!sourceText && aiWritingAction === 'generate' && !userInstruction) {
+      setAiWritingTargetId(target.id);
+      setAiWritingResult('');
+      setAiWritingMessage('Add instructions or select text before using Generate');
+      return;
+    }
 
     setAiWritingTargetId(target.id);
-    setAiWritingResult(suggestion);
-    setAiWritingMessage('Suggestion generated. Review it before applying');
+    setAiWritingResult('');
+    setIsGeneratingAiWriting(true);
+
+    const fallbackSuggestion = () =>
+      getAiWritingSuggestion(
+        target.value,
+        aiWritingAction,
+        aiWritingInstructions,
+        draft.personalDetails.fullName,
+        target.label
+      );
+
+    try {
+      if (activeWebsiteId && !activeWebsiteId.startsWith('local-')) {
+        const payload = {
+          websiteId: activeWebsiteId,
+          sectionId: currentBackendSection?.id || null,
+          sourceText: sourceText || null,
+          userInstruction: userInstruction || null,
+          tone: 'WARM',
+          language: 'ENGLISH' as const,
+        };
+        const response =
+          aiWritingAction === 'rewrite'
+            ? await authService.rewriteAiWriting(payload)
+            : aiWritingAction === 'improve'
+              ? await authService.improveAiWriting(payload)
+              : aiWritingAction === 'expand'
+                ? await authService.expandAiWriting(payload)
+                : await authService.generateAiWriting(payload);
+
+        setAiWritingResult(response.generatedText);
+        setAiWritingMessage(
+          response.totalTokens
+            ? `AI suggestion generated from backend (${response.totalTokens} tokens). Review before applying`
+            : 'AI suggestion generated from backend. Review before applying'
+        );
+        return;
+      }
+
+      setAiWritingResult(fallbackSuggestion());
+      setAiWritingMessage('Local suggestion generated. Save this biography first to use backend AI writing.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'AI writing request failed';
+      setAiWritingResult(fallbackSuggestion());
+      setAiWritingMessage(`${message}. Local suggestion generated instead.`);
+    } finally {
+      setIsGeneratingAiWriting(false);
+    }
   };
 
   const handleApplyAiWriting = (mode: 'replace' | 'insert') => {
@@ -5350,6 +5403,14 @@ export default function LifeJourneyEditPage() {
     const targets = getAiWritingTargets();
     const selectedTarget = getSelectedAiWritingTarget();
     const selectedAction = AI_WRITING_ACTIONS.find((action) => action.value === aiWritingAction);
+    const selectedTargetHasText = selectedTarget ? hasText(selectedTarget.value) : false;
+    const hasAiWritingInstruction = hasText(aiWritingInstructions);
+    const canRequestAiWriting =
+      Boolean(selectedTarget) &&
+      !isGeneratingAiWriting &&
+      (aiWritingAction === 'generate'
+        ? selectedTargetHasText || hasAiWritingInstruction
+        : selectedTargetHasText);
 
     return (
       <section className={variant === 'mobile' ? 'bg-white' : 'flex h-full min-h-0 flex-col bg-white'}>
@@ -5487,12 +5548,12 @@ export default function LifeJourneyEditPage() {
 
           <button
             type="button"
-            onClick={handleGenerateAiWriting}
-            disabled={!selectedTarget || (aiWritingAction !== 'generate' && !hasText(selectedTarget.value))}
+            onClick={() => void handleGenerateAiWriting()}
+            disabled={!canRequestAiWriting}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <WandSparkles className="h-4 w-4" />
-            Create Suggestion
+            {isGeneratingAiWriting ? 'Generating' : 'Create Suggestion'}
           </button>
 
           {aiWritingMessage && (
@@ -5533,10 +5594,11 @@ export default function LifeJourneyEditPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleGenerateAiWriting}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
+                  onClick={() => void handleGenerateAiWriting()}
+                  disabled={!canRequestAiWriting}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Regenerate
+                  {isGeneratingAiWriting ? 'Generating' : 'Regenerate'}
                 </button>
                 <button
                   type="button"
@@ -5553,7 +5615,7 @@ export default function LifeJourneyEditPage() {
           )}
 
           <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
-            This is a local writing assistant for now. It can be connected to a real AI endpoint later without changing the editor workflow.
+            Saved biographies use the backend AI Writing endpoint. Unsaved local drafts use a local fallback.
           </p>
         </div>
       </section>

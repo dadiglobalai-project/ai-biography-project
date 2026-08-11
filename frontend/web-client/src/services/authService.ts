@@ -165,6 +165,36 @@ export interface BiographyMediaAsset {
   createdAt?: string;
 }
 
+export type AiWritingActionType = 'GENERATE' | 'REWRITE' | 'IMPROVE_GRAMMAR' | 'EXPAND';
+export type AiWritingLanguage = 'ENGLISH';
+
+export interface AiWritingBasePayload {
+  websiteId: string;
+  sectionId?: string | null;
+  sourceText?: string | null;
+  userInstruction?: string | null;
+  tone?: string | null;
+  language: AiWritingLanguage;
+}
+
+export interface AiWritingRequestPayload extends AiWritingBasePayload {
+  actionType: AiWritingActionType;
+}
+
+export interface AiWritingResponse {
+  requestId: string;
+  outputId: string;
+  actionType: AiWritingActionType | string;
+  generatedText: string;
+  language: string;
+  englishWordCount?: number;
+  chineseCharacterCount?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  createdAt?: string;
+}
+
 export interface UpdateSectionSettingsPayload {
   isVisible: boolean;
   sortOrder: number;
@@ -915,6 +945,65 @@ function getMediaAssetFromResponse(data: any) {
   return data?.mediaAsset || data?.asset || data?.data || data;
 }
 
+function getAiWritingFromResponse(data: any) {
+  return data?.aiWriting || data?.writing || data?.result || data?.output || data?.data || data;
+}
+
+function normalizeAiWritingResponse(data: any): AiWritingResponse {
+  return {
+    requestId: String(data?.requestId || ''),
+    outputId: String(data?.outputId || ''),
+    actionType: String(data?.actionType || ''),
+    generatedText: String(data?.generatedText || data?.text || data?.outputText || ''),
+    language: String(data?.language || 'ENGLISH'),
+    englishWordCount:
+      data?.englishWordCount == null ? undefined : getNumberFromData(data.englishWordCount),
+    chineseCharacterCount:
+      data?.chineseCharacterCount == null ? undefined : getNumberFromData(data.chineseCharacterCount),
+    inputTokens: data?.inputTokens == null ? undefined : getNumberFromData(data.inputTokens),
+    outputTokens: data?.outputTokens == null ? undefined : getNumberFromData(data.outputTokens),
+    totalTokens: data?.totalTokens == null ? undefined : getNumberFromData(data.totalTokens),
+    createdAt: typeof data?.createdAt === 'string' ? data.createdAt : undefined,
+  };
+}
+
+async function requestAiWriting(payload: AiWritingRequestPayload): Promise<AiWritingResponse> {
+  const response = await fetch(apiUrl('/api/ai-writing/generate'), {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      websiteId: payload.websiteId,
+      sectionId: payload.sectionId ?? null,
+      actionType: payload.actionType,
+      sourceText: payload.sourceText ?? null,
+      userInstruction: payload.userInstruction ?? null,
+      tone: payload.tone ?? null,
+      language: payload.language,
+    }),
+  });
+
+  const text = await response.text();
+  let data: any = null;
+
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = { message: text };
+  }
+
+  if (!response.ok) {
+    throw new Error(getMessage(data, 'Unable to generate AI writing'));
+  }
+
+  const aiWriting = normalizeAiWritingResponse(getAiWritingFromResponse(data));
+
+  if (!aiWriting.generatedText.trim()) {
+    throw new Error('AI writing endpoint returned empty text');
+  }
+
+  return aiWriting;
+}
+
 function getSessionFromJwt(token: string) {
   try {
     const [, payload] = token.split('.');
@@ -1184,6 +1273,26 @@ export const authService = {
     };
   },
 
+  async createAiWritingSuggestion(payload: AiWritingRequestPayload): Promise<AiWritingResponse> {
+    return requestAiWriting(payload);
+  },
+
+  async generateAiWriting(payload: AiWritingBasePayload): Promise<AiWritingResponse> {
+    return requestAiWriting({ ...payload, actionType: 'GENERATE' });
+  },
+
+  async rewriteAiWriting(payload: AiWritingBasePayload): Promise<AiWritingResponse> {
+    return requestAiWriting({ ...payload, actionType: 'REWRITE' });
+  },
+
+  async improveAiWriting(payload: AiWritingBasePayload): Promise<AiWritingResponse> {
+    return requestAiWriting({ ...payload, actionType: 'IMPROVE_GRAMMAR' });
+  },
+
+  async expandAiWriting(payload: AiWritingBasePayload): Promise<AiWritingResponse> {
+    return requestAiWriting({ ...payload, actionType: 'EXPAND' });
+  },
+
   async createBiographyWebsite(payload: CreateBiographyWebsitePayload): Promise<BiographyWebsite> {
     try {
       const response = await fetch(apiUrl('/api/websites'), {
@@ -1286,8 +1395,11 @@ export const authService = {
         throw new Error(getMessage(data, 'Unable to load biography sections'));
       }
 
-      return getSectionsFromResponse(data)
-        .map(normalizeBiographyWebsiteSection)
+      const sections: BiographyWebsiteSection[] = getSectionsFromResponse(data).map(
+        normalizeBiographyWebsiteSection
+      );
+
+      return sections
         .sort((a, b) => (a.sortOrder ?? a.order ?? 0) - (b.sortOrder ?? b.order ?? 0));
     } catch {
       return [];
@@ -1311,8 +1423,11 @@ export const authService = {
         throw new Error(getMessage(data, 'Unable to load contact messages'));
       }
 
-      return getContactMessagesFromResponse(data)
-        .map(normalizeBiographyContactMessage)
+      const messages: BiographyContactMessage[] = getContactMessagesFromResponse(data).map(
+        normalizeBiographyContactMessage
+      );
+
+      return messages
         .filter((message) => Boolean(message.id))
         .sort((a, b) => {
           const dateA = new Date(a.createdAt || 0).getTime();
@@ -1341,8 +1456,11 @@ export const authService = {
         throw new Error(getMessage(data, 'Unable to load media assets'));
       }
 
-      return getMediaAssetsFromResponse(data)
-        .map(normalizeBiographyMediaAsset)
+      const mediaAssets: BiographyMediaAsset[] = getMediaAssetsFromResponse(data).map(
+        normalizeBiographyMediaAsset
+      );
+
+      return mediaAssets
         .filter((mediaAsset) => Boolean(mediaAsset.mediaAssetId))
         .sort((a, b) => {
           const dateA = new Date(a.createdAt || 0).getTime();

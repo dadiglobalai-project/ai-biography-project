@@ -5,6 +5,7 @@ import {
   Sparkles, 
   Lightbulb, 
   Check, 
+  CheckCircle2,
   ArrowRight, 
   Plus, 
   LogOut, 
@@ -118,6 +119,7 @@ export default function DIYDashboard() {
   const [selectedRelation, setSelectedRelation] = useState<RelationType>('Loved One');
   const [hoveredTemplate, setHoveredTemplate] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [templateSelectionMessage, setTemplateSelectionMessage] = useState('');
   const [dashboardSummary, setDashboardSummary] = useState<DashboardResponse | null>(null);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [backendTemplates, setBackendTemplates] = useState<BiographyTemplate[]>([]);
@@ -237,6 +239,18 @@ export default function DIYDashboard() {
     };
   }, [loadBiographies]);
 
+  React.useEffect(() => {
+    if (!templateSelectionMessage) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setTemplateSelectionMessage('');
+    }, 3200);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [templateSelectionMessage]);
+
   const relations: RelationType[] = ['Myself', 'Parent', 'Grandparent', 'Child', 'Spouse', 'Loved One'];
 
   // Map each selected relation option to a recommended template
@@ -354,15 +368,9 @@ export default function DIYDashboard() {
     const matched = templates.find(t => t.id === recommended.id);
     if (matched) {
       setSelectedTemplateId(matched.id);
-      setModalContent({
-        title: `Recommended Template Applied!`,
-        desc: `The "${matched.title}" template has been successfully selected as recommended for your ${selectedRelation}.`
-      });
+      setTemplateSelectionMessage(`${matched.title} selected for ${selectedRelation}.`);
     } else {
-      setModalContent({
-        title: `Recommendation Applied`,
-        desc: `"${recommended.name}" has been chosen for your ${selectedRelation}. Let's begin crafting this legacy.`
-      });
+      setTemplateSelectionMessage(`${recommended.name} selected for ${selectedRelation}.`);
     }
   };
 
@@ -377,10 +385,7 @@ export default function DIYDashboard() {
 
   const handleSelectTemplate = (template: Template) => {
     setSelectedTemplateId(template.id);
-    setModalContent({
-      title: `Template Selected: ${template.title}`,
-      desc: `Excellent choice! You are starting the draft with the "${template.title}" aesthetic model. We are creating a secure archive space.`
-    });
+    setTemplateSelectionMessage(`${template.title} selected. You can now Preview or Edit.`);
   };
 
   const handlePreviewTemplate = (template: Template) => {
@@ -860,6 +865,13 @@ export default function DIYDashboard() {
               Start with a professionally designed template tailored to your life story.
             </p>
           </div>
+
+          {templateSelectionMessage && (
+            <div className="inline-flex max-w-full items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span className="truncate">{templateSelectionMessage}</span>
+            </div>
+          )}
 
           {/* Biography Templates Showcase Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
