@@ -9,8 +9,11 @@ import {
   ArrowRight, 
   Plus, 
   LogOut, 
+  ChevronDown,
   ChevronRight,
   BookOpen,
+  LayoutDashboard,
+  UserRound,
   PenTool,
   Eye,
   AlertCircle,
@@ -115,11 +118,14 @@ const formatBiographyDateTime = (value?: string) => {
 export default function DIYDashboard() {
   const navigate = useNavigate();
   const templateChooserRef = React.useRef<HTMLDivElement | null>(null);
+  const biographiesSectionRef = React.useRef<HTMLElement | null>(null);
+  const accountMenuRef = React.useRef<HTMLDivElement | null>(null);
   const [currentUser, setCurrentUser] = useState<{ fullName?: string; email: string } | null>(null);
   const [selectedRelation, setSelectedRelation] = useState<RelationType>('Loved One');
   const [hoveredTemplate, setHoveredTemplate] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [templateSelectionMessage, setTemplateSelectionMessage] = useState('');
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardResponse | null>(null);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [backendTemplates, setBackendTemplates] = useState<BiographyTemplate[]>([]);
@@ -251,6 +257,32 @@ export default function DIYDashboard() {
     return () => window.clearTimeout(timeoutId);
   }, [templateSelectionMessage]);
 
+  React.useEffect(() => {
+    if (!isAccountMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!accountMenuRef.current?.contains(event.target as Node)) {
+        setIsAccountMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsAccountMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isAccountMenuOpen]);
+
   const relations: RelationType[] = ['Myself', 'Parent', 'Grandparent', 'Child', 'Spouse', 'Loved One'];
 
   // Map each selected relation option to a recommended template
@@ -274,6 +306,7 @@ export default function DIYDashboard() {
 
   const recommended = getRecommendation(selectedRelation);
   const displayName = currentUser?.fullName || 'User';
+  const displayEmail = currentUser?.email || '';
   const selectedSubjectType = SUBJECT_TYPE_BY_RELATION[selectedRelation];
 
   const baseTemplates: Template[] = [
@@ -374,7 +407,33 @@ export default function DIYDashboard() {
     }
   };
 
+  const handleGoToDashboardTop = () => {
+    setIsAccountMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleGoToMyBiographies = () => {
+    setIsAccountMenuOpen(false);
+    biographiesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleGoToTemplates = () => {
+    setIsAccountMenuOpen(false);
+    templateChooserRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleStayOnDashboard = () => {
+    setIsAccountMenuOpen(false);
+    navigate('/diy-dashboard');
+  };
+
+  const handleOpenAccountSettings = () => {
+    setIsAccountMenuOpen(false);
+    navigate('/account-settings');
+  };
+
   const handleLogout = async () => {
+    setIsAccountMenuOpen(false);
     try {
       await authService.logout();
     } catch (err) {
@@ -535,42 +594,127 @@ export default function DIYDashboard() {
             <BrandLogo variant="mobile" className="w-full h-auto" />
           </div>
 
-          {/* Nav links containing ONLY DIY Dashboard link with bold active line */}
-          <nav className="hidden md:flex items-center space-x-8 text-sm font-medium">
-            <button 
-              onClick={() => navigate('/diy-dashboard')}
-              className="text-[#0A1128] font-bold border-b-2 border-[#FED362] pb-1 transition-all cursor-pointer"
+          {/* Dashboard Navigation */}
+          <nav className="hidden items-center gap-7 text-sm font-medium md:flex">
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="pb-1 text-slate-500 transition hover:text-[#0A1128]"
             >
-              DIY Dashboard
+              Home
+            </button>
+            <button
+              type="button"
+              onClick={handleGoToDashboardTop}
+              className="border-b-2 border-[#FED362] pb-1 font-bold text-[#0A1128] transition"
+            >
+              Dashboard
+            </button>
+            <button
+              type="button"
+              onClick={handleGoToMyBiographies}
+              className="pb-1 text-slate-500 transition hover:text-[#0A1128]"
+            >
+              My Biographies
+            </button>
+            <button
+              type="button"
+              onClick={handleGoToTemplates}
+              className="pb-1 text-slate-500 transition hover:text-[#0A1128]"
+            >
+              Templates
             </button>
           </nav>
 
-          {/* User Session Profile with Name & Avatar & Logout */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2.5">
-              <span className="font-sans text-sm font-bold text-[#0A1128]">
+          {/* User Account Menu */}
+          <div ref={accountMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setIsAccountMenuOpen((isOpen) => !isOpen)}
+              className="flex items-center gap-2.5 rounded-xl border border-transparent px-2 py-1.5 text-left transition hover:border-slate-200 hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-200"
+              aria-haspopup="menu"
+              aria-expanded={isAccountMenuOpen}
+            >
+              <span className="hidden max-w-[150px] truncate font-sans text-sm font-bold text-[#0A1128] sm:inline">
                 {displayName}
               </span>
-              <div className="relative w-8.5 h-8.5 rounded-full overflow-hidden border border-slate-200/80 shadow-sm bg-slate-100">
-                <img 
-                  src="https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=150" 
+              <div className="relative h-9 w-9 overflow-hidden rounded-full border border-slate-200/80 bg-slate-100 shadow-sm">
+                <img
+                  src="https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=150"
                   alt={`${displayName} profile`}
-                  className="w-full h-full object-cover"
+                  className="h-full w-full object-cover"
                   referrerPolicy="no-referrer"
                 />
               </div>
-            </div>
-
-            <div className="h-4 w-px bg-slate-200" />
-
-            <button 
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50/50 rounded-lg text-xs font-semibold transition-all cursor-pointer"
-              title="Sign Out"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Logout</span>
+              <ChevronDown
+                className={`hidden h-4 w-4 text-slate-500 transition sm:block ${
+                  isAccountMenuOpen ? 'rotate-180' : ''
+                }`}
+              />
             </button>
+
+            {isAccountMenuOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 top-[calc(100%+0.6rem)] z-50 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10"
+              >
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <p className="truncate text-sm font-bold text-[#0A1128]">{displayName}</p>
+                  {displayEmail && (
+                    <p className="mt-0.5 truncate text-xs text-slate-500">{displayEmail}</p>
+                  )}
+                </div>
+                <div className="p-2">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleOpenAccountSettings}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-[#0A1128]"
+                  >
+                    <UserRound className="h-4 w-4 text-slate-500" />
+                    Profile & Account Settings
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleStayOnDashboard}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-[#0A1128]"
+                  >
+                    <LayoutDashboard className="h-4 w-4 text-slate-500" />
+                    Dashboard
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleGoToMyBiographies}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-[#0A1128]"
+                  >
+                    <BookOpen className="h-4 w-4 text-slate-500" />
+                    My Biographies
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleGoToTemplates}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-[#0A1128]"
+                  >
+                    <PenTool className="h-4 w-4 text-slate-500" />
+                    Templates
+                  </button>
+                </div>
+                <div className="border-t border-slate-100 p-2">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>
@@ -649,7 +793,7 @@ export default function DIYDashboard() {
           </div>
         )}
 
-        <section className="space-y-4">
+        <section ref={biographiesSectionRef} className="scroll-mt-24 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
             <div className="space-y-1">
               <h2 className="font-serif-display text-2xl md:text-3xl font-semibold text-[#0A1128] tracking-tight">
