@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, PenTool } from 'lucide-react';
-import LifeJourneyTemplate from '../Templates/LifeJourney/LifeJourneyTemplate';
+import BiographyTemplateRenderer from '../Templates/BiographyTemplateRenderer';
 import { loadDraft, saveDraft } from '../Templates/LifeJourney/draftStorage';
 import { getBiographyTemplateRoute } from '../Templates/LifeJourney/templateRoutes';
 import {
@@ -131,7 +131,8 @@ export default function LifeJourneyPreviewPage() {
         </a>
       </div>
 
-      <LifeJourneyTemplate
+      <BiographyTemplateRenderer
+        templateId={templateRoute.id}
         categoryKey={templateRoute.categoryKey}
         dataOverride={previewDraft}
         websiteId={websiteId}

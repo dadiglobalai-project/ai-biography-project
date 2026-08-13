@@ -35,7 +35,7 @@ import {
   WandSparkles,
   X,
 } from 'lucide-react';
-import LifeJourneyTemplate from '../Templates/LifeJourney/LifeJourneyTemplate';
+import BiographyTemplateRenderer from '../Templates/BiographyTemplateRenderer';
 import {
   cloneTemplateData,
   loadDraft,
@@ -382,9 +382,15 @@ const editorSections: Array<{
   },
   {
     key: 'about',
-    label: 'About',
-    description: 'Biography, values, interests',
+    label: 'Chronicle & Values',
+    description: 'Biography summary and values',
     icon: BookOpen,
+  },
+  {
+    key: 'pursuits',
+    label: 'Specialized Pursuits',
+    description: 'Hobbies and interest cards',
+    icon: WandSparkles,
   },
   {
     key: 'timeline',
@@ -426,7 +432,7 @@ const sidebarSectionItems: Array<{
 }> = [
   { navKey: 'hero', section: 'hero', label: 'Hero', icon: Home },
   { navKey: 'chronicle', section: 'about', label: 'Chronicle & Values', icon: Sparkles },
-  { navKey: 'pursuits', section: 'about', label: 'Specialized Pursuits', icon: WandSparkles },
+  { navKey: 'pursuits', section: 'pursuits', label: 'Specialized Pursuits', icon: WandSparkles },
   { navKey: 'timeline', section: 'timeline', label: 'Life Journey', icon: Clock3 },
   { navKey: 'gallery', section: 'gallery', label: 'Media Gallery', icon: ImageIcon },
   { navKey: 'stories', section: 'stories', label: 'Memories & Stories', icon: FileText },
@@ -436,6 +442,7 @@ const sidebarSectionItems: Array<{
 const BACKEND_SECTION_ALIASES: Record<ContentEditorSection, string[]> = {
   hero: ['hero', 'hero section'],
   about: ['about', 'about section', 'chronicle', 'chronicle section', 'chronicle overview', 'archival essence'],
+  pursuits: ['pursuits', 'pursuit', 'specialized pursuits', 'hobbies', 'interests'],
   timeline: ['timeline', 'timeline section', 'life journey', 'life journey section'],
   gallery: ['gallery', 'gallery section'],
   stories: ['stories', 'story', 'memory', 'memories', 'memories stories', 'memories stories section'],
@@ -754,7 +761,7 @@ const getImageTargetLabel = (target: EditableImageTarget | null) => {
   switch (target.section) {
     case 'hero':
       return 'Hero profile image';
-    case 'about':
+    case 'pursuits':
       return target.itemIndex != null
         ? `Pursuit image ${target.itemIndex + 1}`
         : 'Pursuit image';
@@ -864,7 +871,15 @@ export default function LifeJourneyEditPage() {
     () => getBackendSectionByAliases(['pursuits', 'pursuit', 'specialized pursuits'], websiteSections),
     [websiteSections]
   );
-  const currentBackendSection = activeBackendSection || matchingBackendSection;
+  const activeBackendSectionMatchesEditor = Boolean(
+    activeBackendSection &&
+      activeEditorSection &&
+      activeEditorSection !== 'style' &&
+      getBackendSectionForEditorSection(activeEditorSection, [activeBackendSection])?.id === activeBackendSection.id
+  );
+  const currentBackendSection = activeBackendSectionMatchesEditor
+    ? activeBackendSection
+    : matchingBackendSection;
   const publishChecklistItems = React.useMemo<PublishChecklistItem[]>(() => {
     const sectionCopy = getSectionCopy(draft.sectionCopy);
     const showContactSection = draft.settings.showContactSection !== false;
@@ -1170,7 +1185,7 @@ export default function LifeJourneyEditPage() {
         : '';
     const fallbackSection: EditableImageTarget['section'] =
       activeEditorSection === 'hero' ||
-      activeEditorSection === 'about' ||
+      activeEditorSection === 'pursuits' ||
       activeEditorSection === 'timeline' ||
       activeEditorSection === 'gallery' ||
       activeEditorSection === 'stories'
@@ -1195,7 +1210,7 @@ export default function LifeJourneyEditPage() {
         };
       }
 
-      if (targetSection === 'about' && currentDraft.hobbies.length > 0) {
+      if (targetSection === 'pursuits' && currentDraft.hobbies.length > 0) {
         return {
           ...currentDraft,
           hobbies: currentDraft.hobbies.map((hobby, index) =>
@@ -3517,6 +3532,13 @@ export default function LifeJourneyEditPage() {
         value: draft.personalDetails.signatureQuote,
         onReplace: (value) => updatePersonalDetail('signatureQuote', value),
       },
+      ...draft.hobbies.map((item, index) => ({
+        id: `pursuits.${item.id}.description`,
+        label: `Specialized Pursuits - Interest ${index + 1} description`,
+        section: 'pursuits' as EditableTemplateSection,
+        value: item.description,
+        onReplace: (value: string) => updateHobbyItem(index, 'description', value),
+      })),
       {
         id: 'timeline.description',
         label: 'Life Journey - Section description',
@@ -4108,8 +4130,13 @@ export default function LifeJourneyEditPage() {
                 </div>
               ))}
             </div>
+          </div>
+        );
 
-            <div className="space-y-3 border-t border-slate-100 pt-5">
+      case 'pursuits':
+        return (
+          <div className="space-y-6">
+            <div className="space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700">
                 Hobbies / Interests
               </h3>
@@ -4118,19 +4145,19 @@ export default function LifeJourneyEditPage() {
                   {renderTextField({
                     label: `Interest ${index + 1} title`,
                     value: item.title,
-                    section: 'about',
+                    section: 'pursuits',
                     onChange: (value) => updateHobbyItem(index, 'title', value),
                   })}
                   {renderTextField({
                     label: `Interest ${index + 1} description`,
                     value: item.description,
                     multiline: true,
-                    section: 'about',
+                    section: 'pursuits',
                     onChange: (value) => updateHobbyItem(index, 'description', value),
                   })}
                   {renderTextDisplayFields({
                     title: `Interest ${index + 1} Text`,
-                    section: 'about',
+                    section: 'pursuits',
                     settings: item.textSettings,
                     onChange: (textSettings) => updateHobbyItem(index, 'textSettings', textSettings),
                   })}
@@ -4139,12 +4166,12 @@ export default function LifeJourneyEditPage() {
                     value: item.imageUrl,
                     assetId: item.imageAssetId,
                     usageType: 'PURSUIT',
-                    section: 'about',
+                    section: 'pursuits',
                     onChange: (value) => updateHobbyItem(index, 'imageUrl', value),
                     onAssetChange: (assetId) => updateHobbyItem(index, 'imageAssetId', assetId),
                   })}
                   {renderImageDisplayFields({
-                    section: 'about',
+                    section: 'pursuits',
                     settings: item.imageSettings,
                     onChange: (imageSettings) => updateHobbyItem(index, 'imageSettings', imageSettings),
                   })}
@@ -4838,6 +4865,23 @@ export default function LifeJourneyEditPage() {
                   </button>
                 )}
 
+                {activeEditorSection === 'pursuits' && (
+                  <button
+                    type="button"
+                    onClick={handleUpdatePursuitsSection}
+                    disabled={
+                      isUpdatingPursuitsSection ||
+                      isUpdatingSectionSettings ||
+                      isDeletingSection ||
+                      isCreatingPursuitsSection
+                    }
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-black px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    {isUpdatingPursuitsSection ? 'Updating Pursuits' : 'Update Pursuits Content'}
+                  </button>
+                )}
+
                 {activeEditorSection === 'timeline' && (
                   <button
                     type="button"
@@ -5098,30 +5142,7 @@ export default function LifeJourneyEditPage() {
               </div>
             )}
 
-            {activeEditorSection === 'about' && pursuitsBackendSection && (
-              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-600">
-                <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
-                  Backend Pursuits Section
-                </p>
-                <p className="mt-1 font-semibold text-slate-800">
-                  Loaded {pursuitsBackendSection.title}
-                </p>
-                <p className="mt-1">
-                  <span className="font-semibold">Section ID:</span> {pursuitsBackendSection.id}
-                </p>
-                <button
-                  type="button"
-                  onClick={handleUpdatePursuitsSection}
-                  disabled={isUpdatingPursuitsSection || isCreatingPursuitsSection}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-black px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  {isUpdatingPursuitsSection ? 'Updating Pursuits' : 'Update Pursuits Content'}
-                </button>
-              </div>
-            )}
-
-            {activeEditorSection === 'about' && !pursuitsBackendSection && (
+            {activeEditorSection === 'pursuits' && !currentBackendSection && (
               <div className="space-y-3 rounded-xl border border-[#FED362]/70 bg-[#FFF7DC] px-3 py-3 text-xs text-slate-700">
                 <div>
                   <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#B18625]">
@@ -5245,7 +5266,7 @@ export default function LifeJourneyEditPage() {
               No Section Selected
             </h3>
             <p className="mt-1 text-xs leading-relaxed text-slate-500">
-              Click the Hero, About, Life Journey, Gallery, Stories, or Contact area in the live preview.
+              Click the Hero, Chronicle, Pursuits, Life Journey, Gallery, Stories, or Contact area in the live preview.
             </p>
           </div>
         )}
@@ -5273,7 +5294,7 @@ export default function LifeJourneyEditPage() {
             const Icon = item.icon;
             const isActive = activeSidebarItem
               ? activeSidebarItem === item.navKey
-              : activeEditorSection === item.section && item.navKey !== 'pursuits';
+              : activeEditorSection === item.section;
 
             return (
               <button
@@ -6389,7 +6410,8 @@ export default function LifeJourneyEditPage() {
           {previewViewport !== 'desktop' ? (
             <div className="flex justify-center rounded-2xl border border-slate-200 bg-slate-200 px-3 py-6 shadow-sm sm:px-6 lg:px-8">
               <DevicePreviewFrame iframeRef={devicePreviewFrameRef} viewport={previewViewport}>
-                <LifeJourneyTemplate
+                <BiographyTemplateRenderer
+                  templateId={templateRoute.id}
                   categoryKey={templateRoute.categoryKey}
                   dataOverride={draft}
                   activeEditSection={isEditingMode ? activeEditorSection : null}
@@ -6402,7 +6424,8 @@ export default function LifeJourneyEditPage() {
             </div>
           ) : (
             <div className="mx-auto max-w-[1060px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <LifeJourneyTemplate
+              <BiographyTemplateRenderer
+                templateId={templateRoute.id}
                 categoryKey={templateRoute.categoryKey}
                 dataOverride={draft}
                 activeEditSection={isEditingMode ? activeEditorSection : null}

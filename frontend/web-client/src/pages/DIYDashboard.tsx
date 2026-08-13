@@ -339,6 +339,16 @@ export default function DIYDashboard() {
       tag: 'Professional',
       previewPath: '/diy-dashboard/templates/entrepreneur-story/preview',
       editPath: '/diy-dashboard/templates/entrepreneur-story/edit'
+    },
+    {
+      id: 'legacy-heritage',
+      title: 'Legacy & Heritage',
+      subtitle: 'Preserve a family archive',
+      description: 'A warm scrapbook-style template for family legacies, heirloom memories, letters, and heritage stories.',
+      imageUrl: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&q=80&w=800',
+      tag: 'Heritage',
+      previewPath: '/diy-dashboard/templates/legacy-heritage/preview',
+      editPath: '/diy-dashboard/templates/legacy-heritage/edit'
     }
   ];
 

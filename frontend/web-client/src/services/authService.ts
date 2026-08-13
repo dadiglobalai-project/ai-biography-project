@@ -195,6 +195,13 @@ export interface AiWritingResponse {
   createdAt?: string;
 }
 
+const AI_WRITING_ENDPOINTS: Record<AiWritingActionType, string> = {
+  GENERATE: '/api/ai-writing/generate',
+  REWRITE: '/api/ai-writing/rewrite',
+  IMPROVE_GRAMMAR: '/api/ai-writing/improve',
+  EXPAND: '/api/ai-writing/expand',
+};
+
 export interface UpdateSectionSettingsPayload {
   isVisible: boolean;
   sortOrder: number;
@@ -968,7 +975,7 @@ function normalizeAiWritingResponse(data: any): AiWritingResponse {
 }
 
 async function requestAiWriting(payload: AiWritingRequestPayload): Promise<AiWritingResponse> {
-  const response = await fetch(apiUrl('/api/ai-writing/generate'), {
+  const response = await fetch(apiUrl(AI_WRITING_ENDPOINTS[payload.actionType]), {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({
@@ -992,7 +999,7 @@ async function requestAiWriting(payload: AiWritingRequestPayload): Promise<AiWri
   }
 
   if (!response.ok) {
-    throw new Error(getMessage(data, 'Unable to generate AI writing'));
+    throw new Error(getMessage(data, 'Unable to process AI writing request'));
   }
 
   const aiWriting = normalizeAiWritingResponse(getAiWritingFromResponse(data));

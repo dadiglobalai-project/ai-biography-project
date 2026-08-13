@@ -13,6 +13,15 @@
   --color-legacy-navy-light: #1C2541;
   --color-legacy-navy-dark: #020817;
   --color-legacy-paper: #FDFBF7;
+
+  --font-script: "Cormorant Garamond", "Brush Script MT", cursive;
+
+  --color-artistic-bg: #eee4d3;
+  --color-artistic-panel: #dfc8a4;
+  --color-artistic-light: #fff9ed;
+  --color-artistic-dark: #3a2419;
+  --color-artistic-text: #2d2118;
+  --color-artistic-gold: #b98a38;
 }
 
 /* Custom animation for subtle ambient pulse */
@@ -29,5 +38,86 @@
 
 .animate-ambient-pulse {
   animation: ambient-pulse 8s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 220ms ease-out both;
+}
+
+.artistic-radial-bg {
+  background-image:
+    radial-gradient(circle at 18% 12%, rgba(185, 138, 56, 0.16), transparent 28rem),
+    radial-gradient(circle at 82% 18%, rgba(58, 36, 25, 0.14), transparent 24rem),
+    linear-gradient(180deg, #eee4d3 0%, #e7dac5 100%);
+}
+
+.paper-grain {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.14)),
+    radial-gradient(circle at 20% 20%, rgba(58, 36, 25, 0.05) 0 1px, transparent 1px),
+    radial-gradient(circle at 70% 30%, rgba(185, 138, 56, 0.06) 0 1px, transparent 1px);
+  background-size: auto, 18px 18px, 24px 24px;
+}
+
+.vintage-double-border {
+  box-shadow:
+    inset 0 0 0 1px rgba(185, 138, 56, 0.32),
+    inset 0 0 0 8px rgba(255, 249, 237, 0.72),
+    0 24px 70px rgba(45, 33, 24, 0.22);
+}
+
+.vintage-photo-sepia {
+  filter: sepia(0.26) contrast(1.08) saturate(0.86);
+}
+
+.photo-corner-tl,
+.photo-corner-tr,
+.photo-corner-bl,
+.photo-corner-br {
+  position: absolute;
+  z-index: 10;
+  width: 2rem;
+  height: 2rem;
+  pointer-events: none;
+  border-color: rgba(58, 36, 25, 0.38);
+}
+
+.photo-corner-tl {
+  top: 0.35rem;
+  left: 0.35rem;
+  border-top-width: 3px;
+  border-left-width: 3px;
+}
+
+.photo-corner-tr {
+  top: 0.35rem;
+  right: 0.35rem;
+  border-top-width: 3px;
+  border-right-width: 3px;
+}
+
+.photo-corner-bl {
+  bottom: 0.35rem;
+  left: 0.35rem;
+  border-bottom-width: 3px;
+  border-left-width: 3px;
+}
+
+.photo-corner-br {
+  right: 0.35rem;
+  bottom: 0.35rem;
+  border-right-width: 3px;
+  border-bottom-width: 3px;
 }
 
