@@ -1300,7 +1300,14 @@ export default function LifeJourneyTemplate({
 
           </div>
 
-          {/* Specialized Pursuits - Displayed below in a gorgeous full-width row */}
+        </section>
+
+        {/* Specialized Pursuits - Displayed below in a gorgeous full-width row */}
+        <section
+          className={`space-y-6 ${getEditHighlightClass('pursuits')}`}
+          id="pursuits-section"
+          {...getSectionInteractionProps('pursuits')}
+        >
           <div className={`rounded-3xl border p-8 md:p-10 text-left space-y-6 ${theme.card}`}>
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
@@ -1325,19 +1332,19 @@ export default function LifeJourneyTemplate({
                     <div className="absolute top-3 left-3 bg-stone-900/85 backdrop-blur-xs w-6 h-6 rounded-md flex items-center justify-center text-amber-100 border border-stone-800 shadow-xs">
                       {renderIcon(hob.icon, "w-3.5 h-3.5 text-amber-400")}
                     </div>
-                    {renderChangePictureButton({ section: 'about', itemIndex: index, itemId: hob.id })}
+                    {renderChangePictureButton({ section: 'pursuits', itemIndex: index, itemId: hob.id })}
                   </div>
                   {renderEditableText({
                     as: 'h5',
                     value: hob.title,
-                    section: 'about',
+                    section: 'pursuits',
                     className: `font-serif text-xs font-black pt-1 transition-colors ${theme.textPrimary}`,
                     onChange: (value) => updateHobbyItem(index, 'title', value),
                   })}
                   {renderEditableText({
                     as: 'p',
                     value: hob.description,
-                    section: 'about',
+                    section: 'pursuits',
                     multiline: true,
                     className: `font-sans ${getTextSizeClass('cardDescription', hob.textSettings)} ${theme.textMuted} leading-relaxed line-clamp-3`,
                     onChange: (value) => updateHobbyItem(index, 'description', value),

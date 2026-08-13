@@ -115,13 +115,14 @@ export interface PersonalDetails {
 export type EditableTemplateSection =
   | 'hero'
   | 'about'
+  | 'pursuits'
   | 'timeline'
   | 'gallery'
   | 'stories'
   | 'contact'
   | 'style';
 
-export type EditableImageSection = 'hero' | 'about' | 'timeline' | 'gallery' | 'stories';
+export type EditableImageSection = 'hero' | 'pursuits' | 'timeline' | 'gallery' | 'stories';
 
 export interface EditableImageTarget {
   section: EditableImageSection;

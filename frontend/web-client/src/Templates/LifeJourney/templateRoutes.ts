@@ -22,6 +22,11 @@ export const BIOGRAPHY_TEMPLATE_ROUTES: Record<string, BiographyTemplateRoute> =
     id: 'entrepreneur-story',
     title: 'Entrepreneur Story',
   },
+  'legacy-heritage': {
+    categoryKey: 'life',
+    id: 'legacy-heritage',
+    title: 'Legacy & Heritage',
+  },
 };
 
 export function getBiographyTemplateRoute(templateId?: string) {
