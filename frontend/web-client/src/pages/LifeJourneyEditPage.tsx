@@ -4549,7 +4549,7 @@ export default function LifeJourneyEditPage() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<string | null> => {
     saveDraft(templateRoute.id, draft, activeWebsiteId);
 
     setIsSaving(true);
@@ -4563,12 +4563,12 @@ export default function LifeJourneyEditPage() {
           saveDraft(templateRoute.id, draft, activeWebsiteId);
           notifyBiographyListChanged();
           setSaveMessage('Saved to database and My Biographies');
-          return;
+          return activeWebsiteId;
         }
 
         notifyBiographyListChanged();
         setSaveMessage('Saved locally. Biography is in My Biographies');
-        return;
+        return activeWebsiteId;
       }
 
       const savedWebsite = await authService.createBiographyWebsite({
@@ -4594,8 +4594,10 @@ export default function LifeJourneyEditPage() {
           ? 'Saved locally. Biography is in My Biographies'
           : 'Saved to database and My Biographies'
       );
+      return savedWebsite.id;
     } catch (err: any) {
       setSaveMessage(err?.message || 'Saved locally, but My Biographies was not updated');
+      return null;
     } finally {
       setIsSaving(false);
     }
@@ -4605,14 +4607,32 @@ export default function LifeJourneyEditPage() {
     setIsPublishChecklistOpen(true);
   };
 
-  const handleSaveReadyDraft = async () => {
+  const handleProceedToPayment = async () => {
     if (!isPublishReady) {
       return;
     }
 
-    await handleSave();
+    const savedWebsiteId = await handleSave();
+    const paymentWebsiteId = savedWebsiteId || activeWebsiteId || website?.id || '';
+    const editorUrl = new URL(`/diy-dashboard/templates/${templateRoute.id}/edit`, window.location.origin);
+    const paymentUrl = new URL('/payment', window.location.origin);
+
+    if (paymentWebsiteId) {
+      editorUrl.searchParams.set('websiteId', paymentWebsiteId);
+      paymentUrl.searchParams.set('websiteId', paymentWebsiteId);
+    }
+
+    if (backendTemplateId) {
+      editorUrl.searchParams.set('apiTemplateId', backendTemplateId);
+    }
+
+    paymentUrl.searchParams.set('templateId', templateRoute.id);
+    paymentUrl.searchParams.set('title', getBiographyTitle(draft, templateRoute.title));
+    paymentUrl.searchParams.set('returnTo', `${editorUrl.pathname}${editorUrl.search}`);
+
     setIsPublishChecklistOpen(false);
-    setSaveMessage('Publish checklist passed. Draft saved for publish review');
+    setSaveMessage('Draft saved. Continue payment to publish');
+    navigate(`${paymentUrl.pathname}${paymentUrl.search}`);
   };
 
   const handleReset = () => {
@@ -6144,7 +6164,7 @@ export default function LifeJourneyEditPage() {
             {renderPublishChecklistGroup('Recommended Polish', recommendedPublishItems)}
 
             <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
-              Backend publish endpoint is not available yet. When the checklist passes, this button saves the draft as ready for publish review.
+              Publishing starts after payment. When the checklist passes, continue to checkout so the draft can be prepared for launch.
             </p>
           </div>
 
@@ -6167,12 +6187,12 @@ export default function LifeJourneyEditPage() {
             </button>
             <button
               type="button"
-              onClick={() => void handleSaveReadyDraft()}
+              onClick={() => void handleProceedToPayment()}
               disabled={!isPublishReady || isSaving}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Globe2 className="h-4 w-4" />
-              Save Ready Draft
+              Proceed to Payment
             </button>
           </div>
         </section>

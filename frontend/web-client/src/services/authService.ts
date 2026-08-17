@@ -63,6 +63,7 @@ export interface AuthResponse {
   user?: {
     fullName?: string;
     email: string;
+    profilePhoto?: string | null;
   };
 }
 
@@ -1246,6 +1247,12 @@ export const authService = {
     const tokenSession = token ? getSessionFromJwt(token) : null;
     const email = getEmailFromData(data) || tokenSession?.email || '';
     const fullName = getFullNameFromData(data) || tokenSession?.fullName || getKnownFullName(email);
+    const profilePhoto =
+      typeof data?.user?.profilePhoto === 'string' && data.user.profilePhoto.trim()
+        ? data.user.profilePhoto.trim()
+        : typeof data?.profilePhoto === 'string' && data.profilePhoto.trim()
+          ? data.profilePhoto.trim()
+          : null;
 
     const serviceType =
       normalizeServiceType(data.serviceType) ||
@@ -1258,7 +1265,7 @@ export const authService = {
     return {
       success: true,
       message: data.message,
-      user: email ? { fullName, email } : undefined,
+      user: email ? { fullName, email, profilePhoto } : undefined,
       serviceType,
       onboardingStatus: data.onboardingStatus,
       statistics: data.statistics
