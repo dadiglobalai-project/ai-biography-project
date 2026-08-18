@@ -637,93 +637,6 @@ const hasText = (value?: string) => stripRichText(value).length > 0;
 const hasValidEmail = (value?: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((value || '').trim());
 
-const sentenceCase = (value: string) => {
-  const trimmedValue = value.trim();
-  return trimmedValue ? trimmedValue.charAt(0).toUpperCase() + trimmedValue.slice(1) : '';
-};
-
-const ensureSentenceEnding = (value: string) =>
-  /[.!?]$/.test(value.trim()) ? value.trim() : `${value.trim()}.`;
-
-const lowercaseFirst = (value: string) => {
-  const trimmedValue = value.trim();
-  return trimmedValue ? trimmedValue.charAt(0).toLowerCase() + trimmedValue.slice(1) : '';
-};
-
-const getAiStarterDraft = (subjectName: string, targetLabel: string) => {
-  const subject = subjectName.trim() || 'this life story';
-  const normalizedLabel = targetLabel.toLowerCase();
-
-  if (normalizedLabel.includes('full name')) {
-    return subjectName.trim() || 'Full Name';
-  }
-
-  if (normalizedLabel.includes('tagline')) {
-    return 'A life shaped by meaningful memories, steady growth, and a legacy worth preserving.';
-  }
-
-  if (normalizedLabel.includes('story') && normalizedLabel.includes('title')) {
-    return 'A Chapter Worth Remembering';
-  }
-
-  if (normalizedLabel.includes('title')) {
-    return 'A Meaningful Chapter';
-  }
-
-  if (normalizedLabel.includes('section description') || normalizedLabel.includes('summary')) {
-    return `A thoughtful look at the memories, values, and moments that shaped ${subject}'s journey.`;
-  }
-
-  return `This part of the biography shares the experiences, values, and memories that shaped ${subject}'s story.`;
-};
-
-const getAiWritingSuggestion = (
-  value: string,
-  action: AiWritingAction,
-  instructions: string,
-  subjectName: string,
-  targetLabel: string
-) => {
-  const cleanValue = sentenceCase(stripRichText(value));
-  const instructionText = instructions.trim();
-
-  const withInstruction = (text: string) =>
-    instructionText
-      ? `${text}\n\nAdditional direction applied: ${instructionText}`
-      : text;
-
-  if (!cleanValue) {
-    return withInstruction(getAiStarterDraft(subjectName, targetLabel));
-  }
-
-  if (action === 'generate') {
-    return withInstruction(
-      `${ensureSentenceEnding(cleanValue)} This can introduce the story with warmth, context, and a clear sense of legacy.`
-    );
-  }
-
-  if (action === 'rewrite') {
-    return withInstruction(
-      `In this chapter, ${lowercaseFirst(ensureSentenceEnding(cleanValue))}`
-    );
-  }
-
-  if (action === 'expand') {
-    return withInstruction(
-      `${ensureSentenceEnding(cleanValue)} This detail adds depth to the biography by connecting the moment to the values, relationships, and memories that shaped ${subjectName || 'this life story'}.`
-    );
-  }
-
-  return withInstruction(
-    ensureSentenceEnding(
-      cleanValue
-        .replace(/\s+/g, ' ')
-        .replace(/\s+([,.!?])/g, '$1')
-        .trim()
-    )
-  );
-};
-
 const getMediaLibraryStorageKey = (websiteId: string) =>
   `xinghuoji.website.${websiteId}.mediaLibrary`;
 
@@ -3630,51 +3543,42 @@ export default function LifeJourneyEditPage() {
 
     setAiWritingTargetId(target.id);
     setAiWritingResult('');
+
+    if (!activeWebsiteId || activeWebsiteId.startsWith('local-')) {
+      setAiWritingMessage('Save this biography to My Biographies before using backend AI writing.');
+      return;
+    }
+
     setIsGeneratingAiWriting(true);
 
-    const fallbackSuggestion = () =>
-      getAiWritingSuggestion(
-        target.value,
-        aiWritingAction,
-        aiWritingInstructions,
-        draft.personalDetails.fullName,
-        target.label
-      );
-
     try {
-      if (activeWebsiteId && !activeWebsiteId.startsWith('local-')) {
-        const payload = {
-          websiteId: activeWebsiteId,
-          sectionId: currentBackendSection?.id || null,
-          sourceText: sourceText || null,
-          userInstruction: userInstruction || null,
-          tone: 'WARM',
-          language: 'ENGLISH' as const,
-        };
-        const response =
-          aiWritingAction === 'rewrite'
-            ? await authService.rewriteAiWriting(payload)
-            : aiWritingAction === 'improve'
-              ? await authService.improveAiWriting(payload)
-              : aiWritingAction === 'expand'
-                ? await authService.expandAiWriting(payload)
-                : await authService.generateAiWriting(payload);
+      const payload = {
+        websiteId: activeWebsiteId,
+        sectionId: currentBackendSection?.id || null,
+        sourceText: sourceText || null,
+        userInstruction: userInstruction || null,
+        tone: 'WARM',
+        language: 'ENGLISH' as const,
+      };
+      const response =
+        aiWritingAction === 'rewrite'
+          ? await authService.rewriteAiWriting(payload)
+          : aiWritingAction === 'improve'
+            ? await authService.improveAiWriting(payload)
+            : aiWritingAction === 'expand'
+              ? await authService.expandAiWriting(payload)
+              : await authService.generateAiWriting(payload);
 
-        setAiWritingResult(response.generatedText);
-        setAiWritingMessage(
-          response.totalTokens
-            ? `AI suggestion generated from backend (${response.totalTokens} tokens). Review before applying`
-            : 'AI suggestion generated from backend. Review before applying'
-        );
-        return;
-      }
-
-      setAiWritingResult(fallbackSuggestion());
-      setAiWritingMessage('Local suggestion generated. Save this biography first to use backend AI writing.');
+      setAiWritingResult(response.generatedText);
+      setAiWritingMessage(
+        response.totalTokens
+          ? `AI suggestion generated from backend (${response.totalTokens} tokens). Review before applying`
+          : 'AI suggestion generated from backend. Review before applying'
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'AI writing request failed';
-      setAiWritingResult(fallbackSuggestion());
-      setAiWritingMessage(`${message}. Local suggestion generated instead.`);
+      setAiWritingResult('');
+      setAiWritingMessage(`${message}. No suggestion was generated.`);
     } finally {
       setIsGeneratingAiWriting(false);
     }
