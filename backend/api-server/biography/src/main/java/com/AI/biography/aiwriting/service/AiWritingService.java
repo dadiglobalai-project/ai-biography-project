@@ -37,12 +37,17 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Service
 public class AiWritingService {
     private static final Logger LOGGER = LoggerFactory.getLogger(AiWritingService.class);
     private static final String DEEPSEEK_PROVIDER = "DEEPSEEK";
+    private static final Pattern FORBIDDEN_META_LINE = Pattern.compile(
+            "(?i)(Additional direction applied:|This can introduce\\b|This detail adds depth\\b|In this chapter\\b)"
+    );
 
     private final AiWritingRequestRepository requestRepository;
     private final AiWritingOutputRepository outputRepository;
@@ -104,7 +109,10 @@ public class AiWritingService {
             aiRequest = requestRepository.save(aiRequest);
 
             String prompt = promptBuilder.buildPrompt(request);
-            DeepSeekResult result = deepSeekClient.createChatCompletion(List.of(new DeepSeekMessage("user", prompt)));
+            DeepSeekResult result = deepSeekClient.createChatCompletion(List.of(
+                    new DeepSeekMessage("system", AiWritingPromptBuilder.SYSTEM_PROMPT),
+                    new DeepSeekMessage("user", prompt)
+            ));
             String generatedText = requireGeneratedText(result);
             AiWritingUsageCounter.UsageCount usage = usageCounter.count(generatedText);
 
@@ -217,7 +225,19 @@ public class AiWritingService {
         if (result == null || !StringUtils.hasText(result.generatedText())) {
             throw new DeepSeekApiException("DeepSeek returned empty generated content");
         }
-        return result.generatedText().trim();
+        String generatedText = removeForbiddenMetaLines(result.generatedText());
+        if (!StringUtils.hasText(generatedText)) {
+            throw new DeepSeekApiException("DeepSeek returned empty generated content");
+        }
+        return generatedText;
+    }
+
+    private String removeForbiddenMetaLines(String generatedText) {
+        return Arrays.stream(generatedText.strip().split("\\R"))
+                .filter(line -> !FORBIDDEN_META_LINE.matcher(line).find())
+                .reduce((first, second) -> first + System.lineSeparator() + second)
+                .orElse("")
+                .trim();
     }
 
     private AiWritingOutput createOutput(AiWritingRequest aiRequest,

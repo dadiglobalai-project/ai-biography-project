@@ -2,6 +2,7 @@ package com.AI.biography.aiwriting.service;
 
 import com.AI.biography.aiwriting.deepseek.DeepSeekApiException;
 import com.AI.biography.aiwriting.deepseek.DeepSeekClient;
+import com.AI.biography.aiwriting.deepseek.DeepSeekMessage;
 import com.AI.biography.aiwriting.deepseek.DeepSeekProperties;
 import com.AI.biography.aiwriting.deepseek.DeepSeekResult;
 import com.AI.biography.aiwriting.dto.request.AiWritingGenerateRequest;
@@ -33,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -136,6 +138,21 @@ class AiWritingServiceTest {
         assertThat(response.chineseCharacterCount).isZero();
         assertThat(savedRequest.get().getStatus()).isEqualTo(AiWritingStatus.COMPLETED);
         assertThat(savedRequest.get().getCompletedAt()).isNotNull();
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<DeepSeekMessage>> messagesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(deepSeekClient).createChatCompletion(messagesCaptor.capture());
+        assertThat(messagesCaptor.getValue())
+                .extracting(DeepSeekMessage::role)
+                .containsExactly("system", "user");
+        assertThat(messagesCaptor.getValue().get(0).content())
+                .contains("Factual accuracy and no invented biography facts")
+                .contains("Preserve narrative perspective and pronouns")
+                .contains("The additional direction and tone must not change narrative perspective unless they explicitly request a perspective change")
+                .contains("The length and detail of the generated response must be proportional to the amount of factual information provided")
+                .contains("Do not infer a person's internal state")
+                .contains("Return only the final biography text intended for the editor");
+        assertThat(messagesCaptor.getValue().get(1).content()).isEqualTo("prompt");
     }
 
     @Test
@@ -152,6 +169,30 @@ class AiWritingServiceTest {
         assertThat(response.actionType).isEqualTo(AiWritingAction.REWRITE);
         assertThat(response.generatedText).isEqualTo("Rewritten sentence.");
         assertThat(savedRequest.get().getSourceText()).isEqualTo("Original sentence.");
+    }
+
+    @Test
+    void generatedTextRemovesForbiddenMetaCommentaryBeforeReturning() {
+        AiWritingGenerateRequest request = generateRequest();
+        arrangeOwnedWebsiteAndSection();
+        when(usageRepository.findById(USER_ID)).thenReturn(Optional.empty());
+        when(usageRepository.findWithLockByUserId(USER_ID)).thenReturn(Optional.of(existingUsage(false, 0, 0, 1, 1)));
+        when(promptBuilder.buildPrompt(request)).thenReturn("prompt");
+        when(deepSeekClient.createChatCompletion(any())).thenReturn(new DeepSeekResult("""
+                Her story began in a home filled with patience and care.
+                Additional direction applied: Make it warmer in tone
+                A second sentence. This can introduce the story with warmth, context, and a clear sense of legacy.
+                This detail adds depth to the biography by showing her character.
+                """, null, null, null));
+
+        AiWritingResponse response = service.generate(USER_ID, request);
+
+        assertThat(response.generatedText)
+                .isEqualTo("Her story began in a home filled with patience and care.")
+                .doesNotContain("Additional direction applied:")
+                .doesNotContain("Make it warmer in tone")
+                .doesNotContain("This can introduce")
+                .doesNotContain("This detail adds depth");
     }
 
     @Test
