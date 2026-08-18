@@ -15,4 +15,5 @@ public interface AiWritingOutputRepository extends JpaRepository<AiWritingOutput
     List<AiWritingOutput> findByRequestRequestIdAndSelected(String requestId, Boolean selected);
 
     long countByRequestRequestId(String requestId);
+    
 }

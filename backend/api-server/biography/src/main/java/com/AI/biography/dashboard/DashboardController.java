@@ -22,4 +22,4 @@ public class DashboardController {
 
         return dashboardService.getDashboard(userId);
     }
-}
+} 
