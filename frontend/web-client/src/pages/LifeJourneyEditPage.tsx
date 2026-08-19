@@ -1454,6 +1454,10 @@ export default function LifeJourneyEditPage() {
   }, [templateRoute.title]);
 
   React.useEffect(() => {
+    authService.ensureAuthSessionFromOpenTabs().catch(() => undefined);
+  }, []);
+
+  React.useEffect(() => {
     if (!hasMountedDraftRef.current) {
       hasMountedDraftRef.current = true;
       return;
@@ -4505,6 +4509,12 @@ export default function LifeJourneyEditPage() {
     setSaveMessage('Saving...');
 
     try {
+      const hasActiveSession = await authService.ensureAuthSessionFromOpenTabs();
+
+      if (!hasActiveSession) {
+        throw new Error('No active session found for this editor tab. Open the editor from the dashboard again or log in.');
+      }
+
       if (activeWebsiteId && !activeWebsiteId.startsWith('local-')) {
         setSaveMessage('Saving biography content to database...');
         await syncBiographySectionsToBackend(activeWebsiteId);

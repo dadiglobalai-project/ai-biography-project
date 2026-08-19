@@ -8,6 +8,22 @@ const KNOWN_AUTH_USERS_STORAGE_KEY = 'knownAuthUsers';
 const LOCAL_BIOGRAPHY_WEBSITES_STORAGE_KEY = 'localBiographyWebsites';
 const SELECTED_SERVICE_TYPE_STORAGE_KEY = 'selectedServiceType';
 const SELECTED_SERVICE_TYPE_BY_USER_STORAGE_KEY = 'selectedServiceTypeByUser';
+const AUTH_SESSION_CHANNEL_NAME = 'xinghuoji.auth-session';
+const AUTH_SESSION_REQUEST_TYPE = 'xinghuoji:auth-session-request';
+const AUTH_SESSION_RESPONSE_TYPE = 'xinghuoji:auth-session-response';
+const AUTH_SESSION_REQUEST_TIMEOUT_MS = 1200;
+
+type AuthSessionHandoffMessage =
+  | {
+      type: typeof AUTH_SESSION_REQUEST_TYPE;
+      requestId: string;
+    }
+  | {
+      type: typeof AUTH_SESSION_RESPONSE_TYPE;
+      requestId: string;
+      token: string;
+      user?: AuthResponse['user'];
+    };
 
 function getApiBaseUrl() {
   const configuredApiUrl = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -572,6 +588,87 @@ function readStoredUser(): AuthResponse['user'] | undefined {
   }
 }
 
+function createAuthSessionRequestId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function startAuthSessionHandoffResponder() {
+  if (typeof BroadcastChannel === 'undefined') {
+    return () => undefined;
+  }
+
+  const channel = new BroadcastChannel(AUTH_SESSION_CHANNEL_NAME);
+
+  channel.onmessage = (event: MessageEvent<AuthSessionHandoffMessage>) => {
+    const message = event.data;
+
+    if (message?.type !== AUTH_SESSION_REQUEST_TYPE || !message.requestId) {
+      return;
+    }
+
+    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+
+    if (!token) {
+      return;
+    }
+
+    channel.postMessage({
+      type: AUTH_SESSION_RESPONSE_TYPE,
+      requestId: message.requestId,
+      token,
+      user: readStoredUser(),
+    });
+  };
+
+  return () => channel.close();
+}
+
+function ensureAuthSessionFromOpenTabs() {
+  if (localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)) {
+    return Promise.resolve(true);
+  }
+
+  if (typeof BroadcastChannel === 'undefined') {
+    return Promise.resolve(false);
+  }
+
+  return new Promise<boolean>((resolve) => {
+    const requestId = createAuthSessionRequestId();
+    const channel = new BroadcastChannel(AUTH_SESSION_CHANNEL_NAME);
+
+    const cleanup = () => {
+      window.clearTimeout(timeoutId);
+      channel.close();
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      cleanup();
+      resolve(Boolean(localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)));
+    }, AUTH_SESSION_REQUEST_TIMEOUT_MS);
+
+    channel.onmessage = (event: MessageEvent<AuthSessionHandoffMessage>) => {
+      const message = event.data;
+
+      if (
+        message?.type !== AUTH_SESSION_RESPONSE_TYPE ||
+        message.requestId !== requestId ||
+        !message.token
+      ) {
+        return;
+      }
+
+      storeAuthSession(message.token, message.user);
+      cleanup();
+      resolve(true);
+    };
+
+    channel.postMessage({
+      type: AUTH_SESSION_REQUEST_TYPE,
+      requestId,
+    });
+  });
+}
+
 function readKnownUsers(): Record<string, string> {
   const storedKnownUsers = localStorage.getItem(KNOWN_AUTH_USERS_STORAGE_KEY);
   if (!storedKnownUsers) {
@@ -1095,6 +1192,14 @@ function extractResetToken(message?: string) {
 }
 
 export const authService = {
+  startAuthSessionHandoffResponder(): () => void {
+    return startAuthSessionHandoffResponder();
+  },
+
+  ensureAuthSessionFromOpenTabs(): Promise<boolean> {
+    return ensureAuthSessionFromOpenTabs();
+  },
+
   getSavedServiceType(email?: string): ServiceType | undefined {
     return readSelectedServiceType(email);
   },

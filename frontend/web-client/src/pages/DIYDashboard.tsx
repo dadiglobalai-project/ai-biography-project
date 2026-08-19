@@ -140,6 +140,10 @@ export default function DIYDashboard() {
   // Custom dialog or modal states
   const [modalContent, setModalContent] = useState<{ title: string; desc: string } | null>(null);
 
+  React.useEffect(() => {
+    return authService.startAuthSessionHandoffResponder();
+  }, []);
+
   const loadTemplates = React.useCallback(async () => {
     const templates = await authService.getBiographyTemplates();
     setBackendTemplates(templates);
