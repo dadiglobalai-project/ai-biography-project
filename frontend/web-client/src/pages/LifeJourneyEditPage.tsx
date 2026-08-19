@@ -58,6 +58,7 @@ import {
 import type {
   BiographyContactMessage,
   BiographyMediaAsset,
+  BiographyTemplate,
   BiographyWebsite,
   BiographyWebsiteSection,
   CreateChronicleSectionPayload,
@@ -106,6 +107,15 @@ const EMPTY_OMITTED_MEDIA_ASSET_IDS = new Set<string>();
 const IMAGE_UPLOAD_ACCEPT = 'image/png,image/jpeg,image/webp';
 const MOBILE_PREVIEW_SRC_DOC =
   '<!doctype html><html><head></head><body><div id="mobile-preview-root"></div></body></html>';
+
+const normalizeTemplateLookupValue = (value?: string | null) =>
+  typeof value === 'string'
+    ? value
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+    : '';
 
 const loadBackendSectionMediaAccessUrls = async (
   websiteId: string,
@@ -4453,6 +4463,41 @@ export default function LifeJourneyEditPage() {
     }
   };
 
+  const resolveBackendTemplateIdForSave = async () => {
+    const routeAliases = new Set(
+      [templateRoute.id, templateRoute.title, templateRoute.categoryKey]
+        .map(normalizeTemplateLookupValue)
+        .filter(Boolean)
+    );
+    const directTemplateId = backendTemplateId.trim();
+
+    if (directTemplateId && !routeAliases.has(normalizeTemplateLookupValue(directTemplateId))) {
+      return directTemplateId;
+    }
+
+    setSaveMessage('Finding backend template record...');
+
+    const backendTemplates = await authService.getBiographyTemplates();
+    const matchedTemplate = backendTemplates.find((template: BiographyTemplate) => {
+      const candidates = [
+        template.templateId,
+        template.layoutKey,
+        template.name,
+        template.category,
+      ].map(normalizeTemplateLookupValue);
+
+      return candidates.some((candidate) => candidate && routeAliases.has(candidate));
+    });
+
+    if (!matchedTemplate?.templateId) {
+      throw new Error(
+        `Unable to find the backend template record for ${templateRoute.title}. Please open the template from the dashboard after templates load, or ask backend to seed this template.`
+      );
+    }
+
+    return matchedTemplate.templateId;
+  };
+
   const handleSave = async (): Promise<string | null> => {
     saveDraft(templateRoute.id, draft, activeWebsiteId);
 
@@ -4477,18 +4522,17 @@ export default function LifeJourneyEditPage() {
           : 'Creating biography record in database...'
       );
 
+      const resolvedBackendTemplateId = await resolveBackendTemplateIdForSave();
       const savedWebsite = await authService.createBackendBiographyWebsite({
         title: getBiographyTitle(draft, templateRoute.title),
-        templateId: backendTemplateId || templateRoute.id,
+        templateId: resolvedBackendTemplateId,
         subjectType: getSubjectType(draft.settings.subjectType || searchParams.get('subjectType') || website?.subjectType),
       });
 
       setWebsite(savedWebsite);
       const nextSearchParams = new URLSearchParams(searchParams);
       nextSearchParams.set('websiteId', savedWebsite.id);
-      if (backendTemplateId) {
-        nextSearchParams.set('apiTemplateId', backendTemplateId);
-      }
+      nextSearchParams.set('apiTemplateId', resolvedBackendTemplateId);
       setSearchParams(nextSearchParams, { replace: true });
 
       saveDraft(templateRoute.id, draft, savedWebsite.id);

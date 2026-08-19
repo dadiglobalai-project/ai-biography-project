@@ -446,6 +446,20 @@ function getMessage(data: any, fallback: string) {
   return data?.error || data?.message || fallback;
 }
 
+async function parseResponseBody(response: Response) {
+  const text = await response.text();
+
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
+}
+
 function storeAuthSession(token: string, user?: AuthResponse['user']) {
   localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
 
@@ -1037,7 +1051,7 @@ async function createBackendBiographyWebsiteRequest(
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
+  const data = await parseResponseBody(response);
 
   if (!response.ok) {
     throw new Error(getMessage(data, 'Unable to create biography website'));
