@@ -829,6 +829,22 @@ function getLocalBiographyWebsite(websiteId: string) {
   return readLocalBiographyWebsites().find((website) => website.id === websiteId);
 }
 
+function removeLocalBiographyWebsite(websiteId: string) {
+  if (!websiteId || !websiteId.startsWith('local-')) {
+    return false;
+  }
+
+  const websites = readLocalBiographyWebsites();
+  const nextWebsites = websites.filter((website) => website.id !== websiteId);
+
+  if (nextWebsites.length === websites.length) {
+    return false;
+  }
+
+  writeLocalBiographyWebsites(nextWebsites);
+  return true;
+}
+
 function getWebsiteFromResponse(data: any) {
   return data?.website || data?.biographyWebsite || data?.data || data;
 }
@@ -1010,6 +1026,30 @@ async function requestAiWriting(payload: AiWritingRequestPayload): Promise<AiWri
   }
 
   return aiWriting;
+}
+
+async function createBackendBiographyWebsiteRequest(
+  payload: CreateBiographyWebsitePayload
+): Promise<BiographyWebsite> {
+  const response = await fetch(apiUrl('/api/websites'), {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(getMessage(data, 'Unable to create biography website'));
+  }
+
+  const website = normalizeBiographyWebsite(getWebsiteFromResponse(data));
+
+  if (!website.id || website.id.startsWith('local-')) {
+    throw new Error('Backend did not return a valid websiteId');
+  }
+
+  return website;
 }
 
 function getSessionFromJwt(token: string) {
@@ -1307,24 +1347,20 @@ export const authService = {
     return requestAiWriting({ ...payload, actionType: 'EXPAND' });
   },
 
+  async createBackendBiographyWebsite(payload: CreateBiographyWebsitePayload): Promise<BiographyWebsite> {
+    return createBackendBiographyWebsiteRequest(payload);
+  },
+
   async createBiographyWebsite(payload: CreateBiographyWebsitePayload): Promise<BiographyWebsite> {
     try {
-      const response = await fetch(apiUrl('/api/websites'), {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(getMessage(data, 'Unable to create biography website'));
-      }
-
-      return normalizeBiographyWebsite(getWebsiteFromResponse(data));
+      return await createBackendBiographyWebsiteRequest(payload);
     } catch {
       return createLocalBiographyWebsite(payload);
     }
+  },
+
+  removeLocalBiographyWebsite(websiteId: string): boolean {
+    return removeLocalBiographyWebsite(websiteId);
   },
 
   async getBiographyTemplates(): Promise<BiographyTemplate[]> {

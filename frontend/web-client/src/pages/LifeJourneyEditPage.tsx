@@ -4460,47 +4460,54 @@ export default function LifeJourneyEditPage() {
     setSaveMessage('Saving...');
 
     try {
-      if (activeWebsiteId) {
-        if (!activeWebsiteId.startsWith('local-')) {
-          setSaveMessage('Saving biography content to database...');
-          await syncBiographySectionsToBackend(activeWebsiteId);
-          saveDraft(templateRoute.id, draft, activeWebsiteId);
-          notifyBiographyListChanged();
-          setSaveMessage('Saved to database and My Biographies');
-          return activeWebsiteId;
-        }
-
+      if (activeWebsiteId && !activeWebsiteId.startsWith('local-')) {
+        setSaveMessage('Saving biography content to database...');
+        await syncBiographySectionsToBackend(activeWebsiteId);
+        saveDraft(templateRoute.id, draft, activeWebsiteId);
         notifyBiographyListChanged();
-        setSaveMessage('Saved locally. Biography is in My Biographies');
+        setSaveMessage('Saved to database and My Biographies');
         return activeWebsiteId;
       }
 
-      const savedWebsite = await authService.createBiographyWebsite({
+      const previousLocalWebsiteId = activeWebsiteId?.startsWith('local-') ? activeWebsiteId : '';
+
+      setSaveMessage(
+        previousLocalWebsiteId
+          ? 'Creating backend biography record from local draft...'
+          : 'Creating biography record in database...'
+      );
+
+      const savedWebsite = await authService.createBackendBiographyWebsite({
         title: getBiographyTitle(draft, templateRoute.title),
         templateId: backendTemplateId || templateRoute.id,
         subjectType: getSubjectType(draft.settings.subjectType || searchParams.get('subjectType') || website?.subjectType),
       });
 
       setWebsite(savedWebsite);
-      setSearchParams({ websiteId: savedWebsite.id }, { replace: true });
+      const nextSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.set('websiteId', savedWebsite.id);
+      if (backendTemplateId) {
+        nextSearchParams.set('apiTemplateId', backendTemplateId);
+      }
+      setSearchParams(nextSearchParams, { replace: true });
+
       saveDraft(templateRoute.id, draft, savedWebsite.id);
       removeTemplateDraft(templateRoute.id);
 
-      if (!savedWebsite.id.startsWith('local-')) {
-        setSaveMessage('Created biography. Saving content to database...');
-        await syncBiographySectionsToBackend(savedWebsite.id);
-        saveDraft(templateRoute.id, draft, savedWebsite.id);
+      if (previousLocalWebsiteId) {
+        removeDraft(templateRoute.id, previousLocalWebsiteId);
+        authService.removeLocalBiographyWebsite(previousLocalWebsiteId);
       }
 
+      setSaveMessage('Created biography. Saving content to database...');
+      await syncBiographySectionsToBackend(savedWebsite.id);
+      saveDraft(templateRoute.id, draft, savedWebsite.id);
+
       notifyBiographyListChanged();
-      setSaveMessage(
-        savedWebsite.id.startsWith('local-')
-          ? 'Saved locally. Biography is in My Biographies'
-          : 'Saved to database and My Biographies'
-      );
+      setSaveMessage('Saved to database and My Biographies');
       return savedWebsite.id;
     } catch (err: any) {
-      setSaveMessage(err?.message || 'Saved locally, but My Biographies was not updated');
+      setSaveMessage(err?.message || 'Unable to save biography to database');
       return null;
     } finally {
       setIsSaving(false);
