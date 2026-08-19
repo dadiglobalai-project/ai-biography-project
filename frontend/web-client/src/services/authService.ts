@@ -198,9 +198,9 @@ export interface AiWritingResponse {
 
 const AI_WRITING_ENDPOINTS: Record<AiWritingActionType, string> = {
   GENERATE: '/api/ai-writing/generate',
-  REWRITE: '/api/ai-writing/rewrite',
-  IMPROVE_GRAMMAR: '/api/ai-writing/improve',
-  EXPAND: '/api/ai-writing/expand',
+  REWRITE: '/api/ai-writing/generate',
+  IMPROVE_GRAMMAR: '/api/ai-writing/generate',
+  EXPAND: '/api/ai-writing/generate',
 };
 
 export interface UpdateSectionSettingsPayload {
