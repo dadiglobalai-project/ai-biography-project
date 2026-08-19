@@ -981,7 +981,7 @@ async function requestAiWriting(payload: AiWritingRequestPayload): Promise<AiWri
     headers: getAuthHeaders(),
     body: JSON.stringify({
       websiteId: payload.websiteId,
-      sectionId: payload.sectionId ?? null,
+      sectionId: null,
       actionType: payload.actionType,
       sourceText: payload.sourceText ?? null,
       userInstruction: payload.userInstruction ?? null,
