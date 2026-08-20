@@ -91,6 +91,8 @@ import type {
 } from '../Templates/LifeJourney/types';
 
 const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
+const BIOGRAPHY_LIST_CHANNEL_NAME = 'xinghuoji.biographies';
+const BIOGRAPHY_LIST_CHANGED_TYPE = 'xinghuoji:biographies-changed';
 const SUBJECT_TYPES: SubjectType[] = ['SELF', 'PARENT', 'GRANDPARENT', 'CHILD', 'SPOUSE', 'LOVED_ONE'];
 const SUBJECT_TYPE_LABELS: Record<SubjectType, string> = {
   SELF: 'Myself',
@@ -673,7 +675,22 @@ const writeLocalMediaLibraryAssets = (websiteId: string, assets: BiographyMediaA
 };
 
 const notifyBiographyListChanged = () => {
-  window.localStorage.setItem(BIOGRAPHY_LIST_REFRESH_KEY, String(Date.now()));
+  const changedAt = Date.now();
+
+  try {
+    window.localStorage.setItem(BIOGRAPHY_LIST_REFRESH_KEY, String(changedAt));
+  } catch {
+    // Storage events are a convenience only; BroadcastChannel handles tab refresh too.
+  }
+
+  if (typeof BroadcastChannel !== 'undefined') {
+    const channel = new BroadcastChannel(BIOGRAPHY_LIST_CHANNEL_NAME);
+    channel.postMessage({
+      type: BIOGRAPHY_LIST_CHANGED_TYPE,
+      changedAt,
+    });
+    channel.close();
+  }
 };
 
 const getImageTargetLabel = (target: EditableImageTarget | null) => {
@@ -4547,6 +4564,7 @@ export default function LifeJourneyEditPage() {
 
       saveDraft(templateRoute.id, draft, savedWebsite.id);
       removeTemplateDraft(templateRoute.id);
+      notifyBiographyListChanged();
 
       if (previousLocalWebsiteId) {
         removeDraft(templateRoute.id, previousLocalWebsiteId);

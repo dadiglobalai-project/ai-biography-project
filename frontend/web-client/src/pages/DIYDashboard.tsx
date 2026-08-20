@@ -27,6 +27,8 @@ import lifeJourneyPreviewImage from '../Templates/LifeJourney/assets/images/life
 type RelationType = 'Myself' | 'Parent' | 'Grandparent' | 'Child' | 'Spouse' | 'Loved One';
 const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
 const BIOGRAPHY_LAST_OPENED_STORAGE_KEY = 'xinghuoji.biographies.lastOpenedAt';
+const BIOGRAPHY_LIST_CHANNEL_NAME = 'xinghuoji.biographies';
+const BIOGRAPHY_LIST_CHANGED_TYPE = 'xinghuoji:biographies-changed';
 
 const SUBJECT_TYPE_BY_RELATION: Record<RelationType, SubjectType> = {
   Myself: 'SELF',
@@ -239,6 +241,18 @@ export default function DIYDashboard() {
         refreshBiographies();
       }
     };
+    const channel =
+      typeof BroadcastChannel === 'undefined'
+        ? null
+        : new BroadcastChannel(BIOGRAPHY_LIST_CHANNEL_NAME);
+
+    if (channel) {
+      channel.onmessage = (event: MessageEvent<{ type?: string }>) => {
+        if (event.data?.type === BIOGRAPHY_LIST_CHANGED_TYPE) {
+          refreshBiographies();
+        }
+      };
+    }
 
     window.addEventListener('focus', refreshBiographies);
     window.addEventListener('storage', handleStorage);
@@ -246,6 +260,7 @@ export default function DIYDashboard() {
     return () => {
       window.removeEventListener('focus', refreshBiographies);
       window.removeEventListener('storage', handleStorage);
+      channel?.close();
     };
   }, [loadBiographies]);
 
