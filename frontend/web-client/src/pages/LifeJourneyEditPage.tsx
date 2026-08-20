@@ -674,11 +674,17 @@ const writeLocalMediaLibraryAssets = (websiteId: string, assets: BiographyMediaA
   window.localStorage.setItem(getMediaLibraryStorageKey(websiteId), JSON.stringify(assets));
 };
 
-const notifyBiographyListChanged = () => {
+const notifyBiographyListChanged = (website?: BiographyWebsite | null) => {
   const changedAt = Date.now();
 
   try {
-    window.localStorage.setItem(BIOGRAPHY_LIST_REFRESH_KEY, String(changedAt));
+    window.localStorage.setItem(
+      BIOGRAPHY_LIST_REFRESH_KEY,
+      JSON.stringify({
+        changedAt,
+        website,
+      })
+    );
   } catch {
     // Storage events are a convenience only; BroadcastChannel handles tab refresh too.
   }
@@ -688,6 +694,7 @@ const notifyBiographyListChanged = () => {
     channel.postMessage({
       type: BIOGRAPHY_LIST_CHANGED_TYPE,
       changedAt,
+      website,
     });
     channel.close();
   }
@@ -4536,7 +4543,16 @@ export default function LifeJourneyEditPage() {
         setSaveMessage('Saving biography content to database...');
         await syncBiographySectionsToBackend(activeWebsiteId);
         saveDraft(templateRoute.id, draft, activeWebsiteId);
-        notifyBiographyListChanged();
+        notifyBiographyListChanged(
+          website || {
+            id: activeWebsiteId,
+            title: getBiographyTitle(draft, templateRoute.title),
+            templateId: backendTemplateId || templateRoute.id,
+            subjectType: getSubjectType(draft.settings.subjectType || searchParams.get('subjectType') || website?.subjectType),
+            status: 'DRAFT',
+            updatedAt: new Date().toISOString(),
+          }
+        );
         setSaveMessage('Saved to database and My Biographies');
         return activeWebsiteId;
       }
@@ -4564,7 +4580,7 @@ export default function LifeJourneyEditPage() {
 
       saveDraft(templateRoute.id, draft, savedWebsite.id);
       removeTemplateDraft(templateRoute.id);
-      notifyBiographyListChanged();
+      notifyBiographyListChanged(savedWebsite);
 
       if (previousLocalWebsiteId) {
         removeDraft(templateRoute.id, previousLocalWebsiteId);
@@ -4575,7 +4591,7 @@ export default function LifeJourneyEditPage() {
       await syncBiographySectionsToBackend(savedWebsite.id);
       saveDraft(templateRoute.id, draft, savedWebsite.id);
 
-      notifyBiographyListChanged();
+      notifyBiographyListChanged(savedWebsite);
       setSaveMessage('Saved to database and My Biographies');
       return savedWebsite.id;
     } catch (err: any) {

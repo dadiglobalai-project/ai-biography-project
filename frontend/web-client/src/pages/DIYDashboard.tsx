@@ -72,6 +72,22 @@ const writeBiographyLastOpened = (history: Record<string, string>) => {
   window.localStorage.setItem(BIOGRAPHY_LAST_OPENED_STORAGE_KEY, JSON.stringify(history));
 };
 
+const mergeDashboardBiographies = (
+  primaryWebsites: BiographyWebsite[],
+  fallbackWebsites: BiographyWebsite[]
+) => {
+  const websitesById = new Map<string, BiographyWebsite>();
+
+  fallbackWebsites.forEach((website) => websitesById.set(website.id, website));
+  primaryWebsites.forEach((website) => websitesById.set(website.id, website));
+
+  return Array.from(websitesById.values()).sort((a, b) => {
+    const dateA = getDateTime(a.updatedAt || a.createdAt);
+    const dateB = getDateTime(b.updatedAt || b.createdAt);
+    return dateB - dateA;
+  });
+};
+
 const getDateTime = (value?: string) => {
   if (!value) {
     return 0;
@@ -157,7 +173,7 @@ export default function DIYDashboard() {
 
     try {
       const websites = await authService.getBiographyWebsites();
-      setBiographies(websites);
+      setBiographies((currentWebsites) => mergeDashboardBiographies(websites, currentWebsites));
     } catch (err: any) {
       const message = err?.message || 'Unable to load biographies.';
       if (/unauthorized|forbidden|session|token/i.test(message)) {
@@ -232,12 +248,25 @@ export default function DIYDashboard() {
   }, [loadBiographies, loadTemplates, navigate]);
 
   React.useEffect(() => {
+    const upsertBiography = (website?: BiographyWebsite | null) => {
+      if (!website?.id) {
+        return;
+      }
+
+      setBiographies((currentWebsites) => mergeDashboardBiographies([website], currentWebsites));
+    };
     const refreshBiographies = () => {
       void loadBiographies();
     };
 
     const handleStorage = (event: StorageEvent) => {
       if (event.key === BIOGRAPHY_LIST_REFRESH_KEY) {
+        try {
+          const data = event.newValue ? JSON.parse(event.newValue) : null;
+          upsertBiography(data?.website);
+        } catch {
+          // Older tabs may still write a timestamp string here.
+        }
         refreshBiographies();
       }
     };
@@ -247,8 +276,9 @@ export default function DIYDashboard() {
         : new BroadcastChannel(BIOGRAPHY_LIST_CHANNEL_NAME);
 
     if (channel) {
-      channel.onmessage = (event: MessageEvent<{ type?: string }>) => {
+      channel.onmessage = (event: MessageEvent<{ type?: string; website?: BiographyWebsite | null }>) => {
         if (event.data?.type === BIOGRAPHY_LIST_CHANGED_TYPE) {
+          upsertBiography(event.data.website);
           refreshBiographies();
         }
       };

@@ -879,14 +879,29 @@ function writeLocalBiographyWebsites(websites: BiographyWebsite[]) {
   localStorage.setItem(getLocalBiographyWebsitesStorageKey(), JSON.stringify(websites));
 }
 
+function cacheBiographyWebsite(website: BiographyWebsite) {
+  if (!website.id) {
+    return;
+  }
+
+  const websites = readLocalBiographyWebsites();
+  writeLocalBiographyWebsites([
+    {
+      ...website,
+      updatedAt: website.updatedAt || new Date().toISOString(),
+    },
+    ...websites.filter((storedWebsite) => storedWebsite.id !== website.id),
+  ]);
+}
+
 function mergeBiographyWebsites(
   primaryWebsites: BiographyWebsite[],
   localWebsites: BiographyWebsite[]
 ) {
   const websitesById = new Map<string, BiographyWebsite>();
 
-  primaryWebsites.forEach((website) => websitesById.set(website.id, website));
   localWebsites.forEach((website) => websitesById.set(website.id, website));
+  primaryWebsites.forEach((website) => websitesById.set(website.id, website));
 
   return Array.from(websitesById.values()).sort((a, b) => {
     const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
@@ -1159,6 +1174,8 @@ async function createBackendBiographyWebsiteRequest(
   if (!website.id || website.id.startsWith('local-')) {
     throw new Error('Backend did not return a valid websiteId');
   }
+
+  cacheBiographyWebsite(website);
 
   return website;
 }
