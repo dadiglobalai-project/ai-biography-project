@@ -93,6 +93,9 @@ import type {
 const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
 const BIOGRAPHY_LIST_CHANNEL_NAME = 'xinghuoji.biographies';
 const BIOGRAPHY_LIST_CHANGED_TYPE = 'xinghuoji:biographies-changed';
+const BACKEND_TEMPLATE_ID_FALLBACKS: Record<string, string> = {
+  'life-journey': '21004dc9-742f-11f1-b903-d85ed3f9183f',
+};
 const SUBJECT_TYPES: SubjectType[] = ['SELF', 'PARENT', 'GRANDPARENT', 'CHILD', 'SPOUSE', 'LOVED_ONE'];
 const SUBJECT_TYPE_LABELS: Record<SubjectType, string> = {
   SELF: 'Myself',
@@ -114,10 +117,28 @@ const normalizeTemplateLookupValue = (value?: string | null) =>
   typeof value === 'string'
     ? value
         .trim()
+        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '')
     : '';
+
+const getTemplateLookupAliases = (values: Array<string | null | undefined>) => {
+  const aliases = new Set<string>();
+
+  values.forEach((value) => {
+    const normalizedValue = normalizeTemplateLookupValue(value);
+
+    if (!normalizedValue) {
+      return;
+    }
+
+    aliases.add(normalizedValue);
+    aliases.add(normalizedValue.replace(/-/g, ''));
+  });
+
+  return aliases;
+};
 
 const loadBackendSectionMediaAccessUrls = async (
   websiteId: string,
@@ -4492,11 +4513,11 @@ export default function LifeJourneyEditPage() {
   };
 
   const resolveBackendTemplateIdForSave = async () => {
-    const routeAliases = new Set(
-      [templateRoute.id, templateRoute.title, templateRoute.categoryKey]
-        .map(normalizeTemplateLookupValue)
-        .filter(Boolean)
-    );
+    const routeAliases = getTemplateLookupAliases([
+      templateRoute.id,
+      templateRoute.title,
+      templateRoute.categoryKey,
+    ]);
     const directTemplateId = backendTemplateId.trim();
 
     if (directTemplateId && !routeAliases.has(normalizeTemplateLookupValue(directTemplateId))) {
@@ -4507,23 +4528,29 @@ export default function LifeJourneyEditPage() {
 
     const backendTemplates = await authService.getBiographyTemplates();
     const matchedTemplate = backendTemplates.find((template: BiographyTemplate) => {
-      const candidates = [
+      const candidates = getTemplateLookupAliases([
         template.templateId,
         template.layoutKey,
         template.name,
         template.category,
-      ].map(normalizeTemplateLookupValue);
+      ]);
 
-      return candidates.some((candidate) => candidate && routeAliases.has(candidate));
+      return Array.from(candidates).some((candidate) => candidate && routeAliases.has(candidate));
     });
 
-    if (!matchedTemplate?.templateId) {
-      throw new Error(
-        `Unable to find the backend template record for ${templateRoute.title}. Please open the template from the dashboard after templates load, or ask backend to seed this template.`
-      );
+    if (matchedTemplate?.templateId) {
+      return matchedTemplate.templateId;
     }
 
-    return matchedTemplate.templateId;
+    const fallbackTemplateId = BACKEND_TEMPLATE_ID_FALLBACKS[templateRoute.id];
+
+    if (fallbackTemplateId) {
+      return fallbackTemplateId;
+    }
+
+    throw new Error(
+      `Unable to find the backend template record for ${templateRoute.title}. Please open the template from the dashboard after templates load, or ask backend to seed this template.`
+    );
   };
 
   const handleSave = async (): Promise<string | null> => {

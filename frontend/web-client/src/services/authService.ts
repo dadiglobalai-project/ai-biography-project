@@ -451,13 +451,6 @@ export interface UpdateContactMessageStatusPayload {
   status: string;
 }
 
-interface LocalBiographyWebsitePayload {
-  title?: string;
-  templateId?: string;
-  subjectType?: SubjectType | string;
-  status?: string;
-}
-
 function getMessage(data: any, fallback: string) {
   return data?.error || data?.message || fallback;
 }
@@ -879,12 +872,26 @@ function writeLocalBiographyWebsites(websites: BiographyWebsite[]) {
   localStorage.setItem(getLocalBiographyWebsitesStorageKey(), JSON.stringify(websites));
 }
 
+function isBackendBiographyWebsite(website: BiographyWebsite) {
+  return Boolean(website.id && !website.id.startsWith('local-'));
+}
+
+function readCachedBackendBiographyWebsites() {
+  return readLocalBiographyWebsites().filter(isBackendBiographyWebsite);
+}
+
+function removeLocalOnlyBiographyWebsites() {
+  const backendWebsites = readCachedBackendBiographyWebsites();
+  writeLocalBiographyWebsites(backendWebsites);
+  return backendWebsites;
+}
+
 function cacheBiographyWebsite(website: BiographyWebsite) {
-  if (!website.id) {
+  if (!isBackendBiographyWebsite(website)) {
     return;
   }
 
-  const websites = readLocalBiographyWebsites();
+  const websites = readCachedBackendBiographyWebsites();
   writeLocalBiographyWebsites([
     {
       ...website,
@@ -908,47 +915,6 @@ function mergeBiographyWebsites(
     const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
     return dateB - dateA;
   });
-}
-
-function slugifyBiographyTitle(title: string) {
-  const slug = title
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
-  return slug || 'biography';
-}
-
-function createLocalBiographyWebsite(
-  payload: LocalBiographyWebsitePayload,
-  websiteId?: string
-): BiographyWebsite {
-  const websites = readLocalBiographyWebsites();
-  const existingWebsite = websiteId
-    ? websites.find((website) => website.id === websiteId)
-    : undefined;
-  const now = new Date().toISOString();
-  const title = payload.title?.trim() || existingWebsite?.title || 'Untitled Biography';
-  const id = existingWebsite?.id || websiteId || `local-${crypto.randomUUID()}`;
-
-  const website: BiographyWebsite = {
-    id,
-    title,
-    templateId: payload.templateId || existingWebsite?.templateId || 'life-journey',
-    subjectType: payload.subjectType || existingWebsite?.subjectType || 'SELF',
-    status: payload.status || existingWebsite?.status || 'DRAFT',
-    subdomain: existingWebsite?.subdomain || slugifyBiographyTitle(title),
-    createdAt: existingWebsite?.createdAt || now,
-    updatedAt: now,
-  };
-
-  writeLocalBiographyWebsites([
-    website,
-    ...websites.filter((storedWebsite) => storedWebsite.id !== id),
-  ]);
-
-  return website;
 }
 
 function getLocalBiographyWebsite(websiteId: string) {
@@ -1488,11 +1454,7 @@ export const authService = {
   },
 
   async createBiographyWebsite(payload: CreateBiographyWebsitePayload): Promise<BiographyWebsite> {
-    try {
-      return await createBackendBiographyWebsiteRequest(payload);
-    } catch {
-      return createLocalBiographyWebsite(payload);
-    }
+    return createBackendBiographyWebsiteRequest(payload);
   },
 
   removeLocalBiographyWebsite(websiteId: string): boolean {
@@ -1531,19 +1493,20 @@ export const authService = {
         throw new Error(getMessage(data, 'Unable to load biography websites'));
       }
 
-      return mergeBiographyWebsites(
-        getWebsitesFromResponse(data).map(normalizeBiographyWebsite),
-        readLocalBiographyWebsites()
-      );
+      const backendWebsites = getWebsitesFromResponse(data)
+        .map(normalizeBiographyWebsite)
+        .filter(isBackendBiographyWebsite);
+      const cachedBackendWebsites = removeLocalOnlyBiographyWebsites();
+
+      return mergeBiographyWebsites(backendWebsites, cachedBackendWebsites);
     } catch {
-      return readLocalBiographyWebsites();
+      return readCachedBackendBiographyWebsites();
     }
   },
 
   async getBiographyWebsite(websiteId: string): Promise<BiographyWebsite> {
-    const localWebsite = getLocalBiographyWebsite(websiteId);
-    if (localWebsite) {
-      return localWebsite;
+    if (websiteId.startsWith('local-')) {
+      throw new Error('This biography has not been saved to the backend yet');
     }
 
     try {
@@ -1558,8 +1521,15 @@ export const authService = {
         throw new Error(getMessage(data, 'Unable to load biography website'));
       }
 
-      return normalizeBiographyWebsite(getWebsiteFromResponse(data));
+      const website = normalizeBiographyWebsite(getWebsiteFromResponse(data));
+      cacheBiographyWebsite(website);
+      return website;
     } catch {
+      const cachedWebsite = getLocalBiographyWebsite(websiteId);
+      if (cachedWebsite && isBackendBiographyWebsite(cachedWebsite)) {
+        return cachedWebsite;
+      }
+
       throw new Error('Unable to load biography website');
     }
   },

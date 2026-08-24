@@ -72,14 +72,21 @@ const writeBiographyLastOpened = (history: Record<string, string>) => {
   window.localStorage.setItem(BIOGRAPHY_LAST_OPENED_STORAGE_KEY, JSON.stringify(history));
 };
 
+const isBackendDashboardBiography = (website: BiographyWebsite) =>
+  Boolean(website.id && !website.id.startsWith('local-'));
+
 const mergeDashboardBiographies = (
   primaryWebsites: BiographyWebsite[],
   fallbackWebsites: BiographyWebsite[]
 ) => {
   const websitesById = new Map<string, BiographyWebsite>();
 
-  fallbackWebsites.forEach((website) => websitesById.set(website.id, website));
-  primaryWebsites.forEach((website) => websitesById.set(website.id, website));
+  fallbackWebsites
+    .filter(isBackendDashboardBiography)
+    .forEach((website) => websitesById.set(website.id, website));
+  primaryWebsites
+    .filter(isBackendDashboardBiography)
+    .forEach((website) => websitesById.set(website.id, website));
 
   return Array.from(websitesById.values()).sort((a, b) => {
     const dateA = getDateTime(a.updatedAt || a.createdAt);
