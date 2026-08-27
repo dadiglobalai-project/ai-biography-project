@@ -2,6 +2,11 @@ package com.AI.biography.user;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import com.AI.biography.membership.enums.UserRole;
+
+
 
 @Entity
 @Table(name = "users")
@@ -19,6 +24,10 @@ public class User {
 
     @Column(nullable = false, length = 50)
     private String status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
+    private UserRole role = UserRole.USER;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -50,6 +59,10 @@ public class User {
 
     public String getStatus() {
         return status;
+    }    
+
+    public UserRole getRole() {
+        return role;
     }
 
     public void setStatus(String status) {
