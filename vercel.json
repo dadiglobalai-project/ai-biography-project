@@ -1,0 +1,11 @@
+{
+  "installCommand": "cd frontend/web-client && npm install",
+  "buildCommand": "cd frontend/web-client && npm run build",
+  "outputDirectory": "frontend/web-client/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -212,6 +212,64 @@ export interface AiWritingResponse {
   createdAt?: string;
 }
 
+export interface CurrentMembership {
+  membershipId: string;
+  planId: string;
+  planName: string;
+  status: string;
+  startAt?: string;
+  expiresAt?: string;
+  autoRenew: boolean;
+}
+
+export interface MembershipPlan {
+  planId: string;
+  name: string;
+  standardPrice: number;
+  currency: string;
+  durationMonths: number;
+  refundWindowDays: number;
+  active: boolean;
+}
+
+export type PaymentMethod = 'WECHAT' | string;
+
+export interface CreatePaymentPayload {
+  planId: string;
+  paymentMethod: PaymentMethod;
+}
+
+export interface PaymentResponse {
+  paymentId: string;
+  membershipId?: string;
+  paymentReference?: string;
+  amount: number;
+  currency: string;
+  paymentMethod: PaymentMethod;
+  paymentRemark?: string;
+  status: string;
+  paidAt?: string;
+  verifiedAt?: string;
+  createdAt?: string;
+}
+
+export interface CreateRefundPayload {
+  paymentId: string;
+  reason: string;
+}
+
+export interface RefundResponse {
+  refundId: string;
+  paymentId: string;
+  amount: number;
+  currency: string;
+  reason?: string;
+  status: string;
+  createdAt?: string;
+  requestedAt?: string;
+  processedAt?: string;
+}
+
 const AI_WRITING_ENDPOINTS: Record<AiWritingActionType, string> = {
   GENERATE: '/api/ai-writing/generate',
   REWRITE: '/api/ai-writing/generate',
@@ -1065,6 +1123,38 @@ function getAiWritingFromResponse(data: any) {
   return data?.aiWriting || data?.writing || data?.result || data?.output || data?.data || data;
 }
 
+function getMembershipFromResponse(data: any) {
+  return data?.membership || data?.currentMembership || data?.data || data;
+}
+
+function getMembershipPlansFromResponse(data: any) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.plans)) {
+    return data.plans;
+  }
+
+  if (Array.isArray(data?.membershipPlans)) {
+    return data.membershipPlans;
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data;
+  }
+
+  return [];
+}
+
+function getPaymentFromResponse(data: any) {
+  return data?.payment || data?.currentPayment || data?.data || data;
+}
+
+function getRefundFromResponse(data: any) {
+  return data?.refund || data?.data || data;
+}
+
 function normalizeAiWritingResponse(data: any): AiWritingResponse {
   return {
     requestId: String(data?.requestId || ''),
@@ -1080,6 +1170,69 @@ function normalizeAiWritingResponse(data: any): AiWritingResponse {
     outputTokens: data?.outputTokens == null ? undefined : getNumberFromData(data.outputTokens),
     totalTokens: data?.totalTokens == null ? undefined : getNumberFromData(data.totalTokens),
     createdAt: typeof data?.createdAt === 'string' ? data.createdAt : undefined,
+  };
+}
+
+function normalizeCurrentMembership(data: any): CurrentMembership {
+  return {
+    membershipId: String(data?.membershipId || data?.id || ''),
+    planId: String(data?.planId || ''),
+    planName: String(data?.planName || data?.name || ''),
+    status: String(data?.status || ''),
+    startAt: typeof data?.startAt === 'string' ? data.startAt : undefined,
+    expiresAt: typeof data?.expiresAt === 'string' ? data.expiresAt : undefined,
+    autoRenew: Boolean(data?.autoRenew),
+  };
+}
+
+function normalizeMembershipPlan(data: any): MembershipPlan {
+  return {
+    planId: String(data?.planId || data?.id || ''),
+    name: String(data?.name || data?.planName || 'Membership Plan'),
+    standardPrice: getNumberFromData(data?.standardPrice ?? data?.price),
+    currency: String(data?.currency || ''),
+    durationMonths: getNumberFromData(data?.durationMonths),
+    refundWindowDays: getNumberFromData(data?.refundWindowDays),
+    active: typeof data?.active === 'boolean' ? data.active : true,
+  };
+}
+
+function normalizePaymentResponse(data: any): PaymentResponse {
+  return {
+    paymentId: String(data?.paymentId || data?.id || ''),
+    membershipId:
+      typeof data?.membershipId === 'string' && data.membershipId.trim()
+        ? data.membershipId
+        : undefined,
+    paymentReference:
+      typeof data?.paymentReference === 'string' && data.paymentReference.trim()
+        ? data.paymentReference
+        : undefined,
+    amount: getNumberFromData(data?.amount),
+    currency: String(data?.currency || ''),
+    paymentMethod: String(data?.paymentMethod || ''),
+    paymentRemark:
+      typeof data?.paymentRemark === 'string' && data.paymentRemark.trim()
+        ? data.paymentRemark
+        : undefined,
+    status: String(data?.status || ''),
+    paidAt: typeof data?.paidAt === 'string' ? data.paidAt : undefined,
+    verifiedAt: typeof data?.verifiedAt === 'string' ? data.verifiedAt : undefined,
+    createdAt: typeof data?.createdAt === 'string' ? data.createdAt : undefined,
+  };
+}
+
+function normalizeRefundResponse(data: any): RefundResponse {
+  return {
+    refundId: String(data?.refundId || data?.id || ''),
+    paymentId: String(data?.paymentId || ''),
+    amount: getNumberFromData(data?.amount),
+    currency: String(data?.currency || ''),
+    reason: typeof data?.reason === 'string' ? data.reason : undefined,
+    status: String(data?.status || ''),
+    createdAt: typeof data?.createdAt === 'string' ? data.createdAt : undefined,
+    requestedAt: typeof data?.requestedAt === 'string' ? data.requestedAt : undefined,
+    processedAt: typeof data?.processedAt === 'string' ? data.processedAt : undefined,
   };
 }
 
@@ -1427,6 +1580,125 @@ export const authService = {
           }
         : undefined,
     };
+  },
+
+  async getCurrentMembership(): Promise<CurrentMembership | null> {
+    const response = await fetch(apiUrl('/api/membership/current'), {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    if (response.status === 204) {
+      return null;
+    }
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to load current membership'));
+    }
+
+    const membership = normalizeCurrentMembership(getMembershipFromResponse(data));
+    return membership.membershipId ? membership : null;
+  },
+
+  async getMembershipPlans(): Promise<MembershipPlan[]> {
+    const response = await fetch(apiUrl('/api/membership/plans'), {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to load membership plans'));
+    }
+
+    return getMembershipPlansFromResponse(data)
+      .map((plan: any) => normalizeMembershipPlan(plan))
+      .filter((plan: MembershipPlan) => Boolean(plan.planId));
+  },
+
+  async createPayment(payload: CreatePaymentPayload): Promise<PaymentResponse> {
+    const response = await fetch(apiUrl('/api/payments'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to create payment request'));
+    }
+
+    return normalizePaymentResponse(getPaymentFromResponse(data));
+  },
+
+  async getCurrentPayment(): Promise<PaymentResponse | null> {
+    const response = await fetch(apiUrl('/api/payments/current'), {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    if (response.status === 204 || response.status === 404) {
+      return null;
+    }
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to load current payment'));
+    }
+
+    const payment = normalizePaymentResponse(getPaymentFromResponse(data));
+    return payment.paymentId ? payment : null;
+  },
+
+  async getPayment(paymentId: string): Promise<PaymentResponse> {
+    const response = await fetch(apiUrl(`/api/payments/${encodeURIComponent(paymentId)}`), {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to load payment'));
+    }
+
+    return normalizePaymentResponse(getPaymentFromResponse(data));
+  },
+
+  async createRefund(payload: CreateRefundPayload): Promise<RefundResponse> {
+    const response = await fetch(apiUrl('/api/refunds'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to create refund request'));
+    }
+
+    return normalizeRefundResponse(getRefundFromResponse(data));
+  },
+
+  async getRefund(refundId: string): Promise<RefundResponse> {
+    const response = await fetch(apiUrl(`/api/refunds/${encodeURIComponent(refundId)}`), {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to load refund request'));
+    }
+
+    return normalizeRefundResponse(getRefundFromResponse(data));
   },
 
   async createAiWritingSuggestion(payload: AiWritingRequestPayload): Promise<AiWritingResponse> {

@@ -18,8 +18,7 @@ import {
 import BrandLogo from '../components/BrandLogo';
 import { getBiographyTemplateRoute } from '../Templates/LifeJourney/templateRoutes';
 import { authService } from '../services/authService';
-
-type ManualNoticeStatus = 'idle' | 'saved';
+import type { CurrentMembership, MembershipPlan, PaymentResponse } from '../services/authService';
 
 const activationSteps = [
   { label: 'Edit', description: 'Biography content complete', status: 'complete' },
@@ -35,12 +34,13 @@ const includedFeatures = [
   'AI writing assistant access',
 ];
 
-const price = 2499;
-const formattedPrice = new Intl.NumberFormat('en-PH', {
+const DEFAULT_PAYMENT_METHOD = 'WECHAT';
+
+const fallbackPrice = new Intl.NumberFormat('en-PH', {
   style: 'currency',
   currency: 'PHP',
   maximumFractionDigits: 0,
-}).format(price);
+}).format(2499);
 
 const getInitials = (name: string) => {
   const initials = name
@@ -54,11 +54,47 @@ const getInitials = (name: string) => {
   return initials || 'X';
 };
 
+const formatMoney = (amount: number, currency: string) => {
+  if (!amount || !currency) {
+    return fallbackPrice;
+  }
+
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${currency} ${amount.toLocaleString()}`;
+  }
+};
+
+const formatDateTime = (value?: string) => {
+  if (!value) {
+    return 'Not available yet';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'Not available yet';
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+};
+
 export default function PaymentPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const templateId = searchParams.get('templateId') || 'life-journey';
   const websiteId = searchParams.get('websiteId') || '';
+  const planIdFromQuery = searchParams.get('planId') || '';
   const templateRoute = getBiographyTemplateRoute(templateId);
   const biographyTitle = searchParams.get('title') || 'My Life Story';
   const returnTo =
@@ -68,18 +104,26 @@ export default function PaymentPage() {
   const [accountEmail, setAccountEmail] = React.useState('');
   const [accountName, setAccountName] = React.useState('');
   const [accountProfilePhoto, setAccountProfilePhoto] = React.useState('');
-  const [paymentReference, setPaymentReference] = React.useState('');
-  const [notes, setNotes] = React.useState('');
   const [proofFileName, setProofFileName] = React.useState('');
-  const [noticeStatus, setNoticeStatus] = React.useState<ManualNoticeStatus>('idle');
+  const [membership, setMembership] = React.useState<CurrentMembership | null>(null);
+  const [plans, setPlans] = React.useState<MembershipPlan[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = React.useState('');
+  const [currentPayment, setCurrentPayment] = React.useState<PaymentResponse | null>(null);
+  const [isLoadingBilling, setIsLoadingBilling] = React.useState(true);
+  const [isCreatingPayment, setIsCreatingPayment] = React.useState(false);
+  const [paymentMessage, setPaymentMessage] = React.useState('');
+  const [paymentError, setPaymentError] = React.useState('');
 
   React.useEffect(() => {
     document.title = 'Manual Payment Confirmation | Xinghuoji';
 
     let active = true;
-    authService
-      .getCurrentUser()
-      .then((session) => {
+    const loadPaymentData = async () => {
+      setIsLoadingBilling(true);
+      setPaymentError('');
+
+      try {
+        const session = await authService.getCurrentUser();
         if (!active) {
           return;
         }
@@ -91,45 +135,139 @@ export default function PaymentPage() {
         if (session.user?.fullName) {
           setAccountName(session.user.fullName);
         }
-      })
-      .catch(() => {
-        if (active) {
-          setAccountEmail('');
-        }
-      });
 
-    authService
-      .getDashboard()
-      .then((dashboard) => {
+        try {
+          const dashboard = await authService.getDashboard();
+          if (!active) {
+            return;
+          }
+
+          if (dashboard.user?.fullName) {
+            setAccountName(dashboard.user.fullName);
+          }
+
+          if (dashboard.user?.profilePhoto) {
+            setAccountProfilePhoto(dashboard.user.profilePhoto);
+          }
+        } catch {
+          // The payment endpoints can still load as long as the JWT session is valid.
+        }
+
+        const [membershipResponse, plansResponse, paymentResponse] = await Promise.all([
+          authService.getCurrentMembership(),
+          authService.getMembershipPlans(),
+          authService.getCurrentPayment(),
+        ]);
+
         if (!active) {
           return;
         }
 
-        if (dashboard.user?.fullName) {
-          setAccountName(dashboard.user.fullName);
+        setMembership(membershipResponse);
+        setPlans(plansResponse);
+        setCurrentPayment(paymentResponse);
+        setSelectedPlanId((currentPlanId) => {
+          if (currentPlanId) {
+            return currentPlanId;
+          }
+
+          const queryPlan = planIdFromQuery
+            ? plansResponse.find((plan) => plan.planId === planIdFromQuery)
+            : undefined;
+          const activeDiyPlan = plansResponse.find(
+            (plan) => plan.active && /diy/i.test(plan.name)
+          );
+          const firstActivePlan = plansResponse.find((plan) => plan.active);
+
+          return queryPlan?.planId || activeDiyPlan?.planId || firstActivePlan?.planId || plansResponse[0]?.planId || '';
+        });
+      } catch (error) {
+        if (!active) {
+          return;
         }
 
-        if (dashboard.user?.profilePhoto) {
-          setAccountProfilePhoto(dashboard.user.profilePhoto);
+        const message = error instanceof Error ? error.message : 'Unable to load membership payment data.';
+        if (/unauthorized|forbidden|session|token/i.test(message)) {
+          navigate('/login', { replace: true });
+          return;
         }
-      })
-      .catch(() => undefined);
+
+        setPaymentError(message);
+      } finally {
+        if (active) {
+          setIsLoadingBilling(false);
+        }
+      }
+    };
+
+    void loadPaymentData();
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [navigate, planIdFromQuery]);
 
   const handleReturnToEditor = () => {
     navigate(returnTo);
   };
 
-  const handleSaveManualNotice = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleCreatePaymentRequest = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setNoticeStatus('saved');
+
+    if (membership?.status === 'ACTIVE') {
+      setPaymentMessage('Your membership is already active. You can return to the editor and continue publishing.');
+      setPaymentError('');
+      return;
+    }
+
+    const selectedPlan = plans.find((plan) => plan.planId === selectedPlanId);
+    if (!selectedPlan) {
+      setPaymentError('Please select a membership plan before creating a payment request.');
+      setPaymentMessage('');
+      return;
+    }
+
+    setIsCreatingPayment(true);
+    setPaymentError('');
+    setPaymentMessage('');
+
+    try {
+      const payment = await authService.createPayment({
+        planId: selectedPlan.planId,
+        paymentMethod: DEFAULT_PAYMENT_METHOD,
+      });
+      setCurrentPayment(payment);
+      setPaymentMessage('Payment request created. Please wait for admin confirmation after payment is verified.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to create payment request.';
+
+      if (/duplicate|pending|conflict|409/i.test(message)) {
+        try {
+          const payment = await authService.getCurrentPayment();
+          setCurrentPayment(payment);
+          setPaymentMessage('You already have a pending payment request. The latest request is shown here.');
+          setPaymentError('');
+        } catch {
+          setPaymentError(message);
+        }
+      } else {
+        setPaymentError(message);
+      }
+    } finally {
+      setIsCreatingPayment(false);
+    }
   };
 
-  const paymentReferenceCode = websiteId || 'Generated after the biography is saved';
+  const selectedPlan = plans.find((plan) => plan.planId === selectedPlanId);
+  const displayAmount = currentPayment
+    ? formatMoney(currentPayment.amount, currentPayment.currency)
+    : selectedPlan
+      ? formatMoney(selectedPlan.standardPrice, selectedPlan.currency)
+      : fallbackPrice;
+  const paymentReferenceCode =
+    currentPayment?.paymentReference || currentPayment?.paymentId || websiteId || 'Generated after payment request';
+  const membershipStatus = membership?.status || 'No active membership';
+  const paymentStatus = currentPayment?.status || 'No payment request yet';
   const profileButtonLabel = accountName || accountEmail || 'Profile';
 
   return (
@@ -299,8 +437,13 @@ export default function PaymentPage() {
                   </div>
                   <p className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-amber-700">
                     <Clock3 className="h-4 w-4" />
-                    {noticeStatus === 'saved' ? 'Notice recorded locally' : 'Pending payment confirmation'}
+                    {membership?.status === 'ACTIVE' ? 'Membership active' : paymentStatus}
                   </p>
+                  {membership?.expiresAt && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Expires {formatDateTime(membership.expiresAt)}
+                    </p>
+                  )}
                 </div>
 
                 <ul className="mt-5 space-y-3 border-t border-slate-200 pt-5">
@@ -315,11 +458,10 @@ export default function PaymentPage() {
                 <div className="mt-6 border-t border-slate-200 pt-6">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-500">Amount</span>
-                    <span className="text-2xl font-bold text-slate-950">{formattedPrice}</span>
+                    <span className="text-2xl font-bold text-slate-950">{displayAmount}</span>
                   </div>
                   <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                    This amount is displayed for the manual confirmation flow. Final payment
-                    instructions should come from the administrator.
+                    Amount and currency come from the selected backend membership plan or the current payment record.
                   </p>
                 </div>
 
@@ -342,7 +484,7 @@ export default function PaymentPage() {
 
               <form
                 id="manual-payment-form"
-                onSubmit={handleSaveManualNotice}
+                onSubmit={handleCreatePaymentRequest}
                 className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -352,14 +494,104 @@ export default function PaymentPage() {
                       <ShieldCheck className="h-4 w-4 text-[#B18625]" />
                     </div>
                     <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                      Follow the administrator's payment instructions. This page records the payment
-                      notice only; membership activation is still handled manually by the admin.
+                      Create a backend payment request first. After the payment is confirmed manually,
+                      the admin activates the membership in the system.
                     </p>
                   </div>
                   <span className="inline-flex w-fit items-center gap-2 rounded-full border border-amber-100 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
                     <Clock3 className="h-4 w-4" />
                     Admin Review
                   </span>
+                </div>
+
+                {paymentError && (
+                  <div className="mt-6 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-4 text-sm leading-relaxed text-rose-700">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                      <p>{paymentError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {paymentMessage && (
+                  <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4 text-sm leading-relaxed text-emerald-800">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+                      <p>{paymentMessage}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Current Membership
+                    </p>
+                    <p className="mt-2 text-base font-bold text-slate-950">{membershipStatus}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {membership?.planName || 'No current valid membership returned by backend.'}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Current Payment
+                    </p>
+                    <p className="mt-2 text-base font-bold text-slate-950">{paymentStatus}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {currentPayment?.createdAt
+                        ? `Created ${formatDateTime(currentPayment.createdAt)}`
+                        : 'No current payment returned by backend.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">
+                      Membership Plan
+                    </h3>
+                    {isLoadingBilling && (
+                      <span className="text-xs font-semibold text-slate-500">Loading plans...</span>
+                    )}
+                  </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {plans.length > 0 ? (
+                      plans.map((plan) => {
+                        const isSelected = selectedPlanId === plan.planId;
+
+                        return (
+                          <button
+                            key={plan.planId}
+                            type="button"
+                            onClick={() => setSelectedPlanId(plan.planId)}
+                            disabled={!plan.active || isCreatingPayment}
+                            className={`rounded-2xl border px-4 py-4 text-left transition ${
+                              isSelected
+                                ? 'border-[#B18625] bg-amber-50 shadow-sm'
+                                : 'border-slate-200 bg-white hover:border-slate-300'
+                            } disabled:cursor-not-allowed disabled:opacity-60`}
+                          >
+                            <span className="flex items-start justify-between gap-3">
+                              <span>
+                                <span className="block text-sm font-bold text-slate-950">{plan.name}</span>
+                                <span className="mt-1 block text-xs text-slate-500">
+                                  {plan.durationMonths} months, {plan.refundWindowDays} day refund window
+                                </span>
+                              </span>
+                              {isSelected && <CheckCircle2 className="h-5 w-5 shrink-0 text-[#B18625]" />}
+                            </span>
+                            <span className="mt-3 block text-lg font-bold text-slate-950">
+                              {formatMoney(plan.standardPrice, plan.currency)}
+                            </span>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500 sm:col-span-2">
+                        No active membership plans returned yet.
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-6 grid gap-4 sm:grid-cols-3">
@@ -369,8 +601,8 @@ export default function PaymentPage() {
                       description: 'Use the payment channel confirmed by the administrator.',
                     },
                     {
-                      title: 'Share Reference',
-                      description: 'Provide the website ID or receipt reference for checking.',
+                      title: 'Use Backend Reference',
+                      description: 'Backend generates the payment reference for admin checking.',
                     },
                     {
                       title: 'Wait for Activation',
@@ -408,23 +640,17 @@ export default function PaymentPage() {
                         id="account-email"
                         type="email"
                         value={accountEmail}
-                        onChange={(event) => setAccountEmail(event.target.value)}
+                        readOnly
                         placeholder="you@example.com"
                         className="min-w-0 flex-1 bg-transparent text-base text-slate-950 outline-none"
                       />
                     </div>
                   </div>
                   <div>
-                    <label htmlFor="payment-reference" className="text-sm font-semibold text-slate-700">
-                      Receipt / Transfer Reference
-                    </label>
-                    <input
-                      id="payment-reference"
-                      value={paymentReference}
-                      onChange={(event) => setPaymentReference(event.target.value)}
-                      placeholder="Optional"
-                      className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-950 outline-none transition focus:border-[#B18625] focus:ring-4 focus:ring-amber-100"
-                    />
+                    <p className="text-sm font-semibold text-slate-700">Payment Method</p>
+                    <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-semibold text-slate-950">
+                      {DEFAULT_PAYMENT_METHOD}
+                    </div>
                   </div>
                 </div>
 
@@ -434,7 +660,9 @@ export default function PaymentPage() {
                     <span className="mt-3 text-sm font-bold text-slate-950">
                       {proofFileName || 'Attach payment proof'}
                     </span>
-                    <span className="mt-1 text-xs text-slate-500">Optional receipt image or PDF</span>
+                    <span className="mt-1 text-xs text-slate-500">
+                      UI only for now; the payment endpoint does not accept files yet.
+                    </span>
                     <input
                       type="file"
                       className="sr-only"
@@ -444,38 +672,12 @@ export default function PaymentPage() {
                   </label>
                 </div>
 
-                <div className="mt-5">
-                  <label htmlFor="payment-notes" className="text-sm font-semibold text-slate-700">
-                    Notes for Admin
-                  </label>
-                  <textarea
-                    id="payment-notes"
-                    value={notes}
-                    onChange={(event) => setNotes(event.target.value)}
-                    rows={4}
-                    placeholder="Optional notes, payment channel, or confirmation details"
-                    className="mt-2 w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-950 outline-none transition focus:border-[#B18625] focus:ring-4 focus:ring-amber-100"
-                  />
-                </div>
-
-                {noticeStatus === 'saved' && (
-                  <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4 text-sm leading-relaxed text-emerald-800">
-                    <div className="flex items-start gap-3">
-                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
-                      <p>
-                        Payment notice recorded locally for testing. Final membership activation
-                        still requires admin confirmation in the system.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
                 <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                   <div className="flex items-start gap-3">
                     <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
                     <p>
-                      This page does not process live payments. Once the membership status endpoint
-                      is available, the frontend can show whether the user is pending or activated.
+                      This page creates a pending backend payment request. Live payment processing
+                      and proof upload are still outside this endpoint set.
                     </p>
                   </div>
                 </div>
@@ -483,10 +685,11 @@ export default function PaymentPage() {
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                   <button
                     type="submit"
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800"
+                    disabled={isLoadingBilling || isCreatingPayment || !selectedPlan || membership?.status === 'ACTIVE'}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <ReceiptText className="h-4 w-4" />
-                    Record Payment Notice
+                    {isCreatingPayment ? 'Creating Request...' : 'Create Payment Request'}
                   </button>
                   <button
                     type="button"
