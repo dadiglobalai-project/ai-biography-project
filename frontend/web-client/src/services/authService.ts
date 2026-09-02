@@ -2,6 +2,7 @@ import { RegisterFormState } from '../types';
 import { getEmailValidationError } from '../utils/emailValidation';
 
 const DEFAULT_API_PORT = '8080';
+const PRODUCTION_API_BASE_URL = 'https://biography-backend-omu6.onrender.com';
 const AUTH_TOKEN_STORAGE_KEY = 'token';
 const AUTH_USER_STORAGE_KEY = 'authUser';
 const KNOWN_AUTH_USERS_STORAGE_KEY = 'knownAuthUsers';
@@ -37,7 +38,7 @@ function getApiBaseUrl() {
     return `${protocol}//${hostname}:${DEFAULT_API_PORT}`;
   }
 
-  return '';
+  return PRODUCTION_API_BASE_URL;
 }
 
 const API_BASE_URL = getApiBaseUrl();
@@ -60,7 +61,7 @@ function getAuthHeaders(): HeadersInit {
   return headers;
 }
 
-function getMultipartAuthHeaders(): HeadersInit {
+function getAuthorizationHeaders(): HeadersInit {
   const headers: Record<string, string> = {};
   const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
 
@@ -69,6 +70,10 @@ function getMultipartAuthHeaders(): HeadersInit {
   }
 
   return headers;
+}
+
+function getMultipartAuthHeaders(): HeadersInit {
+  return getAuthorizationHeaders();
 }
 
 export interface AuthResponse {
@@ -268,6 +273,48 @@ export interface RefundResponse {
   createdAt?: string;
   requestedAt?: string;
   processedAt?: string;
+}
+
+export type AdminPaymentStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'FAILED' | 'REFUNDED' | string;
+export type AdminRefundStatus =
+  | 'REQUESTED'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'PROCESSING'
+  | 'COMPLETED'
+  | 'FAILED'
+  | string;
+
+export interface AdminPaymentResponse extends PaymentResponse {
+  userId?: string;
+  userName?: string;
+  userEmail?: string;
+  biographyTitle?: string;
+  websiteId?: string;
+  planId?: string;
+  planName?: string;
+  proofOfPaymentUrl?: string;
+}
+
+export interface ConfirmAdminPaymentPayload {
+  paidAt?: string;
+}
+
+export interface AdminRefundResponse extends RefundResponse {
+  userId?: string;
+  userName?: string;
+  userEmail?: string;
+  refundMethod?: string;
+  externalRefundReference?: string;
+}
+
+export interface CompleteAdminRefundPayload {
+  refundMethod: string;
+  externalRefundReference?: string;
+}
+
+export interface AdminMembershipResponse extends CurrentMembership {
+  userId?: string;
 }
 
 const AI_WRITING_ENDPOINTS: Record<AiWritingActionType, string> = {
@@ -1155,6 +1202,62 @@ function getRefundFromResponse(data: any) {
   return data?.refund || data?.data || data;
 }
 
+function getAdminPaymentsFromResponse(data: any) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.payments)) {
+    return data.payments;
+  }
+
+  if (Array.isArray(data?.adminPayments)) {
+    return data.adminPayments;
+  }
+
+  if (Array.isArray(data?.items)) {
+    return data.items;
+  }
+
+  if (Array.isArray(data?.content)) {
+    return data.content;
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data;
+  }
+
+  return [];
+}
+
+function getAdminRefundsFromResponse(data: any) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.refunds)) {
+    return data.refunds;
+  }
+
+  if (Array.isArray(data?.adminRefunds)) {
+    return data.adminRefunds;
+  }
+
+  if (Array.isArray(data?.items)) {
+    return data.items;
+  }
+
+  if (Array.isArray(data?.content)) {
+    return data.content;
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data;
+  }
+
+  return [];
+}
+
 function normalizeAiWritingResponse(data: any): AiWritingResponse {
   return {
     requestId: String(data?.requestId || ''),
@@ -1233,6 +1336,116 @@ function normalizeRefundResponse(data: any): RefundResponse {
     createdAt: typeof data?.createdAt === 'string' ? data.createdAt : undefined,
     requestedAt: typeof data?.requestedAt === 'string' ? data.requestedAt : undefined,
     processedAt: typeof data?.processedAt === 'string' ? data.processedAt : undefined,
+  };
+}
+
+function normalizeAdminPaymentResponse(data: any): AdminPaymentResponse {
+  const payment = normalizePaymentResponse(data);
+  const user = data?.user || data?.account || data?.member || {};
+  const website = data?.website || data?.biographyWebsite || data?.biography || {};
+  const plan = data?.plan || data?.membershipPlan || {};
+
+  return {
+    ...payment,
+    paymentId: payment.paymentId || String(data?.paymentId || data?.id || ''),
+    userId:
+      typeof data?.userId === 'string' && data.userId.trim()
+        ? data.userId
+        : typeof user?.userId === 'string' && user.userId.trim()
+          ? user.userId
+          : typeof user?.id === 'string' && user.id.trim()
+            ? user.id
+            : undefined,
+    userName:
+      String(data?.userName || data?.customerName || getFullNameFromData(data) || getFullNameFromData(user) || '') ||
+      undefined,
+    userEmail:
+      String(data?.userEmail || data?.email || getEmailFromData(data) || getEmailFromData(user) || '') ||
+      undefined,
+    biographyTitle:
+      String(
+        data?.biographyTitle ||
+          data?.websiteTitle ||
+          website?.title ||
+          data?.title ||
+          ''
+      ) || undefined,
+    websiteId:
+      typeof data?.websiteId === 'string' && data.websiteId.trim()
+        ? data.websiteId
+        : typeof website?.websiteId === 'string' && website.websiteId.trim()
+          ? website.websiteId
+          : typeof website?.id === 'string' && website.id.trim()
+            ? website.id
+            : undefined,
+    planId:
+      typeof data?.planId === 'string' && data.planId.trim()
+        ? data.planId
+        : typeof plan?.planId === 'string' && plan.planId.trim()
+          ? plan.planId
+          : undefined,
+    planName:
+      String(
+        data?.planName ||
+          (typeof data?.plan === 'string' ? data.plan : '') ||
+          plan?.name ||
+          ''
+      ) || undefined,
+    proofOfPaymentUrl:
+      typeof data?.proofOfPaymentUrl === 'string' && data.proofOfPaymentUrl.trim()
+        ? data.proofOfPaymentUrl
+        : typeof data?.proofUrl === 'string' && data.proofUrl.trim()
+          ? data.proofUrl
+          : undefined,
+  };
+}
+
+function normalizeAdminRefundResponse(data: any): AdminRefundResponse {
+  const refund = normalizeRefundResponse(data);
+  const user = data?.user || data?.account || data?.member || data?.payment?.user || {};
+
+  return {
+    ...refund,
+    refundId: refund.refundId || String(data?.refundId || data?.id || ''),
+    paymentId: refund.paymentId || String(data?.paymentId || data?.payment?.paymentId || data?.payment?.id || ''),
+    userId:
+      typeof data?.userId === 'string' && data.userId.trim()
+        ? data.userId
+        : typeof user?.userId === 'string' && user.userId.trim()
+          ? user.userId
+          : typeof user?.id === 'string' && user.id.trim()
+            ? user.id
+            : undefined,
+    userName:
+      String(data?.userName || getFullNameFromData(data) || getFullNameFromData(user) || '') ||
+      undefined,
+    userEmail:
+      String(data?.userEmail || data?.email || getEmailFromData(data) || getEmailFromData(user) || '') ||
+      undefined,
+    refundMethod:
+      typeof data?.refundMethod === 'string' && data.refundMethod.trim()
+        ? data.refundMethod
+        : undefined,
+    externalRefundReference:
+      typeof data?.externalRefundReference === 'string' && data.externalRefundReference.trim()
+        ? data.externalRefundReference
+        : undefined,
+  };
+}
+
+function normalizeAdminMembershipResponse(data: any): AdminMembershipResponse {
+  const membership = normalizeCurrentMembership(getMembershipFromResponse(data));
+
+  return {
+    ...membership,
+    userId:
+      typeof data?.userId === 'string' && data.userId.trim()
+        ? data.userId
+        : typeof data?.user?.userId === 'string' && data.user.userId.trim()
+          ? data.user.userId
+          : typeof data?.user?.id === 'string' && data.user.id.trim()
+            ? data.user.id
+            : undefined,
   };
 }
 
@@ -1699,6 +1912,200 @@ export const authService = {
     }
 
     return normalizeRefundResponse(getRefundFromResponse(data));
+  },
+
+  async getAdminPayments(status?: AdminPaymentStatus): Promise<AdminPaymentResponse[]> {
+    const path =
+      status && status !== 'All'
+        ? `/api/admin/payments?status=${encodeURIComponent(status)}`
+        : '/api/admin/payments';
+    const response = await fetch(apiUrl(path), {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to load admin payments'));
+    }
+
+    return getAdminPaymentsFromResponse(data)
+      .map((payment: any) => normalizeAdminPaymentResponse(payment))
+      .filter((payment: AdminPaymentResponse) => Boolean(payment.paymentId));
+  },
+
+  async getAdminPayment(paymentId: string): Promise<AdminPaymentResponse> {
+    const response = await fetch(apiUrl(`/api/admin/payments/${encodeURIComponent(paymentId)}`), {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to load admin payment details'));
+    }
+
+    return normalizeAdminPaymentResponse(getPaymentFromResponse(data));
+  },
+
+  async confirmAdminPayment(
+    paymentId: string,
+    payload?: ConfirmAdminPaymentPayload
+  ): Promise<AdminPaymentResponse> {
+    const hasBody = Boolean(payload?.paidAt);
+    const response = await fetch(
+      apiUrl(`/api/admin/payments/${encodeURIComponent(paymentId)}/confirm`),
+      {
+        method: 'PATCH',
+        headers: hasBody ? getAuthHeaders() : getAuthorizationHeaders(),
+        body: hasBody ? JSON.stringify(payload) : undefined,
+      }
+    );
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to confirm payment'));
+    }
+
+    return normalizeAdminPaymentResponse(getPaymentFromResponse(data));
+  },
+
+  async rejectAdminPayment(paymentId: string): Promise<AdminPaymentResponse> {
+    const response = await fetch(
+      apiUrl(`/api/admin/payments/${encodeURIComponent(paymentId)}/reject`),
+      {
+        method: 'PATCH',
+        headers: getAuthorizationHeaders(),
+      }
+    );
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to reject payment'));
+    }
+
+    return normalizeAdminPaymentResponse(getPaymentFromResponse(data));
+  },
+
+  async getAdminRefunds(status?: AdminRefundStatus): Promise<AdminRefundResponse[]> {
+    const path =
+      status && status !== 'All'
+        ? `/api/admin/refunds?status=${encodeURIComponent(status)}`
+        : '/api/admin/refunds';
+    const response = await fetch(apiUrl(path), {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to load admin refunds'));
+    }
+
+    return getAdminRefundsFromResponse(data)
+      .map((refund: any) => normalizeAdminRefundResponse(refund))
+      .filter((refund: AdminRefundResponse) => Boolean(refund.refundId));
+  },
+
+  async getAdminRefund(refundId: string): Promise<AdminRefundResponse> {
+    const response = await fetch(apiUrl(`/api/admin/refunds/${encodeURIComponent(refundId)}`), {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to load admin refund details'));
+    }
+
+    return normalizeAdminRefundResponse(getRefundFromResponse(data));
+  },
+
+  async approveAdminRefund(refundId: string): Promise<AdminRefundResponse> {
+    const response = await fetch(
+      apiUrl(`/api/admin/refunds/${encodeURIComponent(refundId)}/approve`),
+      {
+        method: 'PATCH',
+        headers: getAuthorizationHeaders(),
+      }
+    );
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to approve refund'));
+    }
+
+    return normalizeAdminRefundResponse(getRefundFromResponse(data));
+  },
+
+  async rejectAdminRefund(refundId: string): Promise<AdminRefundResponse> {
+    const response = await fetch(
+      apiUrl(`/api/admin/refunds/${encodeURIComponent(refundId)}/reject`),
+      {
+        method: 'PATCH',
+        headers: getAuthorizationHeaders(),
+      }
+    );
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to reject refund'));
+    }
+
+    return normalizeAdminRefundResponse(getRefundFromResponse(data));
+  },
+
+  async completeAdminRefund(
+    refundId: string,
+    payload: CompleteAdminRefundPayload
+  ): Promise<AdminRefundResponse> {
+    const response = await fetch(
+      apiUrl(`/api/admin/refunds/${encodeURIComponent(refundId)}/complete`),
+      {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to complete refund'));
+    }
+
+    return normalizeAdminRefundResponse(getRefundFromResponse(data));
+  },
+
+  async getAdminUserMembership(userId: string): Promise<AdminMembershipResponse | null> {
+    const response = await fetch(
+      apiUrl(`/api/admin/users/${encodeURIComponent(userId)}/membership`),
+      {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      }
+    );
+
+    if (response.status === 204 || response.status === 404) {
+      return null;
+    }
+
+    const data = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new Error(getMessage(data, 'Unable to load admin user membership'));
+    }
+
+    const membership = normalizeAdminMembershipResponse(data);
+    return membership.membershipId ? membership : null;
   },
 
   async createAiWritingSuggestion(payload: AiWritingRequestPayload): Promise<AiWritingResponse> {

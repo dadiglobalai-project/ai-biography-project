@@ -7,6 +7,7 @@ import {
   BookOpen,
   CheckCircle2,
   Clock3,
+  Copy,
   Eye,
   ExternalLink,
   FileText,
@@ -633,6 +634,18 @@ const getSubjectType = (subjectType?: string): SubjectType => {
   return SUBJECT_TYPES.includes(subjectType as SubjectType) ? (subjectType as SubjectType) : 'SELF';
 };
 
+const normalizeBiographyIdentityText = (value?: string) =>
+  value?.trim().toLowerCase().replace(/\s+/g, ' ') || '';
+
+const getBiographyDateTime = (value?: string) => {
+  if (!value) {
+    return 0;
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
 const formatContactMessageDate = (date?: string) => {
   if (!date) {
     return 'No date';
@@ -757,8 +770,11 @@ export default function LifeJourneyEditPage() {
   const templateRoute = getBiographyTemplateRoute(templateId);
   const websiteId = searchParams.get('websiteId') || '';
   const backendTemplateId = searchParams.get('apiTemplateId') || '';
+  const isStartingNewDraft = searchParams.get('newDraft') === '1' && !websiteId;
   const [draft, setDraft] = useState<BiographyCategory>(() =>
-    loadDraft(templateRoute.id, templateRoute.categoryKey, websiteId)
+    isStartingNewDraft
+      ? cloneTemplateData(templateRoute.categoryKey)
+      : loadDraft(templateRoute.id, templateRoute.categoryKey, websiteId)
   );
   const [website, setWebsite] = useState<BiographyWebsite | null>(null);
   const [saveMessage, setSaveMessage] = useState('Unsaved changes');
@@ -3643,7 +3659,7 @@ export default function LifeJourneyEditPage() {
     }
   };
 
-  const handleApplyAiWriting = (mode: 'replace' | 'insert') => {
+  const handleApplyAiWriting = () => {
     const target = getSelectedAiWritingTarget();
 
     if (!target || !hasText(aiWritingResult)) {
@@ -3651,13 +3667,22 @@ export default function LifeJourneyEditPage() {
       return;
     }
 
-    const nextValue =
-      mode === 'insert' && hasText(target.value)
-        ? `${target.value.trim()}\n\n${aiWritingResult.trim()}`
-        : aiWritingResult.trim();
+    target.onReplace(aiWritingResult.trim());
+    setAiWritingMessage('Suggestion replaced the selected field');
+  };
 
-    target.onReplace(nextValue);
-    setAiWritingMessage(mode === 'insert' ? 'Suggestion inserted below' : 'Suggestion replaced the selected field');
+  const handleCopyAiWritingResult = async () => {
+    if (!hasText(aiWritingResult)) {
+      setAiWritingMessage('Generate a suggestion before copying');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(aiWritingResult.trim());
+      setAiWritingMessage('Suggestion copied to clipboard');
+    } catch {
+      setAiWritingMessage('Unable to copy automatically. Select the AI result and copy it manually.');
+    }
   };
 
   const renderTextField = ({
@@ -4553,6 +4578,48 @@ export default function LifeJourneyEditPage() {
     );
   };
 
+  const findReusableBackendDraftForSave = async (resolvedBackendTemplateId: string) => {
+    const targetTemplateAliases = getTemplateLookupAliases([
+      resolvedBackendTemplateId,
+      backendTemplateId,
+      templateRoute.id,
+      templateRoute.title,
+      templateRoute.categoryKey,
+    ]);
+    const targetTitle = normalizeBiographyIdentityText(getBiographyTitle(draft, templateRoute.title));
+    const targetSubjectType = getSubjectType(
+      draft.settings.subjectType || searchParams.get('subjectType') || website?.subjectType
+    );
+    const backendWebsites = await authService.getBiographyWebsites();
+
+    return backendWebsites
+      .filter((candidateWebsite) => {
+        if (!candidateWebsite.id || candidateWebsite.id.startsWith('local-')) {
+          return false;
+        }
+
+        if (candidateWebsite.status.toUpperCase() !== 'DRAFT') {
+          return false;
+        }
+
+        if (candidateWebsite.subjectType !== targetSubjectType) {
+          return false;
+        }
+
+        if (normalizeBiographyIdentityText(candidateWebsite.title) !== targetTitle) {
+          return false;
+        }
+
+        const candidateTemplateAliases = getTemplateLookupAliases([candidateWebsite.templateId]);
+        return Array.from(candidateTemplateAliases).some((alias) => targetTemplateAliases.has(alias));
+      })
+      .sort((a, b) => {
+        const dateA = getBiographyDateTime(a.updatedAt || a.createdAt);
+        const dateB = getBiographyDateTime(b.updatedAt || b.createdAt);
+        return dateB - dateA;
+      })[0] || null;
+  };
+
   const handleSave = async (): Promise<string | null> => {
     saveDraft(templateRoute.id, draft, activeWebsiteId);
 
@@ -4593,6 +4660,38 @@ export default function LifeJourneyEditPage() {
       );
 
       const resolvedBackendTemplateId = await resolveBackendTemplateIdForSave();
+      const reusableWebsite = isStartingNewDraft
+        ? null
+        : await findReusableBackendDraftForSave(resolvedBackendTemplateId);
+
+      if (reusableWebsite) {
+        setSaveMessage('Existing draft found. Saving updates to that biography...');
+        setWebsite(reusableWebsite);
+
+        const nextSearchParams = new URLSearchParams(searchParams);
+        nextSearchParams.set('websiteId', reusableWebsite.id);
+        nextSearchParams.set('apiTemplateId', resolvedBackendTemplateId);
+        nextSearchParams.delete('newDraft');
+        setSearchParams(nextSearchParams, { replace: true });
+
+        saveDraft(templateRoute.id, draft, reusableWebsite.id);
+        removeTemplateDraft(templateRoute.id);
+
+        if (previousLocalWebsiteId) {
+          removeDraft(templateRoute.id, previousLocalWebsiteId);
+          authService.removeLocalBiographyWebsite(previousLocalWebsiteId);
+        }
+
+        await syncBiographySectionsToBackend(reusableWebsite.id);
+        saveDraft(templateRoute.id, draft, reusableWebsite.id);
+        notifyBiographyListChanged({
+          ...reusableWebsite,
+          updatedAt: new Date().toISOString(),
+        });
+        setSaveMessage('Saved to existing biography draft');
+        return reusableWebsite.id;
+      }
+
       const savedWebsite = await authService.createBackendBiographyWebsite({
         title: getBiographyTitle(draft, templateRoute.title),
         templateId: resolvedBackendTemplateId,
@@ -4603,6 +4702,7 @@ export default function LifeJourneyEditPage() {
       const nextSearchParams = new URLSearchParams(searchParams);
       nextSearchParams.set('websiteId', savedWebsite.id);
       nextSearchParams.set('apiTemplateId', resolvedBackendTemplateId);
+      nextSearchParams.delete('newDraft');
       setSearchParams(nextSearchParams, { replace: true });
 
       saveDraft(templateRoute.id, draft, savedWebsite.id);
@@ -5548,7 +5648,7 @@ export default function LifeJourneyEditPage() {
 
             {selectedTarget && (
               <label className="block space-y-1.5">
-                <span className="text-xs font-bold text-slate-500">Your content</span>
+                <span className="text-xs font-bold text-slate-500">Selected field content</span>
                 <textarea
                   rows={6}
                   value={selectedTarget.value}
@@ -5646,18 +5746,19 @@ export default function LifeJourneyEditPage() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => handleApplyAiWriting('replace')}
+                  onClick={handleApplyAiWriting}
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-slate-800"
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  Replace
+                  Replace Field
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleApplyAiWriting('insert')}
+                  onClick={() => void handleCopyAiWritingResult()}
                   className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
                 >
-                  Insert Below
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy Result
                 </button>
                 <button
                   type="button"
@@ -5682,7 +5783,7 @@ export default function LifeJourneyEditPage() {
           )}
 
           <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
-            Saved biographies use the backend AI Writing endpoint. Unsaved local drafts use a local fallback.
+            Save this biography to My Biographies before using the backend AI Writing endpoint.
           </p>
         </div>
       </section>

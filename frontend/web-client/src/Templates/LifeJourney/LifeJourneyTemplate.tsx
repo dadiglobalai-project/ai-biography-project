@@ -1514,11 +1514,11 @@ export default function LifeJourneyTemplate({
           </div>
 
           {/* Cards Gallery Layout */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 items-start gap-8 md:grid-cols-2 lg:grid-cols-3">
             {data.gallery.map((item, idx) => (
               <div 
                 key={item.id} 
-                className={`rounded-2xl border p-4 text-left group transition-all duration-300 flex flex-col justify-between ${theme.card} ${theme.accentHover} hover:shadow-md`}
+                className={`rounded-2xl border p-4 text-left group transition-all duration-300 flex flex-col ${theme.card} ${theme.accentHover} hover:shadow-md`}
               >
                 <div>
                   <div className={`${getImageSizeClass('gallery', item.imageSettings)} group/image rounded-xl overflow-hidden bg-stone-100 mb-4 border border-stone-200/20 relative`}>
@@ -1566,7 +1566,7 @@ export default function LifeJourneyTemplate({
                   value: item.caption,
                   section: 'gallery',
                   multiline: true,
-                  className: `font-sans ${getTextSizeClass('caption', item.textSettings)} ${theme.textMuted} mt-1 leading-relaxed border-t ${theme.sectionBorder} pt-2.5 mt-3`,
+                  className: `font-sans ${getTextSizeClass('caption', item.textSettings)} ${theme.textMuted} mt-3 break-words border-t ${theme.sectionBorder} pt-2.5 leading-relaxed line-clamp-4`,
                   onChange: (value) => updateGalleryItem(idx, { caption: value }),
                 })}
               </div>
