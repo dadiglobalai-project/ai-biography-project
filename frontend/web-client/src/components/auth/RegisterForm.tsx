@@ -181,7 +181,7 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
       {/* Header section */}
       <div className="mb-10 text-left">
         {/* Responsive Mobile Logo display */}
-        <BrandLogo variant="mobile" className="mb-6 lg:hidden -ml-2" />
+        <BrandLogo variant="mobile" className="mb-8 w-44 max-w-full lg:hidden -ml-2" />
 
         <h2 className="font-serif-display text-4xl text-legacy-navy font-semibold tracking-normal leading-tight mb-2">
           Begin Your Legacy

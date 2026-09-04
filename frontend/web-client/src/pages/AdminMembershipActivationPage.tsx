@@ -457,7 +457,7 @@ export default function AdminMembershipActivationPage() {
             </button>
             <button
               type="button"
-              onClick={() => setPageMessage('Admin refund endpoints are integrated in the frontend service. A refund management screen can be added next.')}
+              onClick={() => navigate('/admin/refunds')}
               className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-white hover:text-[#07142e]"
             >
               <FileText className="h-5 w-5" />

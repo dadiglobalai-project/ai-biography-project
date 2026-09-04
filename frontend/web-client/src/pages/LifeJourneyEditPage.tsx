@@ -789,6 +789,7 @@ export default function LifeJourneyEditPage() {
   const [isMobileMediaLibraryOpen, setIsMobileMediaLibraryOpen] = useState(false);
   const [isMobileToolbarMenuOpen, setIsMobileToolbarMenuOpen] = useState(false);
   const [isPublishChecklistOpen, setIsPublishChecklistOpen] = useState(false);
+  const [isCheckingPublishAccess, setIsCheckingPublishAccess] = useState(false);
   const [aiWritingAction, setAiWritingAction] = useState<AiWritingAction>('generate');
   const [aiWritingTargetId, setAiWritingTargetId] = useState('');
   const [aiWritingInstructions, setAiWritingInstructions] = useState('');
@@ -4733,32 +4734,95 @@ export default function LifeJourneyEditPage() {
     setIsPublishChecklistOpen(true);
   };
 
-  const handleProceedToPayment = async () => {
-    if (!isPublishReady) {
+  const handleContinuePublishFlow = async () => {
+    if (!isPublishReady || isCheckingPublishAccess) {
       return;
     }
 
-    const savedWebsiteId = await handleSave();
-    const paymentWebsiteId = savedWebsiteId || activeWebsiteId || website?.id || '';
-    const editorUrl = new URL(`/diy-dashboard/templates/${templateRoute.id}/edit`, window.location.origin);
-    const paymentUrl = new URL('/payment', window.location.origin);
+    setIsCheckingPublishAccess(true);
 
-    if (paymentWebsiteId) {
+    try {
+      const savedWebsiteId = await handleSave();
+      const paymentWebsiteId = savedWebsiteId || activeWebsiteId || website?.id || '';
+      const editorUrl = new URL(`/diy-dashboard/templates/${templateRoute.id}/edit`, window.location.origin);
+
+      if (!paymentWebsiteId || paymentWebsiteId.startsWith('local-')) {
+        setSaveMessage('Save this biography to the database before publishing');
+        return;
+      }
+
       editorUrl.searchParams.set('websiteId', paymentWebsiteId);
+
+      if (backendTemplateId) {
+        editorUrl.searchParams.set('apiTemplateId', backendTemplateId);
+      }
+
+      const biographyTitle = getBiographyTitle(draft, templateRoute.title);
+      const membership = await authService.getCurrentMembership();
+      const membershipStatus = membership?.status?.toUpperCase() || '';
+
+      if (membershipStatus === 'ACTIVE') {
+        const previewUrl = new URL(`/diy-dashboard/templates/${templateRoute.id}/preview`, window.location.origin);
+        previewUrl.searchParams.set('websiteId', paymentWebsiteId);
+        previewUrl.searchParams.set('publishReady', '1');
+
+        if (backendTemplateId) {
+          previewUrl.searchParams.set('apiTemplateId', backendTemplateId);
+        }
+
+        setIsPublishChecklistOpen(false);
+        setSaveMessage('Membership active. Opening publish-ready preview.');
+        navigate(`${previewUrl.pathname}${previewUrl.search}`);
+        return;
+      }
+
+      let currentPayment = null;
+
+      try {
+        currentPayment = await authService.getCurrentPayment();
+      } catch {
+        currentPayment = null;
+      }
+
+      const paymentStatus = currentPayment?.status?.toUpperCase() || '';
+
+      if (
+        currentPayment?.paymentId &&
+        (paymentStatus === 'PENDING' || paymentStatus === 'CONFIRMED')
+      ) {
+        const statusUrl = new URL('/payment/status', window.location.origin);
+        statusUrl.searchParams.set('websiteId', paymentWebsiteId);
+        statusUrl.searchParams.set('paymentId', currentPayment.paymentId);
+        statusUrl.searchParams.set('templateId', templateRoute.id);
+        statusUrl.searchParams.set('title', biographyTitle);
+        statusUrl.searchParams.set('returnTo', `${editorUrl.pathname}${editorUrl.search}`);
+
+        setIsPublishChecklistOpen(false);
+        setSaveMessage('Payment request found. Check payment status.');
+        navigate(`${statusUrl.pathname}${statusUrl.search}`);
+        return;
+      }
+
+      const paymentUrl = new URL('/payment', window.location.origin);
       paymentUrl.searchParams.set('websiteId', paymentWebsiteId);
+      paymentUrl.searchParams.set('templateId', templateRoute.id);
+      paymentUrl.searchParams.set('title', biographyTitle);
+      paymentUrl.searchParams.set('returnTo', `${editorUrl.pathname}${editorUrl.search}`);
+
+      setIsPublishChecklistOpen(false);
+      setSaveMessage('No active membership yet. Continue payment to publish.');
+      navigate(`${paymentUrl.pathname}${paymentUrl.search}`);
+    } catch (err: any) {
+      const message = err?.message || 'Unable to verify membership before publishing';
+      if (/unauthorized|forbidden|session|token/i.test(message)) {
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      setSaveMessage(message);
+    } finally {
+      setIsCheckingPublishAccess(false);
     }
-
-    if (backendTemplateId) {
-      editorUrl.searchParams.set('apiTemplateId', backendTemplateId);
-    }
-
-    paymentUrl.searchParams.set('templateId', templateRoute.id);
-    paymentUrl.searchParams.set('title', getBiographyTitle(draft, templateRoute.title));
-    paymentUrl.searchParams.set('returnTo', `${editorUrl.pathname}${editorUrl.search}`);
-
-    setIsPublishChecklistOpen(false);
-    setSaveMessage('Draft saved. Continue payment to publish');
-    navigate(`${paymentUrl.pathname}${paymentUrl.search}`);
   };
 
   const handleReset = () => {
@@ -6291,7 +6355,8 @@ export default function LifeJourneyEditPage() {
             {renderPublishChecklistGroup('Recommended Polish', recommendedPublishItems)}
 
             <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
-              Publishing starts after payment. When the checklist passes, continue to checkout so the draft can be prepared for launch.
+              Publishing requires an active DIY membership. If your membership is already active,
+              this biography can continue without another payment.
             </p>
           </div>
 
@@ -6314,12 +6379,12 @@ export default function LifeJourneyEditPage() {
             </button>
             <button
               type="button"
-              onClick={() => void handleProceedToPayment()}
-              disabled={!isPublishReady || isSaving}
+              onClick={() => void handleContinuePublishFlow()}
+              disabled={!isPublishReady || isSaving || isCheckingPublishAccess}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Globe2 className="h-4 w-4" />
-              Proceed to Payment
+              {isCheckingPublishAccess ? 'Checking Access' : 'Continue'}
             </button>
           </div>
         </section>
@@ -6463,7 +6528,7 @@ export default function LifeJourneyEditPage() {
             <button
               type="button"
               onClick={handleOpenPublishChecklist}
-              disabled={isSaving}
+              disabled={isSaving || isCheckingPublishAccess}
               className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-950 px-2.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:gap-2 sm:text-sm lg:px-4 lg:py-2.5"
             >
               <Globe2 className="h-4 w-4" />

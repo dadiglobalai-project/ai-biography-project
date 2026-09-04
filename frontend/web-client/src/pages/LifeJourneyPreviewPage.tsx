@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, PenTool } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, PenTool } from 'lucide-react';
 import BiographyTemplateRenderer from '../Templates/BiographyTemplateRenderer';
 import { loadDraft, saveDraft } from '../Templates/LifeJourney/draftStorage';
 import { getBiographyTemplateRoute } from '../Templates/LifeJourney/templateRoutes';
@@ -34,9 +34,12 @@ const loadBackendSectionMediaAccessUrls = async (
 export default function LifeJourneyPreviewPage() {
   const navigate = useNavigate();
   const { templateId } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const templateRoute = getBiographyTemplateRoute(templateId);
   const websiteId = searchParams.get('websiteId') || '';
+  const [isPublishReadyPreview, setIsPublishReadyPreview] = React.useState(
+    () => searchParams.get('publishReady') === '1'
+  );
   const [previewDraft, setPreviewDraft] = React.useState(() =>
     loadDraft(templateRoute.id, templateRoute.categoryKey, websiteId)
   );
@@ -50,6 +53,24 @@ export default function LifeJourneyPreviewPage() {
       websiteId ? getWebsitePreviewProgressKey(websiteId) : getTemplatePreviewProgressKey(templateRoute.id)
     );
   }, [templateRoute.id, websiteId]);
+
+  React.useEffect(() => {
+    if (searchParams.get('publishReady') !== '1') {
+      return;
+    }
+
+    setIsPublishReadyPreview(true);
+
+    const timeout = window.setTimeout(() => {
+      setIsPublishReadyPreview(false);
+
+      const nextSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.delete('publishReady');
+      setSearchParams(nextSearchParams, { replace: true });
+    }, 4500);
+
+    return () => window.clearTimeout(timeout);
+  }, [searchParams, setSearchParams]);
 
   React.useEffect(() => {
     setPreviewDraft(loadDraft(templateRoute.id, templateRoute.categoryKey, websiteId));
@@ -111,6 +132,17 @@ export default function LifeJourneyPreviewPage() {
 
   return (
     <div className="relative min-h-screen bg-[#FAF6F0]">
+      {isPublishReadyPreview && (
+        <div className="fixed left-1/2 top-5 z-[90] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 rounded-2xl border border-emerald-100 bg-white/95 px-4 py-3 text-sm font-semibold text-emerald-800 shadow-xl backdrop-blur-md">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+            <p>
+              Membership active. Payment is not required for this biography.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="fixed bottom-6 right-6 z-[80] flex flex-col gap-2 sm:flex-row">
         <button
           type="button"

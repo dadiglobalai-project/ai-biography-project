@@ -1,11 +1,12 @@
 import React from 'react';
 
 interface BrandLogoProps {
-  variant?: 'hero' | 'mobile';
+  variant?: 'hero' | 'mobile' | 'mark';
   className?: string;
 }
 
 export default function BrandLogo({ variant = 'hero', className = '' }: BrandLogoProps) {
+  const isMark = variant === 'mark';
   const isHero = variant === 'hero';
 
   // Exact HEX Colors from the image
@@ -92,7 +93,7 @@ export default function BrandLogo({ variant = 'hero', className = '' }: BrandLog
   return (
     <div className={`select-none ${className}`}>
       <svg
-        viewBox="0 0 1000 380"
+        viewBox={isMark ? '105 80 210 300' : '0 0 1000 380'}
         fill="none"
         className="w-full h-auto transition-colors duration-300"
         id="xinghuoji-exact-logo"
@@ -192,7 +193,7 @@ export default function BrandLogo({ variant = 'hero', className = '' }: BrandLog
         })}
 
         {/* Escaping seeds flowing towards wordmark and sky */}
-        {blowingSeeds.map((seed, index) => {
+        {!isMark && blowingSeeds.map((seed, index) => {
           const sRad = (seed.angle * Math.PI) / 180;
           const tx = seed.x + (46 * seed.scale) * Math.cos(sRad);
           const ty = seed.y + (46 * seed.scale) * Math.sin(sRad);
@@ -256,64 +257,68 @@ export default function BrandLogo({ variant = 'hero', className = '' }: BrandLog
         })}
 
         {/* Sparkling celestial stars following the blowing path */}
-        {goldStars.map((star, idx) => {
+        {!isMark && goldStars.map((star, idx) => {
           const key = `star-glow-${idx}`;
           return star.type === '5-point'
             ? renderFivePointStar(key, star.x, star.y, star.size, goldColor)
             : renderFourPointStar(key, star.x, star.y, star.size, goldColor);
         })}
 
-        {/* Wordmark "XINGHUOJI" matching elegant Display typography */}
-        <text
-          x="578"
-          y="242"
-          textAnchor="middle"
-          fontFamily="'Cinzel', 'Playfair Display', serif"
-          fontWeight="bold"
-          fontSize="68"
-          letterSpacing="0.22em"
-          fill={mainColor}
-          id="exact-wordmark-text"
-        >
-          XINGHUOJI
-        </text>
+        {!isMark && (
+          <>
+            {/* Wordmark "XINGHUOJI" matching elegant Display typography */}
+            <text
+              x="578"
+              y="242"
+              textAnchor="middle"
+              fontFamily="'Cinzel', 'Playfair Display', serif"
+              fontWeight="bold"
+              fontSize="68"
+              letterSpacing="0.22em"
+              fill={mainColor}
+              id="exact-wordmark-text"
+            >
+              XINGHUOJI
+            </text>
 
-        {/* Elegant divider horizontal bars with centered gold 4-point star */}
-        <line
-          x1="300"
-          y1="282"
-          x2="548"
-          y2="282"
-          stroke={goldColor}
-          strokeWidth="1.8"
-          opacity="0.85"
-        />
-        {renderFourPointStar("divider-center-gold-star", 578, 282, 8.5, goldColor)}
-        <line
-          x1="608"
-          y1="282"
-          x2="856"
-          y2="282"
-          stroke={goldColor}
-          strokeWidth="1.8"
-          opacity="0.85"
-        />
+            {/* Elegant divider horizontal bars with centered gold 4-point star */}
+            <line
+              x1="300"
+              y1="282"
+              x2="548"
+              y2="282"
+              stroke={goldColor}
+              strokeWidth="1.8"
+              opacity="0.85"
+            />
+            {renderFourPointStar("divider-center-gold-star", 578, 282, 8.5, goldColor)}
+            <line
+              x1="608"
+              y1="282"
+              x2="856"
+              y2="282"
+              stroke={goldColor}
+              strokeWidth="1.8"
+              opacity="0.85"
+            />
 
-        {/* Subtitle "AI BIOGRAPHY & DIGITAL LEGACY PLATFORM" */}
-        <text
-          x="578"
-          y="328"
-          textAnchor="middle"
-          fontFamily="'Inter', sans-serif"
-          fontWeight="500"
-          fontSize="17.2"
-          letterSpacing="0.22em"
-          fill={goldColor}
-          opacity="0.95"
-          id="exact-subtitle-text"
-        >
-          AI BIOGRAPHY & DIGITAL LEGACY PLATFORM
-        </text>
+            {/* Subtitle "AI BIOGRAPHY & DIGITAL LEGACY PLATFORM" */}
+            <text
+              x="578"
+              y="328"
+              textAnchor="middle"
+              fontFamily="'Inter', sans-serif"
+              fontWeight="500"
+              fontSize="17.2"
+              letterSpacing="0.22em"
+              fill={goldColor}
+              opacity="0.95"
+              id="exact-subtitle-text"
+            >
+              AI BIOGRAPHY & DIGITAL LEGACY PLATFORM
+            </text>
+          </>
+        )}
       </svg>
     </div>
   );
