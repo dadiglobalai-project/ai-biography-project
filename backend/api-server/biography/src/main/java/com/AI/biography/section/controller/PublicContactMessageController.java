@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/public/websites/{websiteId}/contact-messages")
-@CrossOrigin(origins = "*")
 public class PublicContactMessageController {
     private final ContactMessageService contactMessageService;
 

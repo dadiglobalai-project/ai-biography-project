@@ -6,7 +6,6 @@ import com.AI.biography.membership.enums.RefundStatus;
 import com.AI.biography.membership.service.AdminRefundService;
 import jakarta.validation.Valid;
 import java.util.List;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,7 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin/refunds")
-@CrossOrigin(origins = "*")
 public class AdminRefundController {
     private final AdminRefundService adminRefundService;
 

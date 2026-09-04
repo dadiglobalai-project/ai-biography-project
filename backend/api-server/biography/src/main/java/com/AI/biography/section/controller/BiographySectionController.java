@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/websites/{websiteId}/sections")
-@CrossOrigin(origins = "*")
 public class BiographySectionController {
     private final BiographySectionService sectionService;
 

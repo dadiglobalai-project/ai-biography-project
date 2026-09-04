@@ -17,7 +17,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/websites/{websiteId}/media")
-@CrossOrigin(origins = "*")
 public class MediaAssetController {
     private final MediaAssetService mediaAssetService;
 

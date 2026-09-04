@@ -5,7 +5,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/templates")
-@CrossOrigin(origins = "*")
 public class TemplateController {
 
     private final TemplateService templateService;
