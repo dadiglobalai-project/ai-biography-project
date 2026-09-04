@@ -1,5 +1,6 @@
 import React from 'react';
 import BrandLogo from '../BrandLogo';
+import archiveHeroImage from '../../assets/images/celestial_library_1781657848291.jpg';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -16,7 +17,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       >
         {/* Beautiful atmospheric image with no-referrer for safety */}
         <img 
-          src="/src/assets/images/celestial_library_1781657848291.jpg" 
+          src={archiveHeroImage} 
           alt="Xinghuoji Archival Sanctuary"
           referrerPolicy="no-referrer"
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-[12000ms] hover:scale-105"
