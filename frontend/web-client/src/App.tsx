@@ -11,7 +11,9 @@ import DIYDashboard from './pages/DIYDashboard';
 import ProfessionalDashboard from './pages/ProfessionalDashboard';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import PaymentPage from './pages/PaymentPage';
+import PaymentStatusPage from './pages/PaymentStatusPage';
 import AdminMembershipActivationPage from './pages/AdminMembershipActivationPage';
+import AdminRefundRequestsPage from './pages/AdminRefundRequestsPage';
 import LifeJourneyPreviewPage from './pages/LifeJourneyPreviewPage';
 import LifeJourneyEditPage from './pages/LifeJourneyEditPage';
 
@@ -27,7 +29,9 @@ const pageTitles: Record<string, string> = {
   '/professional-dashboard': 'Professional Dashboard | Xinghuoji',
   '/account-settings': 'Profile & Account Settings | Xinghuoji',
   '/payment': 'Payment | Xinghuoji',
+  '/payment/status': 'Payment Status | Xinghuoji',
   '/admin/memberships': 'Membership Activation | Xinghuoji',
+  '/admin/refunds': 'Refund Requests | Xinghuoji',
   '/diy-dashboard/templates/life-journey/preview': 'Life Journey Preview | Xinghuoji',
   '/diy-dashboard/templates/life-journey/edit': 'Edit Life Journey | Xinghuoji',
 };
@@ -59,7 +63,9 @@ export default function App() {
         <Route path="/professional-dashboard" element={<ProfessionalDashboard />} />
         <Route path="/account-settings" element={<AccountSettingsPage />} />
         <Route path="/payment" element={<PaymentPage />} />
+        <Route path="/payment/status" element={<PaymentStatusPage />} />
         <Route path="/admin/memberships" element={<AdminMembershipActivationPage />} />
+        <Route path="/admin/refunds" element={<AdminRefundRequestsPage />} />
         <Route path="/diy-dashboard/templates/:templateId/preview" element={<LifeJourneyPreviewPage />} />
         <Route path="/diy-dashboard/templates/:templateId/edit" element={<LifeJourneyEditPage />} />
         

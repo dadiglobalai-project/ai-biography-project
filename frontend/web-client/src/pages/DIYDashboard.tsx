@@ -29,6 +29,9 @@ const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
 const BIOGRAPHY_LAST_OPENED_STORAGE_KEY = 'xinghuoji.biographies.lastOpenedAt';
 const BIOGRAPHY_LIST_CHANNEL_NAME = 'xinghuoji.biographies';
 const BIOGRAPHY_LIST_CHANGED_TYPE = 'xinghuoji:biographies-changed';
+const BACKEND_TEMPLATE_ID_FALLBACKS: Record<string, string> = {
+  'life-journey': '21004dc9-742f-11f1-b903-d85ed3f9183f',
+};
 
 const SUBJECT_TYPE_BY_RELATION: Record<RelationType, SubjectType> = {
   Myself: 'SELF',
@@ -49,6 +52,11 @@ interface Template {
   tag: string;
   previewPath?: string;
   editPath?: string;
+}
+
+interface TemplateDraftChoice {
+  template: Template;
+  existingDraft: BiographyWebsite;
 }
 
 const readBiographyLastOpened = (): Record<string, string> => {
@@ -75,6 +83,32 @@ const writeBiographyLastOpened = (history: Record<string, string>) => {
 const isBackendDashboardBiography = (website: BiographyWebsite) =>
   Boolean(website.id && !website.id.startsWith('local-'));
 
+const normalizeBiographyIdentityText = (value?: string) =>
+  value?.trim().toLowerCase().replace(/\s+/g, ' ') || '';
+
+const getDashboardBiographyDuplicateKey = (website: BiographyWebsite) =>
+  [
+    normalizeBiographyIdentityText(website.templateId),
+    normalizeBiographyIdentityText(website.title),
+    normalizeBiographyIdentityText(website.subjectType),
+    normalizeBiographyIdentityText(website.status),
+    normalizeBiographyIdentityText(website.subdomain || ''),
+  ].join('|');
+
+const collapseDuplicateDashboardBiographies = (websites: BiographyWebsite[]) => {
+  const websitesByDraftIdentity = new Map<string, BiographyWebsite>();
+
+  websites.forEach((website) => {
+    const duplicateKey = getDashboardBiographyDuplicateKey(website);
+
+    if (!websitesByDraftIdentity.has(duplicateKey)) {
+      websitesByDraftIdentity.set(duplicateKey, website);
+    }
+  });
+
+  return Array.from(websitesByDraftIdentity.values());
+};
+
 const mergeDashboardBiographies = (
   primaryWebsites: BiographyWebsite[],
   fallbackWebsites: BiographyWebsite[]
@@ -88,11 +122,13 @@ const mergeDashboardBiographies = (
     .filter(isBackendDashboardBiography)
     .forEach((website) => websitesById.set(website.id, website));
 
-  return Array.from(websitesById.values()).sort((a, b) => {
+  const sortedWebsites = Array.from(websitesById.values()).sort((a, b) => {
     const dateA = getDateTime(a.updatedAt || a.createdAt);
     const dateB = getDateTime(b.updatedAt || b.createdAt);
     return dateB - dateA;
   });
+
+  return collapseDuplicateDashboardBiographies(sortedWebsites);
 };
 
 const getDateTime = (value?: string) => {
@@ -164,6 +200,7 @@ export default function DIYDashboard() {
   
   // Custom dialog or modal states
   const [modalContent, setModalContent] = useState<{ title: string; desc: string } | null>(null);
+  const [templateDraftChoice, setTemplateDraftChoice] = useState<TemplateDraftChoice | null>(null);
 
   React.useEffect(() => {
     return authService.startAuthSessionHandoffResponder();
@@ -431,7 +468,7 @@ export default function DIYDashboard() {
 
   const buildTemplatePageUrl = (
     path: string,
-    options: { website?: BiographyWebsite; subjectType?: SubjectType; template?: Template } = {}
+    options: { website?: BiographyWebsite; subjectType?: SubjectType; template?: Template; startNew?: boolean } = {}
   ) => {
     const url = new URL(path, window.location.origin);
     if (options.website?.id) {
@@ -443,13 +480,16 @@ export default function DIYDashboard() {
     if (options.template?.backendTemplateId) {
       url.searchParams.set('apiTemplateId', options.template.backendTemplateId);
     }
+    if (options.startNew && !options.website?.id) {
+      url.searchParams.set('newDraft', '1');
+    }
 
     return url.toString();
   };
 
   const openTemplatePage = (
     path: string,
-    options: { website?: BiographyWebsite; subjectType?: SubjectType; template?: Template } = {}
+    options: { website?: BiographyWebsite; subjectType?: SubjectType; template?: Template; startNew?: boolean } = {}
   ) => {
     const pageUrl = buildTemplatePageUrl(path, options);
 
@@ -510,7 +550,7 @@ export default function DIYDashboard() {
 
   const handleSelectTemplate = (template: Template) => {
     setSelectedTemplateId(template.id);
-    setTemplateSelectionMessage(`${template.title} selected. You can now Preview or Edit.`);
+    setTemplateSelectionMessage(`${template.title} selected. You can now Preview or Use Template.`);
   };
 
   const handlePreviewTemplate = (template: Template) => {
@@ -533,6 +573,28 @@ export default function DIYDashboard() {
 
   const getEditorPath = (templateId: string) => {
     return getTemplateByIdentifier(templateId)?.editPath || '';
+  };
+
+  const findExistingDraftForTemplate = (template: Template, subjectType = selectedSubjectType) => {
+    const templateIdentifiers = new Set(
+      [template.id, template.backendTemplateId, BACKEND_TEMPLATE_ID_FALLBACKS[template.id]]
+        .map((value) => value?.trim())
+        .filter((value): value is string => Boolean(value))
+    );
+
+    return biographies
+      .filter((website) => {
+        const isDraft = website.status.toUpperCase() === 'DRAFT';
+        const matchesTemplate = templateIdentifiers.has(website.templateId);
+        const matchesSubjectType = !subjectType || website.subjectType === subjectType;
+
+        return isDraft && matchesTemplate && matchesSubjectType;
+      })
+      .sort((a, b) => {
+        const dateA = getDateTime(a.updatedAt || a.createdAt);
+        const dateB = getDateTime(b.updatedAt || b.createdAt);
+        return dateB - dateA;
+      })[0];
   };
 
   const recordBiographyOpened = (website: BiographyWebsite) => {
@@ -586,7 +648,44 @@ export default function DIYDashboard() {
     }
 
     setSelectedTemplateId(template.id);
-    openTemplatePage(template.editPath, { subjectType: selectedSubjectType, template });
+    const existingDraft = findExistingDraftForTemplate(template);
+
+    if (existingDraft) {
+      setTemplateDraftChoice({ template, existingDraft });
+      return;
+    }
+
+    openTemplatePage(template.editPath, {
+      subjectType: selectedSubjectType,
+      template,
+      startNew: true,
+    });
+  };
+
+  const handleContinueExistingTemplateDraft = () => {
+    if (!templateDraftChoice?.template.editPath) {
+      return;
+    }
+
+    recordBiographyOpened(templateDraftChoice.existingDraft);
+    openTemplatePage(templateDraftChoice.template.editPath, {
+      website: templateDraftChoice.existingDraft,
+      template: templateDraftChoice.template,
+    });
+    setTemplateDraftChoice(null);
+  };
+
+  const handleStartNewTemplateDraft = () => {
+    if (!templateDraftChoice?.template.editPath) {
+      return;
+    }
+
+    openTemplatePage(templateDraftChoice.template.editPath, {
+      subjectType: selectedSubjectType,
+      template: templateDraftChoice.template,
+      startNew: true,
+    });
+    setTemplateDraftChoice(null);
   };
 
   const handleCreateNew = () => {
@@ -611,12 +710,6 @@ export default function DIYDashboard() {
   };
 
   const defaultCreateTemplate = templates.find((template) => template.id === 'life-journey');
-  const createNewUrl = defaultCreateTemplate?.editPath
-    ? buildTemplatePageUrl(defaultCreateTemplate.editPath, {
-        subjectType: selectedSubjectType,
-        template: defaultCreateTemplate,
-      })
-    : '';
   const dashboardLatestDraft = dashboardSummary?.actions?.latestDraftId
     ? biographies.find((website) => website.id === dashboardSummary.actions?.latestDraftId)
     : undefined;
@@ -802,28 +895,13 @@ export default function DIYDashboard() {
 
           {/* Action buttons (Right-aligned in desktop) */}
           <div className="flex items-center gap-3 shrink-0">
-            {createNewUrl ? (
-              <a
-                href={createNewUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => {
-                  if (defaultCreateTemplate) {
-                    setSelectedTemplateId(defaultCreateTemplate.id);
-                  }
-                }}
-                className="px-6 py-3 bg-black hover:bg-slate-900 active:scale-[0.98] text-white rounded-xl text-xs font-bold tracking-wide transition-all duration-150 shadow-sm cursor-pointer"
-              >
-                Create New Biography
-              </a>
-            ) : (
-              <button
-                onClick={handleCreateNew}
-                className="px-6 py-3 bg-black hover:bg-slate-900 active:scale-[0.98] text-white rounded-xl text-xs font-bold tracking-wide transition-all duration-150 shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                Create New Biography
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleCreateNew}
+              className="px-6 py-3 bg-black hover:bg-slate-900 active:scale-[0.98] text-white rounded-xl text-xs font-bold tracking-wide transition-all duration-150 shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              Create New Biography
+            </button>
             {continueDraftUrl && !isLoadingBiographies ? (
               <a
                 href={continueDraftUrl}
@@ -1087,11 +1165,9 @@ export default function DIYDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
             {templates.map((template) => {
               const isSelected = selectedTemplateId === template.id;
+              const existingTemplateDraft = findExistingDraftForTemplate(template);
               const previewUrl = template.previewPath
                 ? buildTemplatePageUrl(template.previewPath, { template })
-                : '';
-              const editUrl = template.editPath
-                ? buildTemplatePageUrl(template.editPath, { subjectType: selectedSubjectType, template })
                 : '';
               return (
                 <div
@@ -1152,7 +1228,7 @@ export default function DIYDashboard() {
                     <div className="pt-3 border-t border-slate-50 space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-mono font-bold tracking-wide text-[#B18625] uppercase">
-                          {isSelected ? 'Selected Active' : 'Select Theme'}
+                          {existingTemplateDraft ? 'Draft Available' : isSelected ? 'Selected Active' : 'Select Theme'}
                         </span>
                         <div className="w-7 h-7 rounded-lg bg-slate-50 text-slate-700 flex items-center justify-center border border-slate-100 group-hover:bg-[#FED362] group-hover:text-slate-900 transition-colors">
                           <ChevronRight className="w-4 h-4" />
@@ -1184,33 +1260,17 @@ export default function DIYDashboard() {
                             Preview
                           </button>
                         )}
-                        {editUrl ? (
-                          <a
-                            href={editUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setSelectedTemplateId(template.id);
-                            }}
-                            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-black px-3 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-slate-900"
-                          >
-                            <PenTool className="w-3.5 h-3.5" />
-                            Edit
-                          </a>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleEditTemplate(template);
-                            }}
-                            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-black px-3 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-slate-900 disabled:opacity-60 disabled:cursor-not-allowed"
-                          >
-                            <PenTool className="w-3.5 h-3.5" />
-                            Edit
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleEditTemplate(template);
+                          }}
+                          className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-black px-3 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-slate-900 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          <PenTool className="w-3.5 h-3.5" />
+                          Use Template
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1245,6 +1305,81 @@ export default function DIYDashboard() {
           &copy; 2026 Xinghuoji. The Eternal Spark. All rights reserved.
         </p>
       </footer>
+
+      <AnimatePresence>
+        {templateDraftChoice && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setTemplateDraftChoice(null)}
+              className="absolute inset-0 bg-[#0A1128]/45 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative z-10 w-full max-w-md rounded-2xl border border-slate-100 bg-white p-6 text-left shadow-2xl md:p-7"
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-100 bg-amber-50 text-[#B18625]">
+                  <BookOpen className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#B18625]">
+                    Existing Draft Found
+                  </p>
+                  <h3 className="mt-1 font-serif-display text-2xl font-semibold leading-tight text-[#0A1128]">
+                    Continue or start new?
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                    You already have a draft using {templateDraftChoice.template.title}. Continue the existing
+                    biography to avoid duplicates, or start a separate new biography.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="truncate text-sm font-bold text-[#0A1128]">
+                  {templateDraftChoice.existingDraft.title}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {templateDraftChoice.existingDraft.subjectType} - Last edited:{' '}
+                  {formatBiographyDateTime(
+                    templateDraftChoice.existingDraft.updatedAt || templateDraftChoice.existingDraft.createdAt
+                  )}
+                </p>
+              </div>
+
+              <div className="mt-6 grid gap-3">
+                <button
+                  type="button"
+                  onClick={handleContinueExistingTemplateDraft}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-black px-4 py-3 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-slate-900"
+                >
+                  Continue Existing Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStartNewTemplateDraft}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
+                >
+                  Start New Biography
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTemplateDraftChoice(null)}
+                  className="inline-flex min-h-10 items-center justify-center rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wide text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Modern Pop-up / Modal Component for interactive user feedback */}
       <AnimatePresence>

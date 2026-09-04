@@ -7,6 +7,7 @@ import {
   BookOpen,
   CheckCircle2,
   Clock3,
+  Copy,
   Eye,
   ExternalLink,
   FileText,
@@ -633,6 +634,18 @@ const getSubjectType = (subjectType?: string): SubjectType => {
   return SUBJECT_TYPES.includes(subjectType as SubjectType) ? (subjectType as SubjectType) : 'SELF';
 };
 
+const normalizeBiographyIdentityText = (value?: string) =>
+  value?.trim().toLowerCase().replace(/\s+/g, ' ') || '';
+
+const getBiographyDateTime = (value?: string) => {
+  if (!value) {
+    return 0;
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
 const formatContactMessageDate = (date?: string) => {
   if (!date) {
     return 'No date';
@@ -757,8 +770,11 @@ export default function LifeJourneyEditPage() {
   const templateRoute = getBiographyTemplateRoute(templateId);
   const websiteId = searchParams.get('websiteId') || '';
   const backendTemplateId = searchParams.get('apiTemplateId') || '';
+  const isStartingNewDraft = searchParams.get('newDraft') === '1' && !websiteId;
   const [draft, setDraft] = useState<BiographyCategory>(() =>
-    loadDraft(templateRoute.id, templateRoute.categoryKey, websiteId)
+    isStartingNewDraft
+      ? cloneTemplateData(templateRoute.categoryKey)
+      : loadDraft(templateRoute.id, templateRoute.categoryKey, websiteId)
   );
   const [website, setWebsite] = useState<BiographyWebsite | null>(null);
   const [saveMessage, setSaveMessage] = useState('Unsaved changes');
@@ -773,6 +789,7 @@ export default function LifeJourneyEditPage() {
   const [isMobileMediaLibraryOpen, setIsMobileMediaLibraryOpen] = useState(false);
   const [isMobileToolbarMenuOpen, setIsMobileToolbarMenuOpen] = useState(false);
   const [isPublishChecklistOpen, setIsPublishChecklistOpen] = useState(false);
+  const [isCheckingPublishAccess, setIsCheckingPublishAccess] = useState(false);
   const [aiWritingAction, setAiWritingAction] = useState<AiWritingAction>('generate');
   const [aiWritingTargetId, setAiWritingTargetId] = useState('');
   const [aiWritingInstructions, setAiWritingInstructions] = useState('');
@@ -3643,7 +3660,7 @@ export default function LifeJourneyEditPage() {
     }
   };
 
-  const handleApplyAiWriting = (mode: 'replace' | 'insert') => {
+  const handleApplyAiWriting = () => {
     const target = getSelectedAiWritingTarget();
 
     if (!target || !hasText(aiWritingResult)) {
@@ -3651,13 +3668,22 @@ export default function LifeJourneyEditPage() {
       return;
     }
 
-    const nextValue =
-      mode === 'insert' && hasText(target.value)
-        ? `${target.value.trim()}\n\n${aiWritingResult.trim()}`
-        : aiWritingResult.trim();
+    target.onReplace(aiWritingResult.trim());
+    setAiWritingMessage('Suggestion replaced the selected field');
+  };
 
-    target.onReplace(nextValue);
-    setAiWritingMessage(mode === 'insert' ? 'Suggestion inserted below' : 'Suggestion replaced the selected field');
+  const handleCopyAiWritingResult = async () => {
+    if (!hasText(aiWritingResult)) {
+      setAiWritingMessage('Generate a suggestion before copying');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(aiWritingResult.trim());
+      setAiWritingMessage('Suggestion copied to clipboard');
+    } catch {
+      setAiWritingMessage('Unable to copy automatically. Select the AI result and copy it manually.');
+    }
   };
 
   const renderTextField = ({
@@ -4553,6 +4579,48 @@ export default function LifeJourneyEditPage() {
     );
   };
 
+  const findReusableBackendDraftForSave = async (resolvedBackendTemplateId: string) => {
+    const targetTemplateAliases = getTemplateLookupAliases([
+      resolvedBackendTemplateId,
+      backendTemplateId,
+      templateRoute.id,
+      templateRoute.title,
+      templateRoute.categoryKey,
+    ]);
+    const targetTitle = normalizeBiographyIdentityText(getBiographyTitle(draft, templateRoute.title));
+    const targetSubjectType = getSubjectType(
+      draft.settings.subjectType || searchParams.get('subjectType') || website?.subjectType
+    );
+    const backendWebsites = await authService.getBiographyWebsites();
+
+    return backendWebsites
+      .filter((candidateWebsite) => {
+        if (!candidateWebsite.id || candidateWebsite.id.startsWith('local-')) {
+          return false;
+        }
+
+        if (candidateWebsite.status.toUpperCase() !== 'DRAFT') {
+          return false;
+        }
+
+        if (candidateWebsite.subjectType !== targetSubjectType) {
+          return false;
+        }
+
+        if (normalizeBiographyIdentityText(candidateWebsite.title) !== targetTitle) {
+          return false;
+        }
+
+        const candidateTemplateAliases = getTemplateLookupAliases([candidateWebsite.templateId]);
+        return Array.from(candidateTemplateAliases).some((alias) => targetTemplateAliases.has(alias));
+      })
+      .sort((a, b) => {
+        const dateA = getBiographyDateTime(a.updatedAt || a.createdAt);
+        const dateB = getBiographyDateTime(b.updatedAt || b.createdAt);
+        return dateB - dateA;
+      })[0] || null;
+  };
+
   const handleSave = async (): Promise<string | null> => {
     saveDraft(templateRoute.id, draft, activeWebsiteId);
 
@@ -4593,6 +4661,38 @@ export default function LifeJourneyEditPage() {
       );
 
       const resolvedBackendTemplateId = await resolveBackendTemplateIdForSave();
+      const reusableWebsite = isStartingNewDraft
+        ? null
+        : await findReusableBackendDraftForSave(resolvedBackendTemplateId);
+
+      if (reusableWebsite) {
+        setSaveMessage('Existing draft found. Saving updates to that biography...');
+        setWebsite(reusableWebsite);
+
+        const nextSearchParams = new URLSearchParams(searchParams);
+        nextSearchParams.set('websiteId', reusableWebsite.id);
+        nextSearchParams.set('apiTemplateId', resolvedBackendTemplateId);
+        nextSearchParams.delete('newDraft');
+        setSearchParams(nextSearchParams, { replace: true });
+
+        saveDraft(templateRoute.id, draft, reusableWebsite.id);
+        removeTemplateDraft(templateRoute.id);
+
+        if (previousLocalWebsiteId) {
+          removeDraft(templateRoute.id, previousLocalWebsiteId);
+          authService.removeLocalBiographyWebsite(previousLocalWebsiteId);
+        }
+
+        await syncBiographySectionsToBackend(reusableWebsite.id);
+        saveDraft(templateRoute.id, draft, reusableWebsite.id);
+        notifyBiographyListChanged({
+          ...reusableWebsite,
+          updatedAt: new Date().toISOString(),
+        });
+        setSaveMessage('Saved to existing biography draft');
+        return reusableWebsite.id;
+      }
+
       const savedWebsite = await authService.createBackendBiographyWebsite({
         title: getBiographyTitle(draft, templateRoute.title),
         templateId: resolvedBackendTemplateId,
@@ -4603,6 +4703,7 @@ export default function LifeJourneyEditPage() {
       const nextSearchParams = new URLSearchParams(searchParams);
       nextSearchParams.set('websiteId', savedWebsite.id);
       nextSearchParams.set('apiTemplateId', resolvedBackendTemplateId);
+      nextSearchParams.delete('newDraft');
       setSearchParams(nextSearchParams, { replace: true });
 
       saveDraft(templateRoute.id, draft, savedWebsite.id);
@@ -4633,32 +4734,95 @@ export default function LifeJourneyEditPage() {
     setIsPublishChecklistOpen(true);
   };
 
-  const handleProceedToPayment = async () => {
-    if (!isPublishReady) {
+  const handleContinuePublishFlow = async () => {
+    if (!isPublishReady || isCheckingPublishAccess) {
       return;
     }
 
-    const savedWebsiteId = await handleSave();
-    const paymentWebsiteId = savedWebsiteId || activeWebsiteId || website?.id || '';
-    const editorUrl = new URL(`/diy-dashboard/templates/${templateRoute.id}/edit`, window.location.origin);
-    const paymentUrl = new URL('/payment', window.location.origin);
+    setIsCheckingPublishAccess(true);
 
-    if (paymentWebsiteId) {
+    try {
+      const savedWebsiteId = await handleSave();
+      const paymentWebsiteId = savedWebsiteId || activeWebsiteId || website?.id || '';
+      const editorUrl = new URL(`/diy-dashboard/templates/${templateRoute.id}/edit`, window.location.origin);
+
+      if (!paymentWebsiteId || paymentWebsiteId.startsWith('local-')) {
+        setSaveMessage('Save this biography to the database before publishing');
+        return;
+      }
+
       editorUrl.searchParams.set('websiteId', paymentWebsiteId);
+
+      if (backendTemplateId) {
+        editorUrl.searchParams.set('apiTemplateId', backendTemplateId);
+      }
+
+      const biographyTitle = getBiographyTitle(draft, templateRoute.title);
+      const membership = await authService.getCurrentMembership();
+      const membershipStatus = membership?.status?.toUpperCase() || '';
+
+      if (membershipStatus === 'ACTIVE') {
+        const previewUrl = new URL(`/diy-dashboard/templates/${templateRoute.id}/preview`, window.location.origin);
+        previewUrl.searchParams.set('websiteId', paymentWebsiteId);
+        previewUrl.searchParams.set('publishReady', '1');
+
+        if (backendTemplateId) {
+          previewUrl.searchParams.set('apiTemplateId', backendTemplateId);
+        }
+
+        setIsPublishChecklistOpen(false);
+        setSaveMessage('Membership active. Opening publish-ready preview.');
+        navigate(`${previewUrl.pathname}${previewUrl.search}`);
+        return;
+      }
+
+      let currentPayment = null;
+
+      try {
+        currentPayment = await authService.getCurrentPayment();
+      } catch {
+        currentPayment = null;
+      }
+
+      const paymentStatus = currentPayment?.status?.toUpperCase() || '';
+
+      if (
+        currentPayment?.paymentId &&
+        (paymentStatus === 'PENDING' || paymentStatus === 'CONFIRMED')
+      ) {
+        const statusUrl = new URL('/payment/status', window.location.origin);
+        statusUrl.searchParams.set('websiteId', paymentWebsiteId);
+        statusUrl.searchParams.set('paymentId', currentPayment.paymentId);
+        statusUrl.searchParams.set('templateId', templateRoute.id);
+        statusUrl.searchParams.set('title', biographyTitle);
+        statusUrl.searchParams.set('returnTo', `${editorUrl.pathname}${editorUrl.search}`);
+
+        setIsPublishChecklistOpen(false);
+        setSaveMessage('Payment request found. Check payment status.');
+        navigate(`${statusUrl.pathname}${statusUrl.search}`);
+        return;
+      }
+
+      const paymentUrl = new URL('/payment', window.location.origin);
       paymentUrl.searchParams.set('websiteId', paymentWebsiteId);
+      paymentUrl.searchParams.set('templateId', templateRoute.id);
+      paymentUrl.searchParams.set('title', biographyTitle);
+      paymentUrl.searchParams.set('returnTo', `${editorUrl.pathname}${editorUrl.search}`);
+
+      setIsPublishChecklistOpen(false);
+      setSaveMessage('No active membership yet. Continue payment to publish.');
+      navigate(`${paymentUrl.pathname}${paymentUrl.search}`);
+    } catch (err: any) {
+      const message = err?.message || 'Unable to verify membership before publishing';
+      if (/unauthorized|forbidden|session|token/i.test(message)) {
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      setSaveMessage(message);
+    } finally {
+      setIsCheckingPublishAccess(false);
     }
-
-    if (backendTemplateId) {
-      editorUrl.searchParams.set('apiTemplateId', backendTemplateId);
-    }
-
-    paymentUrl.searchParams.set('templateId', templateRoute.id);
-    paymentUrl.searchParams.set('title', getBiographyTitle(draft, templateRoute.title));
-    paymentUrl.searchParams.set('returnTo', `${editorUrl.pathname}${editorUrl.search}`);
-
-    setIsPublishChecklistOpen(false);
-    setSaveMessage('Draft saved. Continue payment to publish');
-    navigate(`${paymentUrl.pathname}${paymentUrl.search}`);
   };
 
   const handleReset = () => {
@@ -5548,7 +5712,7 @@ export default function LifeJourneyEditPage() {
 
             {selectedTarget && (
               <label className="block space-y-1.5">
-                <span className="text-xs font-bold text-slate-500">Your content</span>
+                <span className="text-xs font-bold text-slate-500">Selected field content</span>
                 <textarea
                   rows={6}
                   value={selectedTarget.value}
@@ -5646,18 +5810,19 @@ export default function LifeJourneyEditPage() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => handleApplyAiWriting('replace')}
+                  onClick={handleApplyAiWriting}
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-slate-800"
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  Replace
+                  Replace Field
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleApplyAiWriting('insert')}
+                  onClick={() => void handleCopyAiWritingResult()}
                   className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
                 >
-                  Insert Below
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy Result
                 </button>
                 <button
                   type="button"
@@ -5682,7 +5847,7 @@ export default function LifeJourneyEditPage() {
           )}
 
           <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
-            Saved biographies use the backend AI Writing endpoint. Unsaved local drafts use a local fallback.
+            Save this biography to My Biographies before using the backend AI Writing endpoint.
           </p>
         </div>
       </section>
@@ -6190,7 +6355,8 @@ export default function LifeJourneyEditPage() {
             {renderPublishChecklistGroup('Recommended Polish', recommendedPublishItems)}
 
             <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
-              Publishing starts after payment. When the checklist passes, continue to checkout so the draft can be prepared for launch.
+              Publishing requires an active DIY membership. If your membership is already active,
+              this biography can continue without another payment.
             </p>
           </div>
 
@@ -6213,12 +6379,12 @@ export default function LifeJourneyEditPage() {
             </button>
             <button
               type="button"
-              onClick={() => void handleProceedToPayment()}
-              disabled={!isPublishReady || isSaving}
+              onClick={() => void handleContinuePublishFlow()}
+              disabled={!isPublishReady || isSaving || isCheckingPublishAccess}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Globe2 className="h-4 w-4" />
-              Proceed to Payment
+              {isCheckingPublishAccess ? 'Checking Access' : 'Continue'}
             </button>
           </div>
         </section>
@@ -6362,7 +6528,7 @@ export default function LifeJourneyEditPage() {
             <button
               type="button"
               onClick={handleOpenPublishChecklist}
-              disabled={isSaving}
+              disabled={isSaving || isCheckingPublishAccess}
               className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-950 px-2.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:gap-2 sm:text-sm lg:px-4 lg:py-2.5"
             >
               <Globe2 className="h-4 w-4" />

@@ -7,12 +7,13 @@ import {
   CheckCircle2,
   Circle,
   Clock3,
+  Copy,
   FileText,
   HelpCircle,
   Mail,
+  QrCode,
   ReceiptText,
   ShieldCheck,
-  UploadCloud,
   UserCircle,
 } from 'lucide-react';
 import BrandLogo from '../components/BrandLogo';
@@ -35,12 +36,11 @@ const includedFeatures = [
 ];
 
 const DEFAULT_PAYMENT_METHOD = 'WECHAT';
+const WECHAT_PAYMENT_QR_URL = import.meta.env.VITE_WECHAT_PAYMENT_QR_URL?.trim() || '';
+const WECHAT_RECEIVING_ACCOUNT =
+  import.meta.env.VITE_WECHAT_RECEIVING_ACCOUNT?.trim() || 'Xinghuoji WeChat receiving account';
 
-const fallbackPrice = new Intl.NumberFormat('en-PH', {
-  style: 'currency',
-  currency: 'PHP',
-  maximumFractionDigits: 0,
-}).format(2499);
+const fallbackPrice = 'RMB 360';
 
 const getInitials = (name: string) => {
   const initials = name
@@ -57,6 +57,10 @@ const getInitials = (name: string) => {
 const formatMoney = (amount: number, currency: string) => {
   if (!amount || !currency) {
     return fallbackPrice;
+  }
+
+  if (currency.toUpperCase() === 'CNY') {
+    return `RMB ${amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
   }
 
   try {
@@ -104,13 +108,13 @@ export default function PaymentPage() {
   const [accountEmail, setAccountEmail] = React.useState('');
   const [accountName, setAccountName] = React.useState('');
   const [accountProfilePhoto, setAccountProfilePhoto] = React.useState('');
-  const [proofFileName, setProofFileName] = React.useState('');
   const [membership, setMembership] = React.useState<CurrentMembership | null>(null);
   const [plans, setPlans] = React.useState<MembershipPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = React.useState('');
   const [currentPayment, setCurrentPayment] = React.useState<PaymentResponse | null>(null);
   const [isLoadingBilling, setIsLoadingBilling] = React.useState(true);
   const [isCreatingPayment, setIsCreatingPayment] = React.useState(false);
+  const [copiedPaymentRemark, setCopiedPaymentRemark] = React.useState(false);
   const [paymentMessage, setPaymentMessage] = React.useState('');
   const [paymentError, setPaymentError] = React.useState('');
 
@@ -211,6 +215,41 @@ export default function PaymentPage() {
     navigate(returnTo);
   };
 
+  const handleCopyPaymentRemark = async () => {
+    const remark =
+      currentPayment?.paymentRemark || currentPayment?.paymentReference || currentPayment?.paymentId || '';
+
+    if (!remark) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(remark);
+      setCopiedPaymentRemark(true);
+      window.setTimeout(() => setCopiedPaymentRemark(false), 1800);
+    } catch {
+      setPaymentError('Unable to copy the payment remark. Please copy it manually.');
+    }
+  };
+
+  const getPaymentStatusUrl = (payment?: PaymentResponse | null) => {
+    const statusUrl = new URL('/payment/status', window.location.origin);
+
+    if (websiteId) {
+      statusUrl.searchParams.set('websiteId', websiteId);
+    }
+
+    if (payment?.paymentId) {
+      statusUrl.searchParams.set('paymentId', payment.paymentId);
+    }
+
+    statusUrl.searchParams.set('templateId', templateRoute.id);
+    statusUrl.searchParams.set('title', biographyTitle);
+    statusUrl.searchParams.set('returnTo', returnTo);
+
+    return `${statusUrl.pathname}${statusUrl.search}`;
+  };
+
   const handleCreatePaymentRequest = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -237,7 +276,7 @@ export default function PaymentPage() {
         paymentMethod: DEFAULT_PAYMENT_METHOD,
       });
       setCurrentPayment(payment);
-      setPaymentMessage('Payment request created. Please wait for admin confirmation after payment is verified.');
+      setPaymentMessage('Payment request created. Pay through WeChat using the exact payment remark below, then wait for admin confirmation.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to create payment request.';
 
@@ -245,7 +284,7 @@ export default function PaymentPage() {
         try {
           const payment = await authService.getCurrentPayment();
           setCurrentPayment(payment);
-          setPaymentMessage('You already have a pending payment request. The latest request is shown here.');
+          setPaymentMessage('You already have a pending payment request. Continue with the payment details shown here.');
           setPaymentError('');
         } catch {
           setPaymentError(message);
@@ -259,6 +298,9 @@ export default function PaymentPage() {
   };
 
   const selectedPlan = plans.find((plan) => plan.planId === selectedPlanId);
+  const hasActiveMembership = membership?.status === 'ACTIVE';
+  const normalizedPaymentStatus = currentPayment?.status?.toUpperCase() || '';
+  const isPendingPayment = normalizedPaymentStatus === 'PENDING';
   const displayAmount = currentPayment
     ? formatMoney(currentPayment.amount, currentPayment.currency)
     : selectedPlan
@@ -266,6 +308,9 @@ export default function PaymentPage() {
       : fallbackPrice;
   const paymentReferenceCode =
     currentPayment?.paymentReference || currentPayment?.paymentId || websiteId || 'Generated after payment request';
+  const paymentRemark = currentPayment?.paymentRemark || currentPayment?.paymentReference || currentPayment?.paymentId || '';
+  const canShowWechatInstructions = Boolean(currentPayment?.paymentId && normalizedPaymentStatus !== 'REJECTED' && normalizedPaymentStatus !== 'FAILED');
+  const canViewStatus = Boolean(currentPayment?.paymentId || hasActiveMembership);
   const membershipStatus = membership?.status || 'No active membership';
   const paymentStatus = currentPayment?.status || 'No payment request yet';
   const profileButtonLabel = accountName || accountEmail || 'Profile';
@@ -281,7 +326,7 @@ export default function PaymentPage() {
             aria-label="Xinghuoji homepage"
           >
             <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm transition group-hover:border-[#B18625]">
-              <BrandLogo variant="mobile" className="w-10" />
+              <BrandLogo variant="mark" className="w-9" />
             </span>
             <span className="hidden min-w-0 sm:block">
               <BrandLogo variant="mobile" className="w-36" />
@@ -395,14 +440,14 @@ export default function PaymentPage() {
           <div className="mx-auto max-w-6xl">
             <div className="max-w-3xl">
               <p className="font-mono text-xs font-bold uppercase text-[#B18625]">
-                Manual Payment Confirmation
+                DIY Membership Payment
               </p>
               <h1 className="mt-3 text-4xl font-semibold leading-tight text-slate-950 sm:text-5xl">
-                Awaiting Admin Activation
+                Complete WeChat Payment
               </h1>
               <p className="mt-4 text-lg leading-relaxed text-slate-600">
-                Payment gateway integration is paused for now. After payment is confirmed manually,
-                the administrator will activate the user's membership in the system.
+                Create a payment request, pay RMB 360 through WeChat, then wait for admin
+                verification. Once confirmed, your DIY membership becomes active for 1 year.
               </p>
             </div>
 
@@ -410,8 +455,9 @@ export default function PaymentPage() {
               <div className="flex items-start gap-3">
                 <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#B18625]" />
                 <p>
-                  China payment flow uses manual member activation. Philippine and international
-                  payment integrations are temporarily suspended until the final payment methods are confirmed.
+                  Enter the exact payment remark shown below when paying through WeChat. The
+                  admin will match that remark to your pending payment request before activating
+                  your membership.
                 </p>
               </div>
             </div>
@@ -494,8 +540,8 @@ export default function PaymentPage() {
                       <ShieldCheck className="h-4 w-4 text-[#B18625]" />
                     </div>
                     <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                      Create a backend payment request first. After the payment is confirmed manually,
-                      the admin activates the membership in the system.
+                      Create a backend payment request first, then use the generated reference
+                      and payment remark for the manual WeChat payment.
                     </p>
                   </div>
                   <span className="inline-flex w-fit items-center gap-2 rounded-full border border-amber-100 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
@@ -597,16 +643,16 @@ export default function PaymentPage() {
                 <div className="mt-6 grid gap-4 sm:grid-cols-3">
                   {[
                     {
-                      title: 'Send Payment',
-                      description: 'Use the payment channel confirmed by the administrator.',
+                      title: 'Create Request',
+                      description: 'Backend creates a pending payment with a reference.',
                     },
                     {
-                      title: 'Use Backend Reference',
-                      description: 'Backend generates the payment reference for admin checking.',
+                      title: 'Pay via WeChat',
+                      description: 'Scan the QR code and enter the exact payment remark.',
                     },
                     {
-                      title: 'Wait for Activation',
-                      description: 'Admin activates membership after confirming payment.',
+                      title: 'Admin Confirms',
+                      description: 'Admin matches the remark and activates your membership.',
                     },
                   ].map((item, index) => (
                     <div key={item.title} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
@@ -619,13 +665,74 @@ export default function PaymentPage() {
                   ))}
                 </div>
 
-                <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
-                  <div className="flex items-start gap-3">
-                    <FileText className="mt-0.5 h-5 w-5 shrink-0 text-[#B18625]" />
-                    <div>
-                      <p className="text-sm font-bold text-slate-950">Payment Reference Code</p>
-                      <p className="mt-1 break-all font-mono text-sm text-slate-700">{paymentReferenceCode}</p>
+                <div className="mt-8 grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      {WECHAT_PAYMENT_QR_URL ? (
+                        <img
+                          src={WECHAT_PAYMENT_QR_URL}
+                          alt="WeChat payment QR code"
+                          className="h-full w-full object-contain p-3"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full flex-col items-center justify-center px-6 text-center">
+                          <QrCode className="h-14 w-14 text-slate-300" />
+                          <p className="mt-4 text-sm font-bold text-slate-700">WeChat QR Pending</p>
+                          <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                            Add the official QR image URL as VITE_WECHAT_PAYMENT_QR_URL.
+                          </p>
+                        </div>
+                      )}
                     </div>
+                    <p className="mt-3 text-center text-xs font-semibold text-slate-500">
+                      Receiving account: {WECHAT_RECEIVING_ACCOUNT}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
+                    <div className="flex items-start gap-3">
+                      <FileText className="mt-0.5 h-5 w-5 shrink-0 text-[#B18625]" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-950">Backend Payment Reference</p>
+                        <p className="mt-1 break-all font-mono text-sm text-slate-700">{paymentReferenceCode}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 rounded-xl border border-amber-100 bg-amber-50 px-4 py-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
+                            WeChat Payment Remark
+                          </p>
+                          <p className="mt-2 break-all font-mono text-base font-bold text-slate-950">
+                            {paymentRemark || 'Create a payment request to generate this remark'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCopyPaymentRemark}
+                          disabled={!paymentRemark}
+                          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-bold text-amber-800 transition hover:border-[#B18625] hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <Copy className="h-4 w-4" />
+                          {copiedPaymentRemark ? 'Copied' : 'Copy'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {!canShowWechatInstructions && (
+                      <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold leading-relaxed text-slate-500">
+                        Create a payment request first so the admin has a backend record to match
+                        against the WeChat payment remark.
+                      </div>
+                    )}
+
+                    <ol className="mt-5 space-y-2 text-sm leading-relaxed text-slate-600">
+                      <li>1. Create a payment request if no pending request exists.</li>
+                      <li>2. Scan the WeChat QR code and pay {displayAmount}.</li>
+                      <li>3. Put the exact payment remark in the WeChat payment remarks field.</li>
+                      <li>4. Wait for admin verification and membership activation.</li>
+                    </ol>
                   </div>
                 </div>
 
@@ -654,30 +761,12 @@ export default function PaymentPage() {
                   </div>
                 </div>
 
-                <div className="mt-5">
-                  <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center transition hover:border-[#B18625] hover:bg-amber-50/40">
-                    <UploadCloud className="h-6 w-6 text-[#B18625]" />
-                    <span className="mt-3 text-sm font-bold text-slate-950">
-                      {proofFileName || 'Attach payment proof'}
-                    </span>
-                    <span className="mt-1 text-xs text-slate-500">
-                      UI only for now; the payment endpoint does not accept files yet.
-                    </span>
-                    <input
-                      type="file"
-                      className="sr-only"
-                      accept="image/png,image/jpeg,application/pdf"
-                      onChange={(event) => setProofFileName(event.target.files?.[0]?.name || '')}
-                    />
-                  </label>
-                </div>
-
                 <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                   <div className="flex items-start gap-3">
                     <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
                     <p>
-                      This page creates a pending backend payment request. Live payment processing
-                      and proof upload are still outside this endpoint set.
+                      The 7-day period is a refund window after payment confirmation, not a free
+                      trial. Refunds are full refunds only within the backend-validated refund window.
                     </p>
                   </div>
                 </div>
@@ -685,11 +774,29 @@ export default function PaymentPage() {
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                   <button
                     type="submit"
-                    disabled={isLoadingBilling || isCreatingPayment || !selectedPlan || membership?.status === 'ACTIVE'}
+                    disabled={
+                      isLoadingBilling ||
+                      isCreatingPayment ||
+                      !selectedPlan ||
+                      hasActiveMembership ||
+                      isPendingPayment
+                    }
                     className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <ReceiptText className="h-4 w-4" />
-                    {isCreatingPayment ? 'Creating Request...' : 'Create Payment Request'}
+                    {isCreatingPayment
+                      ? 'Creating Request...'
+                      : isPendingPayment
+                        ? 'Payment Request Created'
+                        : 'Create Payment Request'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate(getPaymentStatusUrl(currentPayment))}
+                    disabled={!canViewStatus}
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {hasActiveMembership ? 'View Membership Status' : 'View Payment Status'}
                   </button>
                   <button
                     type="button"
