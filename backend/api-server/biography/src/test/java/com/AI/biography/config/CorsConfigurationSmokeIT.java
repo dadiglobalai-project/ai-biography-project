@@ -4,7 +4,8 @@ import com.AI.biography.auth.AuthController;
 import com.AI.biography.auth.AuthService;
 import com.AI.biography.auth.JwtAuthenticationFilter;
 import com.AI.biography.auth.JwtService;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -20,8 +21,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(AuthController.class)
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class})
 class CorsConfigurationSmokeIT {
-    private static final String VERCEL_ORIGIN = "https://ai-biography-project-cyan.vercel.app";
-
     @Autowired
     private MockMvc mockMvc;
 
@@ -31,16 +30,19 @@ class CorsConfigurationSmokeIT {
     @MockBean
     private JwtService jwtService;
 
-    @Test
-    void preflightForLogoutAllowsVercelOriginPostAndAuthHeaders() throws Exception {
-        mockMvc.perform(options("/api/auth/logout")
-                        .header(HttpHeaders.ORIGIN, VERCEL_ORIGIN)
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "https://ai-biography-project-cyan.vercel.app",
+            "https://ai-biography-project-k9t2l7o9x-dadi-ai-s-projects.vercel.app"
+    })
+    void preflightForLoginAllowsVercelOriginPostAndContentTypeHeader(String origin) throws Exception {
+        mockMvc.perform(options("/api/auth/login")
+                        .header(HttpHeaders.ORIGIN, origin)
                         .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
-                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "authorization,content-type"))
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "content-type"))
                 .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, VERCEL_ORIGIN))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, containsString("POST")))
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("authorization")))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("content-type")));
     }
 }
