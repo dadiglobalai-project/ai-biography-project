@@ -1,21 +1,16 @@
 import React from 'react';
+import { AdminHeader, AdminNavigation } from '../components/AdminNavigation';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   BadgeCheck,
-  Bell,
-  BookOpen,
   CheckCircle2,
   Clock3,
   FileText,
-  HelpCircle,
   Loader2,
-  LogOut,
-  Monitor,
   RefreshCw,
   RotateCcw,
   Search,
-  Settings,
   ShieldCheck,
   Users,
   XCircle,
@@ -353,124 +348,19 @@ export default function AdminRefundRequestsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f7f7f5] text-[#07142e]">
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="flex h-20 items-center justify-between px-5 sm:px-8">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="text-2xl font-bold text-[#07142e] transition hover:text-[#8A6500]"
-          >
-            Xinghuoji
-          </button>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
-              aria-label="Notifications"
-            >
-              <Bell className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
-              aria-label="Admin settings"
-            >
-              <Settings className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/account-settings')}
-              className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white p-1 shadow-sm transition hover:border-[#B18625]"
-              aria-label="Admin profile"
-            >
-              <span className="flex h-full w-full items-center justify-center rounded-full bg-[#07142e] text-xs font-bold text-white">
-                AD
-              </span>
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="admin-page">
+      <AdminHeader />
+      <div className="admin-layout">
+        <AdminNavigation onLogout={handleLogout} />
 
-      <div className="grid min-h-[calc(100vh-80px)] lg:grid-cols-[320px_minmax(0,1fr)_420px]">
-        <aside className="border-b border-slate-200 bg-[#f3f2f0] px-5 py-6 lg:border-b-0 lg:border-r">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-slate-200 bg-white text-[#8A6500] shadow-sm">
-              <Monitor className="h-7 w-7" />
-            </div>
+        <main className="admin-main">
+          <div className="admin-main-content">
             <div>
-              <p className="text-xl font-bold">Admin Panel</p>
-              <p className="text-sm text-slate-500">System Oversight</p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setPageMessage('Report generation needs a backend export endpoint.')}
-            className="mt-6 flex w-full items-center justify-center rounded-lg bg-black px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
-          >
-            Generate Report
-          </button>
-
-          <nav className="mt-10 space-y-2">
-            <button
-              type="button"
-              onClick={() => navigate('/admin/memberships')}
-              className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-white hover:text-[#07142e]"
-            >
-              <Monitor className="h-5 w-5" />
-              Membership Activation
-            </button>
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg bg-[#FED362]/60 px-4 py-3 text-left font-bold text-[#07142e]"
-            >
-              <FileText className="h-5 w-5" />
-              Refund Requests
-            </button>
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-white hover:text-[#07142e]"
-            >
-              <Users className="h-5 w-5" />
-              User Management
-            </button>
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-white hover:text-[#07142e]"
-            >
-              <BookOpen className="h-5 w-5" />
-              Biography Management
-            </button>
-          </nav>
-
-          <div className="mt-10 hidden lg:block" />
-          <div className="mt-10 space-y-2 border-t border-slate-200 pt-6 lg:mt-[520px]">
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-white hover:text-[#07142e]"
-            >
-              <HelpCircle className="h-5 w-5" />
-              Support
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleLogout()}
-              className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left font-semibold text-slate-700 transition hover:bg-white hover:text-[#07142e]"
-            >
-              <LogOut className="h-5 w-5" />
-              Sign Out
-            </button>
-          </div>
-        </aside>
-
-        <main className="min-w-0 px-5 py-8 sm:px-8 lg:px-10 lg:py-12">
-          <div className="mx-auto max-w-4xl">
-            <div>
-              <h1 className="text-4xl font-semibold leading-tight sm:text-5xl">
+              <p className="admin-eyebrow">COMMUNITY OPERATIONS</p>
+              <h1 className="admin-title">
                 Refund Requests
               </h1>
-              <p className="mt-3 text-lg text-slate-600">
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-500">
                 Review 7-day cancellation requests and complete manual refunds after verification.
               </p>
             </div>
@@ -487,40 +377,41 @@ export default function AdminRefundRequestsPage() {
               </div>
             )}
 
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="admin-summary">
               {summaryCards.map((card) => {
                 const Icon = card.icon;
 
                 return (
                   <div
                     key={card.label}
-                    className={`min-h-40 rounded-lg border border-slate-200 bg-white p-5 shadow-sm ${card.className}`}
+                    className={`admin-stat ${card.className}`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <p className="max-w-[140px] text-lg font-semibold leading-snug">{card.label}</p>
+                      <p className="text-xs font-semibold leading-snug text-slate-500">{card.label}</p>
                       <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${card.iconClassName}`}>
                         <Icon className="h-5 w-5" />
                       </span>
                     </div>
-                    <p className="mt-6 text-5xl font-semibold leading-none">{card.value}</p>
+                    <p className="mt-5 text-3xl font-semibold leading-none tracking-tight tabular-nums">{card.value}</p>
                   </div>
                 );
               })}
             </div>
 
-            <section className="mt-10 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-              <div className="flex flex-col gap-3 border-b border-slate-200 bg-white p-4 lg:flex-row">
+            <section className="admin-queue">
+              <div className="admin-queue-heading"><div><h2>Request queue</h2><p>Select a request to review its details.</p></div><span>Live records</span></div>
+              <div className="admin-filters">
                 <label className="flex min-h-12 flex-1 items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 text-slate-500">
                   <Search className="h-5 w-5 shrink-0" />
                   <input
-                    value={searchQuery}
+                    aria-label="Search requests" value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     placeholder="Search by user, email, payment ID, refund ID, or reason"
                     className="min-w-0 flex-1 bg-transparent text-sm text-slate-950 outline-none"
                   />
                 </label>
                 <select
-                  value={statusFilter}
+                  aria-label="Filter by status" value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value as RefundStatus | 'All')}
                   className="min-h-12 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-[#B18625] focus:ring-4 focus:ring-amber-100"
                 >
@@ -565,6 +456,14 @@ export default function AdminRefundRequestsPage() {
                         <tr
                           key={refund.id}
                           onClick={() => handleSelectRefund(refund)}
+                          tabIndex={0}
+                          aria-selected={isSelected}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              handleSelectRefund(refund);
+                            }
+                          }}
                           className={`cursor-pointer transition ${
                             isSelected ? 'bg-amber-50/60' : 'bg-white hover:bg-slate-50'
                           }`}
@@ -614,6 +513,12 @@ export default function AdminRefundRequestsPage() {
                 ))}
               </div>
 
+              {isLoadingRefunds && (
+                <div role="status" className="flex items-center justify-center gap-2 border-t border-slate-200 px-5 py-10 text-sm text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />Loading requests...
+                </div>
+              )}
+
               {!isLoadingRefunds && filteredRefunds.length === 0 && (
                 <div className="border-t border-slate-200 px-5 py-12 text-center text-sm text-slate-500">
                   No admin refunds found for the selected filters.
@@ -637,12 +542,12 @@ export default function AdminRefundRequestsPage() {
           </div>
         </main>
 
-        <aside className="border-t border-slate-200 bg-white lg:border-l lg:border-t-0">
+        <aside className="admin-details" aria-label="Request details">
           {selectedRefund ? (
-            <div className="sticky top-20">
+            <div className="admin-details-content">
               <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-7">
                 <div>
-                  <h2 className="text-2xl font-bold">Refund Details</h2>
+                  <h2 className="text-lg font-semibold">Refund details</h2>
                   {isLoadingDetails && (
                     <p className="mt-1 inline-flex items-center gap-2 text-sm text-slate-500">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -655,7 +560,7 @@ export default function AdminRefundRequestsPage() {
                 </span>
               </div>
 
-              <div className="max-h-[calc(100vh-160px)] overflow-y-auto px-6 py-7">
+              <div className="admin-details-body px-6 py-7">
                 <span className={`inline-flex rounded-full border px-4 py-1.5 text-sm font-bold ${refundStatusStyles[selectedRefund.status]}`}>
                   {refundStatusLabels[selectedRefund.status]}
                 </span>
@@ -726,7 +631,7 @@ export default function AdminRefundRequestsPage() {
                   />
                 </div>
 
-                <div className="mt-8 space-y-3">
+                <div className="admin-action-footer mt-8 space-y-3">
                   <button
                     type="button"
                     onClick={() => void handleApproveRefund()}
@@ -765,7 +670,8 @@ export default function AdminRefundRequestsPage() {
               </div>
             </div>
           ) : (
-            <div className="p-8 text-slate-500">
+            <div className="admin-detail-empty">
+              <ShieldCheck className="mx-auto mb-4 h-9 w-9 text-slate-300" />
               {isLoadingRefunds ? 'Loading admin refunds...' : 'Select a refund request to review.'}
             </div>
           )}

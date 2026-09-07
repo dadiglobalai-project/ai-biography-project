@@ -3220,87 +3220,83 @@ export default function LifeJourneyEditPage() {
       return normalizedSection;
     };
 
-    await syncSection(
+    await Promise.all([
+      syncSection(
       'Hero',
       { key: 'hero', title: 'Hero', sortOrder: 1, order: 1, isVisible: true },
       (sections) => getBackendSectionForEditorSection('hero', sections),
       () => authService.createHeroSection(targetWebsiteId, buildHeroSectionPayload(null, omittedMediaAssetIds)),
       async (section) => {
-        const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
-        const sectionToUpdate = detailedSection || section;
+        const sectionToUpdate = section;
         return authService.updateHeroSection(
           targetWebsiteId,
           sectionToUpdate.id,
           buildHeroSectionPayload(sectionToUpdate, omittedMediaAssetIds)
         );
       }
-    );
+      ),
 
-    await syncSection(
+      syncSection(
       'Chronicle',
       { key: 'chronicle', title: 'Chronicle', sortOrder: 2, order: 2, isVisible: true },
       (sections) => getBackendSectionForEditorSection('about', sections),
       () => authService.createChronicleSection(targetWebsiteId, buildChronicleSectionPayload()),
       async (section) => {
-        const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
-        const sectionToUpdate = detailedSection || section;
+        const sectionToUpdate = section;
         return authService.updateChronicleSection(
           targetWebsiteId,
           sectionToUpdate.id,
           buildUpdateChronicleSectionPayload(sectionToUpdate)
         );
       }
-    );
+      ),
 
-    await syncSection(
+      syncSection(
       'Pursuits',
       { key: 'pursuits', title: 'Pursuits', sortOrder: 3, order: 3, isVisible: true },
       (sections) => getBackendSectionByAliases(['pursuits', 'pursuit', 'specialized pursuits'], sections),
       () => authService.createPursuitsSection(targetWebsiteId, buildPursuitsSectionPayload(omittedMediaAssetIds)),
       async (section) => {
-        const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
-        const sectionToUpdate = detailedSection || section;
+        const sectionToUpdate = section;
         return authService.updatePursuitsSection(
           targetWebsiteId,
           sectionToUpdate.id,
           buildUpdatePursuitsSectionPayload(sectionToUpdate, omittedMediaAssetIds)
         );
       }
-    );
+      ),
 
-    await syncSection(
+      syncSection(
       'Timeline',
       { key: 'timeline', title: 'Timeline', sortOrder: 4, order: 4, isVisible: true },
       (sections) => getBackendSectionForEditorSection('timeline', sections),
       () => authService.createTimelineSection(targetWebsiteId, buildTimelineSectionPayload(omittedMediaAssetIds)),
       async (section) => {
-        const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
-        const sectionToUpdate = detailedSection || section;
+        const sectionToUpdate = section;
         return authService.updateTimelineSection(
           targetWebsiteId,
           sectionToUpdate.id,
           buildUpdateTimelineSectionPayload(sectionToUpdate, omittedMediaAssetIds)
         );
       }
-    );
+      ),
 
-    await syncSection(
+      syncSection(
       'Gallery',
       { key: 'gallery', title: 'Gallery', sortOrder: 5, order: 5, isVisible: true },
       (sections) => getBackendSectionForEditorSection('gallery', sections),
       () => authService.createGallerySection(targetWebsiteId, buildGallerySectionPayload(omittedMediaAssetIds)),
       async (section) => {
-        const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
-        const sectionToUpdate = detailedSection || section;
+        const sectionToUpdate = section;
         return authService.updateGallerySection(
           targetWebsiteId,
           sectionToUpdate.id,
           buildUpdateGallerySectionPayload(sectionToUpdate, omittedMediaAssetIds)
         );
       }
-    );
+      ),
 
-    await syncSection(
+      syncSection(
       'Contact',
       {
         key: 'contact',
@@ -3312,15 +3308,15 @@ export default function LifeJourneyEditPage() {
       (sections) => getBackendSectionForEditorSection('contact', sections),
       () => authService.createContactSection(targetWebsiteId, buildContactSectionPayload()),
       async (section) => {
-        const detailedSection = await authService.getBiographyWebsiteSection(targetWebsiteId, section.id);
-        const sectionToUpdate = detailedSection || section;
+        const sectionToUpdate = section;
         return authService.updateContactSection(
           targetWebsiteId,
           sectionToUpdate.id,
           buildUpdateContactSectionPayload(sectionToUpdate)
         );
       }
-    );
+      ),
+    ]);
 
     const nextSections = sortBackendSections(latestSections);
     setWebsiteSections(nextSections);
