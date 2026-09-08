@@ -28,6 +28,16 @@ public interface BiographySectionRepository extends JpaRepository<BiographySecti
     })
     Optional<BiographySection> findBySectionIdAndWebsiteWebsiteId(String sectionId, String websiteId);
 
+    @EntityGraph(attributePaths = {
+            "timelineSection",
+            "timelineSection.timelineEvents"
+    })
+    Optional<BiographySection> findBySectionIdAndWebsiteWebsiteIdAndWebsiteUserId(
+            String sectionId,
+            String websiteId,
+            String userId
+    );
+
     boolean existsByWebsiteWebsiteIdAndSectionType(String websiteId, SectionType sectionType);
     boolean existsByWebsiteWebsiteIdAndSectionTypeAndSectionIdNot(String websiteId, SectionType sectionType, String sectionId);
 }
