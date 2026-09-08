@@ -27,6 +27,14 @@ public class SecurityConfig {
                 .map(String::trim)
                 .filter(origin -> !origin.isBlank())
                 .toList();
+
+        System.out.println("=== CORS ALLOWED ORIGINS ===");
+
+        this.allowedOrigins.forEach(origin ->
+            System.out.println("ORIGIN=[" + origin + "]")
+        );
+
+        System.out.println("============================");
     }
 
     @Bean
