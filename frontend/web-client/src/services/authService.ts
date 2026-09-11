@@ -2195,7 +2195,7 @@ export const authService = {
         headers: getAuthHeaders(),
       });
     } catch {
-      throw new Error('Unable to reach the API. Start the mock server with: node mock-api-server.mjs');
+      throw new Error('Unable to reach the biography API. Check your connection and try again.');
     }
     if (response.status !== 204) {
       const data = await response.json().catch(() => null);
