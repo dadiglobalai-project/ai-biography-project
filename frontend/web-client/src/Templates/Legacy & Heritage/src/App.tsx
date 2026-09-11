@@ -6,6 +6,7 @@ import {
   X, Volume2, VolumeX
 } from 'lucide-react';
 import { MILESTONES, GALLERY_ITEMS, STORIES, VALUES, INTERESTS } from './data';
+import InlineEditableText from '../../../components/InlineEditableText';
 import type {
   BiographyCategory,
   EditableImageTarget,
@@ -14,6 +15,7 @@ import type {
 
 interface LegacyHeritageAppProps {
   data?: BiographyCategory;
+  onDataChange?: React.Dispatch<React.SetStateAction<BiographyCategory>>;
   activeEditSection?: EditableTemplateSection | null;
   onEditSectionChange?: (section: EditableTemplateSection) => void;
   onImageChangeRequest?: (target: EditableImageTarget) => void;
@@ -21,6 +23,7 @@ interface LegacyHeritageAppProps {
 
 export default function App({
   data,
+  onDataChange,
   activeEditSection = null,
   onEditSectionChange,
   onImageChangeRequest,
@@ -28,23 +31,51 @@ export default function App({
   const [selectedItem, setSelectedItem] = useState<null | typeof GALLERY_ITEMS[0]>(null);
   const isEditable = Boolean(onEditSectionChange);
   const isImageEditable = Boolean(onImageChangeRequest);
+  const updatePersonalDetail = (field: 'fullName' | 'tagline' | 'shortIntro' | 'birthDetails' | 'deathDetails' | 'location', value: string) => {
+    onDataChange?.((current) => ({ ...current, personalDetails: { ...current.personalDetails, [field]: value } }));
+  };
+  const updateTimelineDetail = (index: number, field: 'year' | 'title' | 'location' | 'description', value: string) => {
+    onDataChange?.((current) => ({
+      ...current,
+      timeline: current.timeline.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item),
+    }));
+  };
+  const editableText = (value: string, field: 'fullName' | 'tagline' | 'shortIntro' | 'birthDetails' | 'deathDetails' | 'location', className = '') => (
+    <InlineEditableText value={value} editable={isEditable} className={className} label={field} onFocus={() => onEditSectionChange?.('hero')} onChange={(nextValue) => updatePersonalDetail(field, nextValue)} />
+  );
   const heroImageUrl =
     data?.personalDetails.profileImageUrl ||
     "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?q=80&w=600";
   const displayMilestones = MILESTONES.map((milestone, index) => ({
     ...milestone,
+    year: data?.timeline[index]?.year || milestone.year,
+    title: data?.timeline[index]?.title || milestone.title,
+    location: data?.timeline[index]?.location || milestone.location,
+    description: data?.timeline[index]?.description || milestone.description,
     image: data?.timeline[index]?.imageUrl || milestone.image,
   }));
   const displayGalleryItems = GALLERY_ITEMS.map((item, index) => ({
     ...item,
     id: data?.gallery[index]?.id || item.id,
+    title: data?.gallery[index]?.title || item.title,
+    caption: data?.gallery[index]?.caption || item.caption,
     url: data?.gallery[index]?.imageUrl || item.url,
   }));
   const displayStories = STORIES.map((story, index) => ({
     ...story,
     id: data?.stories[index]?.id || story.id,
+    title: data?.stories[index]?.title || story.title,
+    date: data?.stories[index]?.date || story.date,
+    category: data?.stories[index]?.category || story.category,
+    excerpt: data?.stories[index]?.shortDescription || story.excerpt,
     image: data?.stories[index]?.imageUrl || story.image,
   }));
+  const displayValues = data?.values?.length
+    ? data.values.map((value) => ({ ...value, quote: '' }))
+    : VALUES;
+  const displayInterests = data?.hobbies?.length
+    ? data.hobbies.map((hobby) => ({ title: hobby.title, desc: hobby.description }))
+    : INTERESTS;
   const selectedGalleryIndex = selectedItem
     ? displayGalleryItems.findIndex((item) => item.id === selectedItem.id)
     : -1;
@@ -331,23 +362,26 @@ export default function App({
                   THE LIVING CHRONICLE
                 </span>
                 <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight text-artistic-text">
-                  Eleanor Vance Sterling
+                  {editableText(data?.personalDetails.fullName || 'Eleanor Vance Sterling', 'fullName')}
                 </h2>
-                <p className="font-serif italic text-lg text-artistic-dark">
-                  &ldquo;A life of grace, a legacy of stories, and a family&rsquo;s eternal treasure.&rdquo;
+                <p className={`font-serif italic text-lg text-artistic-dark ${isEditable ? 'cursor-text rounded px-1 hover:bg-artistic-gold/10 focus:bg-artistic-gold/15 outline-none' : ''}`} contentEditable={isEditable} suppressContentEditableWarning onFocus={() => onEditSectionChange?.('hero')} onBlur={(event) => updatePersonalDetail('tagline', (event.currentTarget.textContent || '').replace(/[“”]/g, '').trim())}>
+                  &ldquo;{data?.personalDetails.tagline || 'A life of grace, a legacy of stories, and a family’s eternal treasure.'}&rdquo;
                 </p>
                 <div className="text-xs font-mono text-artistic-text/60 flex items-center gap-4 pt-1">
                   <span className="bg-artistic-panel px-2 py-0.5 rounded border border-artistic-gold/15 font-semibold">
-                    Born: Oct 12, 1922
+                    Born: {editableText(data?.personalDetails.birthDetails || 'Oct 12, 1922', 'birthDetails')}
                   </span>
                   <span className="bg-artistic-panel px-2 py-0.5 rounded border border-artistic-gold/15 font-semibold">
-                    Passed: Mar 4, 2018
+                    Passed: {editableText(data?.personalDetails.deathDetails || 'Mar 4, 2018', 'deathDetails')}
+                  </span>
+                  <span className="bg-artistic-panel px-2 py-0.5 rounded border border-artistic-gold/15 font-semibold">
+                    {editableText(data?.personalDetails.location || 'Sterling Family Estate', 'location')}
                   </span>
                 </div>
               </div>
 
-              <p className="text-base text-artistic-text leading-relaxed font-serif">
-                Welcome to the living archive of Eleanor Vance Sterling—matriarch, educator, and gardener of memories. This digital scrapbook preserves her handwritten diaries, treasured photographs, and the timeless milestones of a beautiful century well-lived. It serves as an heirloom passed down to anchor future generations in their native soil.
+              <p className={`text-base text-artistic-text leading-relaxed font-serif ${isEditable ? 'cursor-text rounded px-1 hover:bg-artistic-gold/10 focus:bg-artistic-gold/15 outline-none' : ''}`} contentEditable={isEditable} suppressContentEditableWarning onFocus={() => onEditSectionChange?.('hero')} onBlur={(event) => updatePersonalDetail('shortIntro', event.currentTarget.textContent || '')}>
+                {data?.personalDetails.shortIntro || 'Welcome to the living archive of Eleanor Vance Sterling—matriarch, educator, and gardener of memories. This digital scrapbook preserves her handwritten diaries, treasured photographs, and the timeless milestones of a beautiful century well-lived. It serves as an heirloom passed down to anchor future generations in their native soil.'}
               </p>
 
               {/* Action Buttons */}
@@ -413,11 +447,8 @@ export default function App({
                     <BookOpen className="w-6 h-6 text-artistic-gold" />
                     <h4 className="font-serif text-xl font-bold text-artistic-text">Biography Summary</h4>
                   </div>
-                  <p className="text-artistic-text/90 leading-relaxed font-serif text-base sm:text-lg">
-                    Born in the gentle hills of New England, Eleanor lived through the unfolding tapestry of the 20th century. Her life was defined by a quiet passion for literature, a devotion to teaching three generations of children, and a legendary rose garden that bloomed every June. She was a woman who spoke in elegant paragraphs, wrote letters in impeccable copperplate script, and believed that even the smallest memories deserved to be beautifully preserved.
-                  </p>
-                  <p className="text-artistic-text/90 leading-relaxed font-serif text-base">
-                    Through war, peace, the turn of a millennium, and the rapid pace of modern technology, she remained a steadfast custodian of old-world grace. This digital tribute is our humble effort to keep her lamp burning, sharing the quiet wisdom she cultivated in her Vermont schoolhouse and home garden.
+                  <p className="text-artistic-text/90 leading-relaxed font-serif text-base sm:text-lg whitespace-pre-line">
+                    {data?.personalDetails.bioFull || 'Born in the gentle hills of New England, Eleanor lived through the unfolding tapestry of the 20th century. Her life was defined by a quiet passion for literature, teaching, and preserving family memories.'}
                   </p>
                 </div>
               </div>
@@ -432,7 +463,7 @@ export default function App({
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {VALUES.map((val, idx) => (
+                  {displayValues.map((val, idx) => (
                     <div 
                       key={idx}
                       className="bg-artistic-light p-6 rounded-sm border border-artistic-gold/20 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow duration-300"
@@ -443,7 +474,7 @@ export default function App({
                         </div>
                         <h5 className="font-serif text-lg font-bold text-artistic-text">{val.title}</h5>
                         <p className="font-serif italic text-sm text-artistic-dark leading-relaxed">
-                          &ldquo;{val.quote}&rdquo;
+                            {val.quote && <>&ldquo;{val.quote}&rdquo;</>}
                         </p>
                       </div>
                       <p className="text-xs text-artistic-text/80 mt-4 leading-relaxed font-sans">
@@ -467,11 +498,11 @@ export default function App({
                     <span className="text-xs font-mono uppercase tracking-widest font-semibold">CULTIVATIONS</span>
                   </div>
                   <h4 className="font-serif text-xl font-bold text-artistic-text">Hobbies &amp; Pursuits</h4>
-                  <p className="text-xs text-artistic-text/70 font-sans">Activities that defined Eleanor&rsquo;s quiet days of contemplation.</p>
+                  <p className="text-xs text-artistic-text/70 font-sans">Activities that defined {data?.personalDetails.fullName || 'this biography'}&apos;s days of contemplation.</p>
                 </div>
 
                 <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {INTERESTS.map((int, i) => (
+                  {displayInterests.map((int, i) => (
                     <div key={i} className="p-4 bg-artistic-panel/20 rounded-sm border border-artistic-gold/10 hover:bg-artistic-panel/40 transition-all flex items-start gap-3">
                       <div className="text-artistic-gold mt-0.5">
                         <Flower className="w-4 h-4" />
@@ -528,7 +559,7 @@ export default function App({
                       
                       {/* Brass-style plaque tag for year */}
                       <div className="absolute -top-3 left-4 px-3 py-1 bg-artistic-dark text-artistic-light border border-artistic-gold/30 rounded-sm shadow-md text-xs font-mono tracking-widest uppercase font-semibold">
-                        {mile.year}
+                        <InlineEditableText value={mile.year} editable={isEditable} label={`Timeline year ${idx + 1}`} onFocus={() => onEditSectionChange?.('timeline')} onChange={(value) => updateTimelineDetail(idx, 'year', value)} />
                       </div>
 
                       {/* Text Column */}
@@ -538,16 +569,16 @@ export default function App({
                             {mile.category}
                           </span>
                           <h4 className="font-serif text-xl sm:text-2xl font-bold text-artistic-text">
-                            {mile.title}
+                            <InlineEditableText value={mile.title} editable={isEditable} label={`Timeline title ${idx + 1}`} onFocus={() => onEditSectionChange?.('timeline')} onChange={(value) => updateTimelineDetail(idx, 'title', value)} />
                           </h4>
                           <p className="text-xs font-mono text-artistic-text/60 flex items-center gap-1.5">
                             <MapPin className="w-3.5 h-3.5 text-artistic-gold" />
-                            {mile.location}
+                            <InlineEditableText value={mile.location} editable={isEditable} label={`Timeline location ${idx + 1}`} onFocus={() => onEditSectionChange?.('timeline')} onChange={(value) => updateTimelineDetail(idx, 'location', value)} />
                           </p>
                         </div>
 
                         <p className="text-sm text-artistic-text/90 leading-relaxed font-serif">
-                          {mile.description}
+                          <InlineEditableText value={mile.description} editable={isEditable} multiline label={`Timeline description ${idx + 1}`} onFocus={() => onEditSectionChange?.('timeline')} onChange={(value) => updateTimelineDetail(idx, 'description', value)} />
                         </p>
 
                         {mile.annotation && (
@@ -803,11 +834,11 @@ export default function App({
                 </div>
 
                 <p className="text-sm text-artistic-text/90 leading-relaxed font-serif">
-                  Do you hold a letter, a photograph, or a personal memory of Eleanor Vance Sterling? Help us keep her heirloom scrapbook complete. 
+                  Do you hold a letter, a photograph, or a personal memory of {data?.personalDetails.fullName || 'this person'}? Help keep this heirloom scrapbook complete.
                 </p>
 
                 <p className="text-sm text-artistic-text/90 leading-relaxed font-serif">
-                  Send your stories or request an invitation to the annual Sterling Autumn Reunion. Your contributions will be archived inside the permanent family vault.
+                  Send your stories or request an invitation to contribute to the family archive. Your contributions will be preserved inside the permanent family vault.
                 </p>
 
                 {/* Decorative stamp envelope illustration */}
@@ -978,11 +1009,11 @@ export default function App({
             </div>
 
             <p className="font-serif text-lg font-bold text-artistic-text tracking-wide uppercase">
-              Vance Sterling Archives &amp; Trust
+              {data?.personalDetails.fullName || 'Family'} Archives &amp; Trust
             </p>
             
             <p className="text-xs text-artistic-text/75 font-sans max-w-md mx-auto leading-relaxed">
-              This memorial catalog is a preservation of Eleanor Vance Sterling&rsquo;s living legacy. All contents, family documents, diary fragments, and portraits are protected in perpetual trust.
+              This memorial catalog preserves the living legacy of {data?.personalDetails.fullName || 'this family'}. All contents, family documents, diary fragments, and portraits are protected in perpetual trust.
             </p>
 
             <div className="w-48 h-[1px] bg-gradient-to-r from-transparent via-artistic-gold/40 to-transparent mx-auto"></div>

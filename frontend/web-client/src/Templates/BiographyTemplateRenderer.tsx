@@ -49,6 +49,7 @@ export default function BiographyTemplateRenderer({
     return (
       <EntrepreneurTemplate
         data={data}
+        onDataChange={onDataChange}
         style={getEntrepreneurTemplateStyle(data)}
         activeEditSection={activeEditSection}
         onEditSectionChange={onEditSectionChange}
@@ -61,6 +62,7 @@ export default function BiographyTemplateRenderer({
     return (
       <LegacyHeritageTemplate
         data={data}
+        onDataChange={onDataChange}
         activeEditSection={activeEditSection}
         onEditSectionChange={onEditSectionChange}
         onImageChangeRequest={onImageChangeRequest}

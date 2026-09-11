@@ -94,6 +94,7 @@ export interface PersonalDetails {
   backgroundImageAssetId?: string;
   profileImageSettings?: ImageDisplaySettings;
   birthDetails: string;
+  deathDetails?: string;
   location: string;
   shortIntro: string;
   shortIntroTextSettings?: TextDisplaySettings;

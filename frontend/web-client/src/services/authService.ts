@@ -122,6 +122,8 @@ export interface BiographyWebsite {
   templateId: string;
   subjectType: SubjectType | string;
   status: string;
+  thumbnailUrl?: string;
+  thumbnailGeneratedAt?: string;
   subdomain?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -855,6 +857,8 @@ function normalizeBiographyWebsite(data: any): BiographyWebsite {
     templateId: String(data?.templateId || ''),
     subjectType: String(data?.subjectType || 'SELF'),
     status: String(data?.status || 'DRAFT'),
+    thumbnailUrl: typeof data?.thumbnailUrl === 'string' ? data.thumbnailUrl : undefined,
+    thumbnailGeneratedAt: typeof data?.thumbnailGeneratedAt === 'string' ? data.thumbnailGeneratedAt : undefined,
     subdomain: typeof data?.subdomain === 'string' ? data.subdomain : undefined,
     createdAt: typeof data?.createdAt === 'string' ? data.createdAt : undefined,
     updatedAt: typeof data?.updatedAt === 'string' ? data.updatedAt : undefined,
@@ -2183,6 +2187,25 @@ export const authService = {
     }
   },
 
+  async deleteBiographyWebsite(websiteId: string): Promise<void> {
+    let response: Response;
+    try {
+      response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}`), {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+    } catch {
+      throw new Error('Unable to reach the API. Start the mock server with: node mock-api-server.mjs');
+    }
+    if (response.status !== 204) {
+      const data = await response.json().catch(() => null);
+      throw new Error(response.status === 404
+        ? 'Biography not found or you do not have permission to delete it.'
+        : getMessage(data, 'Unable to delete biography. Please try again.'));
+    }
+    removeLocalBiographyWebsite(websiteId);
+  },
+
   async getBiographyWebsite(websiteId: string): Promise<BiographyWebsite> {
     if (websiteId.startsWith('local-')) {
       throw new Error('This biography has not been saved to the backend yet');
@@ -2310,7 +2333,8 @@ export const authService = {
   async uploadBiographyWebsiteMedia(
     websiteId: string,
     file: File,
-    usageType: MediaUsageType
+    usageType: MediaUsageType,
+    throwOnError = false
   ): Promise<BiographyMediaAsset | null> {
     if (!websiteId || websiteId.startsWith('local-')) {
       return null;
@@ -2336,8 +2360,21 @@ export const authService = {
 
       const mediaAsset = normalizeBiographyMediaAsset(getMediaAssetFromResponse(data));
       return mediaAsset.mediaAssetId ? mediaAsset : null;
-    } catch {
+    } catch (error) {
+      if (throwOnError) throw error;
       return null;
+    }
+  },
+
+  async updateBiographyThumbnail(websiteId: string, thumbnailUrl: string): Promise<void> {
+    const response = await fetch(apiUrl(`/api/websites/${encodeURIComponent(websiteId)}/thumbnail`), {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ thumbnailUrl }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(getMessage(data, 'Unable to save the biography thumbnail'));
     }
   },
 

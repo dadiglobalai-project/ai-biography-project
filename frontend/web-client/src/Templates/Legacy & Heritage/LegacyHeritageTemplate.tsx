@@ -8,6 +8,7 @@ import type {
 
 interface LegacyHeritageTemplateProps {
   data?: BiographyCategory;
+  onDataChange?: React.Dispatch<React.SetStateAction<BiographyCategory>>;
   activeEditSection?: EditableTemplateSection | null;
   onEditSectionChange?: (section: EditableTemplateSection) => void;
   onImageChangeRequest?: (target: EditableImageTarget) => void;
@@ -15,6 +16,7 @@ interface LegacyHeritageTemplateProps {
 
 export default function LegacyHeritageTemplate({
   data,
+  onDataChange,
   activeEditSection = null,
   onEditSectionChange,
   onImageChangeRequest,
@@ -22,6 +24,7 @@ export default function LegacyHeritageTemplate({
   return (
     <LegacyHeritageApp
       data={data}
+      onDataChange={onDataChange}
       activeEditSection={activeEditSection}
       onEditSectionChange={onEditSectionChange}
       onImageChangeRequest={onImageChangeRequest}

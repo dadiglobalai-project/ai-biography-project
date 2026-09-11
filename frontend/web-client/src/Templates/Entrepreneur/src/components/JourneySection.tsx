@@ -93,7 +93,7 @@ export default function JourneySection({ data, style, styles }: JourneySectionPr
             The Journey Map
           </h2>
           <p className={`text-sm md:text-base max-w-xl mx-auto ${style === 'heritage' ? 'text-stone-300' : 'text-stone-400'}`}>
-            Explore the chronological evolution of Daniel Chen's values, milestones, and achievements.
+            Explore the chronological evolution of {data.name}&apos;s values, milestones, and achievements.
           </p>
           <div className={`h-[1px] w-20 mx-auto mt-6 ${
             style === 'heritage' ? 'bg-[#C5A059]' : style === 'modern' ? 'bg-emerald-400' : 'bg-stone-500'
