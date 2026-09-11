@@ -11,6 +11,9 @@ import com.AI.biography.website.BiographyWebsiteRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -54,6 +57,9 @@ class BiographySectionControllerIntegrationTest {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
 
     @Test
     void heroEndpointsCreateGetPatchAndDeleteSection() throws Exception {
@@ -179,7 +185,11 @@ class BiographySectionControllerIntegrationTest {
     @Test
     void timelinePostAndPutUpdatesAddsAndRemovesEventsAndHighlights() throws Exception {
         Fixture fixture = fixture();
-        MvcResult create = postSection(fixture, "timeline", TestDataFactory.timeline(fixture.mediaId()));
+        TimelineSectionRequest createRequest = TestDataFactory.timeline(fixture.mediaId());
+        createRequest.timelineEvents = List.of(
+                TestDataFactory.event(null, "First note", fixture.mediaId(), 1),
+                TestDataFactory.event(null, "Removed event", null, 2));
+        MvcResult create = postSection(fixture, "timeline", createRequest);
         JsonNode created = read(create);
         String sectionId = created.get("sectionId").asText();
         String keptEventId = created.at("/content/timelineEvents/0/id").asText();
@@ -195,6 +205,10 @@ class BiographySectionControllerIntegrationTest {
                 updatedEvent,
                 TestDataFactory.event(null, "New public lecture", null, 10));
 
+        Statistics statistics = hibernateStatistics();
+        statistics.clear();
+        long startedAt = System.nanoTime();
+
         mockMvc.perform(put("/api/websites/{websiteId}/sections/{sectionId}/timeline", fixture.websiteId(), sectionId)
                         .requestAttr("userId", fixture.userId())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -204,6 +218,13 @@ class BiographySectionControllerIntegrationTest {
                 .andExpect(jsonPath("$.content.timelineEvents[0].sortOrder").value(7))
                 .andExpect(jsonPath("$.content.timelineEvents[0].highlights.length()").value(2))
                 .andExpect(jsonPath("$.content.timelineEvents[0].highlights[0].sortOrder").value(8));
+        long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
+        System.out.printf(
+                "Timeline PUT diagnostics: elapsedMs=%d, preparedStatements=%d, entityFetches=%d, collectionFetches=%d%n",
+                elapsedMs,
+                statistics.getPrepareStatementCount(),
+                statistics.getEntityFetchCount(),
+                statistics.getCollectionFetchCount());
 
         assertThat(count("timeline_events", "section_id", sectionId)).isEqualTo(2);
         assertThat(jdbcTemplate.queryForObject("""
@@ -211,6 +232,20 @@ class BiographySectionControllerIntegrationTest {
                 join timeline_events e on e.timeline_event_id = h.timeline_event_id
                 where e.section_id = ?
                 """, Integer.class, sectionId)).isEqualTo(4);
+    }
+
+    @Test
+    void timelinePutRejectsAnotherUsersSection() throws Exception {
+        Fixture fixture = fixture();
+        Fixture other = fixture();
+        MvcResult create = postSection(fixture, "timeline", TestDataFactory.timeline(fixture.mediaId()));
+        String sectionId = read(create).get("sectionId").asText();
+
+        mockMvc.perform(put("/api/websites/{websiteId}/sections/{sectionId}/timeline", fixture.websiteId(), sectionId)
+                        .requestAttr("userId", other.userId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(TestDataFactory.timeline(fixture.mediaId()))))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -347,6 +382,12 @@ class BiographySectionControllerIntegrationTest {
         entityManager.flush();
         return jdbcTemplate.queryForObject("select count(*) from " + table + " where " + column + " = ?",
                 Integer.class, value);
+    }
+
+    private Statistics hibernateStatistics() {
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.setStatisticsEnabled(true);
+        return statistics;
     }
 
     private record Fixture(String userId, String websiteId, String mediaId) {

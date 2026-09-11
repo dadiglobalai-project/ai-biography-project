@@ -205,8 +205,8 @@ class BiographySectionServiceImplTest {
     @Test
     void updateTimelineCreatesUpdatesRemovesEventsAndHighlights() {
         BiographySection section = timelineSectionWithEvents();
-        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website(WEBSITE_ID)));
-        when(sectionRepository.findBySectionIdAndWebsiteWebsiteId(SECTION_ID, WEBSITE_ID)).thenReturn(Optional.of(section));
+        when(sectionRepository.findBySectionIdAndWebsiteWebsiteIdAndWebsiteUserId(SECTION_ID, WEBSITE_ID, USER_ID))
+                .thenReturn(Optional.of(section));
 
         TimelineSectionRequest request = timelineRequest();
         request.timelineEvents.get(0).id = "event-1";
@@ -224,6 +224,19 @@ class BiographySectionServiceImplTest {
         assertThat(content.timelineEvents.get(0).highlights).hasSize(2);
         assertThat(content.timelineEvents.get(0).highlights).extracting(highlight -> highlight.highlightText)
                 .containsExactly("Updated highlight", "New highlight");
+        verifyNoInteractions(websiteRepository);
+    }
+
+    @Test
+    void updateTimelineRejectsWrongOwnerWithoutSeparateWebsiteLookup() {
+        when(sectionRepository.findBySectionIdAndWebsiteWebsiteIdAndWebsiteUserId(SECTION_ID, WEBSITE_ID, "other-user"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.updateTimeline("other-user", WEBSITE_ID, SECTION_ID, timelineRequest()))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Section not found");
+
+        verifyNoInteractions(websiteRepository);
     }
 
     @Test

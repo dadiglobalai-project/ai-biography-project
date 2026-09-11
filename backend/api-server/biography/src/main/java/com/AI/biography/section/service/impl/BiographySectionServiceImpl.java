@@ -149,7 +149,7 @@ public class BiographySectionServiceImpl implements BiographySectionService {
     @Override
     @Transactional
     public SectionResponse updateTimeline(String userId, String websiteId, String sectionId, TimelineSectionRequest request) {
-        BiographySection section = requireTypedSection(userId, websiteId, sectionId, SectionType.LIFE_JOURNEY);
+        BiographySection section = requireTimelineSection(userId, websiteId, sectionId);
         applySettings(section, request.sortOrder, request.isVisible);
         applyTimeline(section.getTimelineSection(), request, websiteId);
         return mapper.toSectionResponse(section);
@@ -209,6 +209,16 @@ public class BiographySectionServiceImpl implements BiographySectionService {
     private BiographySection requireTypedSection(String userId, String websiteId, String sectionId, SectionType sectionType) {
         BiographySection section = requireSection(userId, websiteId, sectionId);
         if (section.getSectionType() != sectionType) {
+            throw new BadRequestException("Invalid section type");
+        }
+        return section;
+    }
+
+    private BiographySection requireTimelineSection(String userId, String websiteId, String sectionId) {
+        BiographySection section = sectionRepository
+                .findBySectionIdAndWebsiteWebsiteIdAndWebsiteUserId(sectionId, websiteId, userId)
+                .orElseThrow(() -> new NotFoundException("Section not found"));
+        if (section.getSectionType() != SectionType.LIFE_JOURNEY) {
             throw new BadRequestException("Invalid section type");
         }
         return section;

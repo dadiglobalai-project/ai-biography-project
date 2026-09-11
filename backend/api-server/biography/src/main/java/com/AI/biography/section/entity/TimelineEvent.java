@@ -1,6 +1,7 @@
 package com.AI.biography.section.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.BatchSize;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +34,7 @@ public class TimelineEvent {
     private Integer sortOrder;
     @OneToMany(mappedBy = "timelineEvent", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
+    @BatchSize(size = 50)
     private List<TimelineHighlight> highlights = new ArrayList<>();
     @Column(name = "created_at")
     private LocalDateTime createdAt;
