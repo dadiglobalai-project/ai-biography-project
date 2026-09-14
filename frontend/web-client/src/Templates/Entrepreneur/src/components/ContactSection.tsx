@@ -78,7 +78,7 @@ export default function ContactSection({ data, style, styles }: ContactSectionPr
                     </div>
                     <div>
                       <p className="text-[10px] font-mono text-stone-500 leading-none">LinkedIn Professional</p>
-                      <p className="text-xs font-semibold text-stone-900 mt-0.5">Daniel Chen</p>
+                      <p className="text-xs font-semibold text-stone-900 mt-0.5">{data.name}</p>
                     </div>
                   </div>
 
@@ -116,7 +116,7 @@ export default function ContactSection({ data, style, styles }: ContactSectionPr
                     </div>
                     <div>
                       <p className="text-[10px] font-mono text-stone-500 leading-none">Personal Archiving</p>
-                      <p className="text-xs font-semibold text-stone-900 mt-0.5">Daniel Chen Page</p>
+                      <p className="text-xs font-semibold text-stone-900 mt-0.5">{data.name} Page</p>
                     </div>
                   </div>
                 </div>

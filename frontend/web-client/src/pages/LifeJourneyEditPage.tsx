@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import DeleteBiographyDialog from '../components/DeleteBiographyDialog';
 import { createPortal, flushSync } from 'react-dom';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -551,6 +552,8 @@ const personalFieldsBySection: Record<
     { field: 'fullName', label: 'Full name' },
     { field: 'occupation', label: 'Occupation' },
     { field: 'tagline', label: 'Short tagline', multiline: true },
+    { field: 'birthDetails', label: 'Birth details' },
+    { field: 'deathDetails', label: 'Death details' },
     { field: 'shortIntro', label: 'Short introduction', multiline: true, rows: 4 },
   ],
   about: [
@@ -778,7 +781,15 @@ export default function LifeJourneyEditPage() {
   );
   const [website, setWebsite] = useState<BiographyWebsite | null>(null);
   const [saveMessage, setSaveMessage] = useState('Unsaved changes');
+  const [thumbnailStatus, setThumbnailStatus] = useState('');
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
+  const thumbnailQueue = React.useRef<Promise<void>>(Promise.resolve());
+  const retryThumbnail = React.useRef<(() => void) | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeletingBiography, setIsDeletingBiography] = useState(false);
+  const deletingBiographyRef = React.useRef(false);
+  const [deleteBiographyError, setDeleteBiographyError] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<EditorMode>('edit');
   const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
   const [activeEditorSection, setActiveEditorSection] = useState<EditableTemplateSection | null>(null);
@@ -1526,6 +1537,7 @@ export default function LifeJourneyEditPage() {
     }
 
     const autosaveTimer = window.setTimeout(() => {
+      if (deletingBiographyRef.current) return;
       saveDraft(templateRoute.id, draft, activeWebsiteId);
       setSaveMessage((currentMessage) => {
         if (currentMessage !== 'Unsaved changes') {
@@ -4617,7 +4629,40 @@ export default function LifeJourneyEditPage() {
       })[0] || null;
   };
 
+  const queueBiographyThumbnail = (saved: BiographyWebsite) => {
+    const content = <BiographyTemplateRenderer templateId={templateRoute.id} categoryKey={templateRoute.categoryKey} dataOverride={structuredClone(draft)} />;
+    const generate = () => {
+      setThumbnailFailed(false);
+      setThumbnailStatus('Updating preview…');
+      thumbnailQueue.current = thumbnailQueue.current.then(async () => {
+        if (deletingBiographyRef.current) return;
+        try {
+          const { captureBiographyThumbnail } = await import('../services/biographyThumbnail');
+          const file = await captureBiographyThumbnail(content);
+          if (deletingBiographyRef.current) return;
+          const media = await authService.uploadBiographyWebsiteMedia(saved.id, file, 'GALLERY', true);
+          if (!media?.mediaAssetId) throw new Error('The upload response did not contain a media asset ID');
+          const thumbnailUrl = media.accessUrl || await authService.getBiographyWebsiteMediaAccessUrl(saved.id, media.mediaAssetId);
+          if (!thumbnailUrl) throw new Error('The uploaded thumbnail has no accessible image URL');
+          if (deletingBiographyRef.current) return;
+          await authService.updateBiographyThumbnail(saved.id, thumbnailUrl);
+          const thumbnail = { thumbnailUrl, thumbnailGeneratedAt: new Date().toISOString() };
+          setWebsite((current) => current?.id === saved.id ? { ...current, ...thumbnail } : current);
+          notifyBiographyListChanged({ ...saved, ...thumbnail });
+          setThumbnailStatus('Preview updated');
+          setThumbnailFailed(false);
+        } catch (error) {
+          setThumbnailStatus(`Biography saved. ${error instanceof Error ? error.message : 'Preview could not update.'}`);
+          setThumbnailFailed(true);
+        }
+      });
+    };
+    retryThumbnail.current = generate;
+    generate();
+  };
+
   const handleSave = async (): Promise<string | null> => {
+    if (deletingBiographyRef.current) return null;
     saveDraft(templateRoute.id, draft, activeWebsiteId);
 
     setIsSaving(true);
@@ -4645,6 +4690,7 @@ export default function LifeJourneyEditPage() {
           }
         );
         setSaveMessage('Saved to database and My Biographies');
+        queueBiographyThumbnail({ ...(website || { id: activeWebsiteId, title: getBiographyTitle(draft, templateRoute.title), templateId: backendTemplateId || templateRoute.id, subjectType: draft.settings.subjectType || 'SELF', status: 'DRAFT' }), updatedAt: new Date().toISOString() });
         return activeWebsiteId;
       }
 
@@ -4686,6 +4732,7 @@ export default function LifeJourneyEditPage() {
           updatedAt: new Date().toISOString(),
         });
         setSaveMessage('Saved to existing biography draft');
+        queueBiographyThumbnail({ ...reusableWebsite, updatedAt: new Date().toISOString() });
         return reusableWebsite.id;
       }
 
@@ -4717,12 +4764,42 @@ export default function LifeJourneyEditPage() {
 
       notifyBiographyListChanged(savedWebsite);
       setSaveMessage('Saved to database and My Biographies');
+      queueBiographyThumbnail({ ...savedWebsite, updatedAt: new Date().toISOString() });
       return savedWebsite.id;
     } catch (err: any) {
       setSaveMessage(err?.message || 'Unable to save biography to database');
       return null;
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteBiography = async () => {
+    if (deletingBiographyRef.current || isSaving || isCheckingPublishAccess) return;
+    deletingBiographyRef.current = true;
+    setIsDeletingBiography(true);
+    setDeleteBiographyError('');
+    try {
+      if (activeWebsiteId && !activeWebsiteId.startsWith('local-')) {
+        await authService.deleteBiographyWebsite(activeWebsiteId);
+      } else if (activeWebsiteId) {
+        authService.removeLocalBiographyWebsite(activeWebsiteId);
+      }
+      try { removeDraft(templateRoute.id, activeWebsiteId); } catch { /* Server deletion succeeded. */ }
+      const event = { type: BIOGRAPHY_LIST_CHANGED_TYPE, deletedWebsiteId: activeWebsiteId, changedAt: Date.now() };
+      try {
+        localStorage.setItem(BIOGRAPHY_LIST_REFRESH_KEY, JSON.stringify(event));
+        if (typeof BroadcastChannel !== 'undefined') {
+          const channel = new BroadcastChannel(BIOGRAPHY_LIST_CHANNEL_NAME);
+          channel.postMessage(event);
+          channel.close();
+        }
+      } catch { /* Notification must not prevent navigation after deletion. */ }
+      navigate('/diy-dashboard', { replace: true });
+    } catch (error) {
+      setDeleteBiographyError(error instanceof Error ? error.message : 'Unable to delete biography.');
+      deletingBiographyRef.current = false;
+      setIsDeletingBiography(false);
     }
   };
 
@@ -6037,17 +6114,19 @@ export default function LifeJourneyEditPage() {
                 Danger Zone
               </p>
               <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                Delete biography will be enabled only after backend provides DELETE /api/websites/{'{websiteId}'}.
+                Permanently delete this biography. This action cannot be undone.
               </p>
             </div>
             <button
               type="button"
-              disabled
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-rose-100 bg-white px-4 py-3 text-xs font-bold uppercase tracking-wide text-rose-300 disabled:cursor-not-allowed"
+              onClick={() => { setDeleteBiographyError(''); setDeleteDialogOpen(true); }}
+              disabled={isDeletingBiography || isSaving || isCheckingPublishAccess}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-3 text-xs font-bold uppercase tracking-wide text-rose-700 hover:bg-rose-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Trash2 className="h-4 w-4" />
-              Delete Biography Unavailable
+              {isDeletingBiography ? 'Deleting...' : 'Delete Biography'}
             </button>
+            {deleteBiographyError && <p role="alert" className="text-xs text-rose-700">{deleteBiographyError}</p>}
           </div>
         </div>
       </section>
@@ -6390,6 +6469,11 @@ export default function LifeJourneyEditPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f2ee] text-slate-900">
+      {thumbnailStatus && <div role="status" className="fixed bottom-4 left-1/2 z-[80] flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-xl border border-[#E8DFC9] bg-[#FFFDFA] px-4 py-3 text-xs text-[#0A192F] shadow-lg">
+        {thumbnailStatus}
+        {thumbnailFailed && <button type="button" className="shrink-0 font-bold text-[#9A741E] underline" onClick={() => retryThumbnail.current?.()}>Retry preview</button>}
+      </div>}
+      <DeleteBiographyDialog open={deleteDialogOpen} title={getBiographyTitle(draft, templateRoute.title)} busy={isDeletingBiography} error={deleteBiographyError} onCancel={() => setDeleteDialogOpen(false)} onConfirm={() => void handleDeleteBiography()} />
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur-md">
         <div className="grid min-h-20 grid-cols-1 items-center gap-2 px-3 py-2 sm:px-4 lg:grid-cols-[1fr_auto_1fr] lg:gap-3 lg:px-6 lg:py-3">
           <div className="flex min-w-0 items-center justify-between gap-3 lg:justify-start">

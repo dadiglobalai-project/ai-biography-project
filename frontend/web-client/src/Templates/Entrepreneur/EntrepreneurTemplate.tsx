@@ -26,6 +26,7 @@ import ContactSection from './src/components/ContactSection';
 
 interface EntrepreneurTemplateProps {
   data?: BiographyCategory | BiographyData;
+  onDataChange?: React.Dispatch<React.SetStateAction<BiographyCategory>>;
   style?: TemplateStyle;
   activeEditSection?: EditableTemplateSection | null;
   onEditSectionChange?: (section: EditableTemplateSection) => void;

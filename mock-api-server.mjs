@@ -33,6 +33,7 @@ let currentMembership = null;
 const payments = [];
 const refunds = [];
 const websites = [];
+const thumbnailMedia = new Map();
 const sectionsByWebsiteId = new Map();
 
 function sendJson(res, statusCode, data) {
@@ -583,6 +584,42 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (method === 'GET' && parts[0] === 'mock-media' && thumbnailMedia.has(parts[1])) {
+    const media = thumbnailMedia.get(parts[1]);
+    res.writeHead(200, { 'Content-Type': media.contentType, 'Access-Control-Allow-Origin': '*' });
+    res.end(media.bytes);
+    return;
+  }
+
+  if (method === 'POST' && parts[0] === 'api' && parts[1] === 'websites' && parts[3] === 'media' && parts.length === 4) {
+    if (!getWebsite(parts[2])) { sendError(res, 404, 'Website not found'); return; }
+    const boundary = /boundary=(?:"([^"]+)"|([^;]+))/.exec(req.headers['content-type'] || '');
+    if (!boundary) { sendError(res, 400, 'Multipart upload required'); return; }
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = Buffer.concat(chunks);
+    const raw = body.toString('latin1');
+    const filePart = raw.split(`--${boundary[1] || boundary[2]}`).find((part) => part.includes('name="file"'));
+    if (!filePart) { sendError(res, 400, 'File required'); return; }
+    const headerEnd = filePart.indexOf('\r\n\r\n');
+    const contentType = /Content-Type: ([^\r\n]+)/i.exec(filePart)?.[1] || 'image/webp';
+    const id = `thumbnail-${Date.now()}-${thumbnailMedia.size}`;
+    thumbnailMedia.set(id, { bytes: Buffer.from(filePart.slice(headerEnd + 4, -2), 'latin1'), contentType });
+    sendJson(res, 201, { mediaAsset: { mediaAssetId: id, websiteId: parts[2], usageType: 'GALLERY', accessUrl: `http://localhost:${PORT}/mock-media/${id}`, contentType } });
+    return;
+  }
+
+  if (method === 'PATCH' && parts[0] === 'api' && parts[1] === 'websites' && parts[3] === 'thumbnail' && parts.length === 4) {
+    const website = getWebsite(parts[2]);
+    if (!website) { sendError(res, 404, 'Website not found'); return; }
+    const body = await readBody(req);
+    if (typeof body.thumbnailUrl !== 'string' || !/^https?:\/\//.test(body.thumbnailUrl)) { sendError(res, 400, 'Valid thumbnailUrl required'); return; }
+    website.thumbnailUrl = body.thumbnailUrl;
+    website.thumbnailGeneratedAt = nowIso();
+    sendNoContent(res);
+    return;
+  }
+
   if (method === 'POST' && pathname === '/api/websites') {
     const body = await readBody(req);
     sendJson(res, 201, { website: createWebsite(body) });
@@ -603,6 +640,11 @@ const server = http.createServer(async (req, res) => {
 
   if (method === 'DELETE' && parts[0] === 'api' && parts[1] === 'websites' && parts[2] && parts.length === 3) {
     const index = websites.findIndex((website) => website.id === parts[2]);
+
+    if (index < 0) {
+      sendError(res, 404, 'Website not found');
+      return;
+    }
 
     if (index >= 0) {
       websites.splice(index, 1);

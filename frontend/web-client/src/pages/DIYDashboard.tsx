@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import DeleteBiographyDialog from '../components/DeleteBiographyDialog';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -19,9 +20,11 @@ import {
   AlertCircle,
   CalendarClock,
   Clock3,
+  Trash2,
 } from 'lucide-react';
 import { authService, BiographyTemplate, BiographyWebsite, DashboardResponse, SubjectType } from '../services/authService';
 import BrandLogo from '../components/BrandLogo';
+import { removeDraft } from '../Templates/LifeJourney/draftStorage';
 import lifeJourneyPreviewImage from '../Templates/LifeJourney/assets/images/life-journey-thumbnail.png';
 
 type RelationType = 'Myself' | 'Parent' | 'Grandparent' | 'Child' | 'Spouse' | 'Loved One';
@@ -191,6 +194,29 @@ export default function DIYDashboard() {
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [backendTemplates, setBackendTemplates] = useState<BiographyTemplate[]>([]);
   const [biographies, setBiographies] = useState<BiographyWebsite[]>([]);
+  const [deletingWebsiteId, setDeletingWebsiteId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BiographyWebsite | null>(null);
+  const deleteInProgress = React.useRef(false);
+  const deletedWebsiteIds = React.useRef(new Set<string>());
+
+  const handleDeleteBiography = async (website: BiographyWebsite) => {
+    if (deleteInProgress.current) return;
+    deleteInProgress.current = true;
+    setDeletingWebsiteId(website.id);
+    setBiographyError(null);
+    try {
+      await authService.deleteBiographyWebsite(website.id);
+      deletedWebsiteIds.current.add(website.id);
+      setBiographies((current) => current.filter((item) => item.id !== website.id));
+      setDeleteTarget(null);
+      try { removeDraft(website.templateId, website.id); } catch { /* Deletion already succeeded. */ }
+    } catch (error) {
+      setBiographyError(error instanceof Error ? error.message : 'Unable to delete biography.');
+    } finally {
+      deleteInProgress.current = false;
+      setDeletingWebsiteId(null);
+    }
+  };
   const [isLoadingBiographies, setIsLoadingBiographies] = useState(false);
   const [biographyError, setBiographyError] = useState<string | null>(null);
   const [openingWebsiteId, setOpeningWebsiteId] = useState<string | null>(null);
@@ -217,7 +243,7 @@ export default function DIYDashboard() {
 
     try {
       const websites = await authService.getBiographyWebsites();
-      setBiographies((currentWebsites) => mergeDashboardBiographies(websites, currentWebsites));
+      setBiographies((currentWebsites) => mergeDashboardBiographies(websites, currentWebsites).filter((item) => !deletedWebsiteIds.current.has(item.id)));
     } catch (err: any) {
       const message = err?.message || 'Unable to load biographies.';
       if (/unauthorized|forbidden|session|token/i.test(message)) {
@@ -297,7 +323,7 @@ export default function DIYDashboard() {
         return;
       }
 
-      setBiographies((currentWebsites) => mergeDashboardBiographies([website], currentWebsites));
+      setBiographies((currentWebsites) => mergeDashboardBiographies([website], currentWebsites).filter((item) => !deletedWebsiteIds.current.has(item.id)));
     };
     const refreshBiographies = () => {
       void loadBiographies();
@@ -307,6 +333,11 @@ export default function DIYDashboard() {
       if (event.key === BIOGRAPHY_LIST_REFRESH_KEY) {
         try {
           const data = event.newValue ? JSON.parse(event.newValue) : null;
+          if (data?.deletedWebsiteId) {
+            deletedWebsiteIds.current.add(data.deletedWebsiteId);
+            setBiographies((current) => current.filter((item) => item.id !== data.deletedWebsiteId));
+            return;
+          }
           upsertBiography(data?.website);
         } catch {
           // Older tabs may still write a timestamp string here.
@@ -320,8 +351,13 @@ export default function DIYDashboard() {
         : new BroadcastChannel(BIOGRAPHY_LIST_CHANNEL_NAME);
 
     if (channel) {
-      channel.onmessage = (event: MessageEvent<{ type?: string; website?: BiographyWebsite | null }>) => {
+      channel.onmessage = (event: MessageEvent<{ type?: string; website?: BiographyWebsite | null; deletedWebsiteId?: string }>) => {
         if (event.data?.type === BIOGRAPHY_LIST_CHANGED_TYPE) {
+          if (event.data.deletedWebsiteId) {
+            deletedWebsiteIds.current.add(event.data.deletedWebsiteId);
+            setBiographies((current) => current.filter((item) => item.id !== event.data.deletedWebsiteId));
+            return;
+          }
           upsertBiography(event.data.website);
           refreshBiographies();
         }
@@ -740,6 +776,14 @@ export default function DIYDashboard() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-between font-sans selection:bg-amber-200">
+      <DeleteBiographyDialog
+        open={deleteTarget !== null}
+        title={deleteTarget?.title || 'Untitled biography'}
+        busy={deletingWebsiteId !== null}
+        error={biographyError}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => { if (deleteTarget) void handleDeleteBiography(deleteTarget); }}
+      />
       
       {/* 1. Header Navigation matches Mockup 100% */}
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-50 px-6 py-4">
@@ -980,6 +1024,10 @@ export default function DIYDashboard() {
                 const lastOpenedValue = lastOpenedByWebsiteId[website.id];
                 const biographyCard = (
                   <>
+                    <div className="relative mx-auto mb-3 aspect-[4/3] h-auto w-full max-w-md overflow-hidden rounded-xl border border-[#B9A875] bg-[#F8F3E8] shadow-[0_8px_20px_rgba(10,25,47,0.18)]">
+                      <div className="flex h-full flex-col items-center justify-center gap-3 text-[#9A741E]"><BookOpen className="h-10 w-10" /><span className="text-xs">Preview available after saving</span></div>
+                      {website.thumbnailUrl && <img key={website.thumbnailUrl} src={website.thumbnailUrl} alt={`Preview of ${website.title}`} loading="lazy" className="absolute inset-0 h-full w-full bg-[#F8F3E8] object-contain object-center" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
+                    </div>
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 space-y-2">
                         <div className="flex items-center gap-2 text-[#B18625]">
@@ -1015,14 +1063,14 @@ export default function DIYDashboard() {
                         </span>
                       </span>
                     </div>
-                    <div className="mt-4 flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      <span>Open Editor</span>
-                      <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:text-[#B18625]" />
-                    </div>
                   </>
                 );
 
-                return biographyUrl ? (
+                return (
+                  <article key={website.id || `${website.templateId}-${website.title}`} className="flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-[#E8DFC9] bg-[#FFFDFA] p-4 shadow-[0_8px_24px_rgba(10,25,47,0.08)] transition hover:border-[#FED362] hover:shadow-[0_12px_30px_rgba(10,25,47,0.12)] sm:p-5">
+                  {biographyCard}
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                  {biographyUrl ? (
                   <a
                     key={website.id || `${website.templateId}-${website.title}`}
                     href={biographyUrl}
@@ -1035,9 +1083,9 @@ export default function DIYDashboard() {
                         window.setTimeout(() => setOpeningWebsiteId(null), 300);
                       }
                     }}
-                    className="group rounded-xl border border-slate-100 bg-white p-5 text-left shadow-sm transition hover:border-[#FED362] hover:shadow-md"
+                    className="group inline-flex min-h-10 items-center gap-2 rounded-lg px-2 text-[11px] font-bold uppercase tracking-wide text-[#0A192F] transition hover:bg-amber-50 focus-visible:outline-2 focus-visible:outline-[#B18625]"
                   >
-                    {biographyCard}
+                    Open editor <ChevronRight className="h-4 w-4 text-[#B18625] transition group-hover:translate-x-0.5" />
                   </a>
                 ) : (
                   <button
@@ -1045,10 +1093,23 @@ export default function DIYDashboard() {
                     type="button"
                     onClick={() => handleOpenBiography(website)}
                     disabled={isOpening}
-                    className="group rounded-xl border border-slate-100 bg-white p-5 text-left shadow-sm transition hover:border-[#FED362] hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="group inline-flex min-h-10 items-center gap-2 rounded-lg px-2 text-[11px] font-bold uppercase tracking-wide text-[#0A192F] transition hover:bg-amber-50 focus-visible:outline-2 focus-visible:outline-[#B18625] disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    {biographyCard}
+                    {isOpening ? 'Opening...' : 'Open editor'} <ChevronRight className="h-4 w-4 text-[#B18625]" />
                   </button>
+                  )}
+                    <button
+                      type="button"
+                      onClick={() => { setBiographyError(null); setDeleteTarget(website); }}
+                      disabled={deletingWebsiteId !== null}
+                      aria-label={`Delete ${website.title}`}
+                      className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition-colors hover:border-rose-300 hover:bg-rose-100 active:bg-rose-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      {deletingWebsiteId === website.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
+                  </article>
                 );
               })}
             </div>
@@ -1162,7 +1223,7 @@ export default function DIYDashboard() {
           )}
 
           {/* Biography Templates Showcase Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+          <div className="grid grid-cols-1 items-start md:grid-cols-3 gap-6 pt-2">
             {templates.map((template) => {
               const isSelected = selectedTemplateId === template.id;
               const existingTemplateDraft = findExistingDraftForTemplate(template);
@@ -1172,7 +1233,7 @@ export default function DIYDashboard() {
               return (
                 <div
                   key={template.id}
-                  className={`bg-white rounded-2xl border overflow-hidden flex flex-col justify-between transition-all duration-300 relative group cursor-pointer ${
+                  className={`bg-white rounded-2xl border overflow-hidden flex flex-col transition-all duration-300 relative group cursor-pointer ${
                     isSelected 
                       ? 'border-[#FED362] shadow-[0_12px_35px_rgba(254,211,98,0.15)] ring-1 ring-[#FED362]' 
                       : 'border-slate-100 hover:border-slate-200 hover:shadow-xl'
@@ -1203,7 +1264,7 @@ export default function DIYDashboard() {
 
                     {/* Overlay Title & Description Texts */}
                     <div className="absolute bottom-5 inset-x-5 space-y-1">
-                      <p className="text-[11px] font-sans text-slate-300 font-bold uppercase tracking-wider italic leading-none opacity-90">
+                      <p className="text-[11px] font-sans text-slate-300 font-bold uppercase tracking-wider italic leading-snug opacity-90">
                         "{template.subtitle}"
                       </p>
                       <h3 className="font-serif-display text-lg font-bold text-white leading-tight">
@@ -1220,8 +1281,8 @@ export default function DIYDashboard() {
                   </div>
 
                   {/* Template body detail card area */}
-                  <div className="p-5 flex-grow flex flex-col justify-between space-y-4">
-                    <p className="text-xs text-slate-500 leading-relaxed font-sans">
+                  <div className="p-5 flex flex-col gap-3">
+                    <p className="text-sm text-slate-600 leading-relaxed font-sans">
                       {template.description}
                     </p>
 
