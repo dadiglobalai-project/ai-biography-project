@@ -29,6 +29,12 @@ public class BiographyWebsite {
     @Column(name = "status", nullable = false, length = 50)
     private String status;
 
+    @Column(name = "thumbnail_url", length = 500)
+    private String thumbnailUrl;
+
+    @Column(name = "thumbnail_generated_at")
+    private LocalDateTime thumbnailGeneratedAt;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -92,6 +98,22 @@ public class BiographyWebsite {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getThumbnailUrl() {
+        return thumbnailUrl;
+    }
+
+    public void setThumbnailUrl(String thumbnailUrl) {
+        this.thumbnailUrl = thumbnailUrl;
+    }
+
+    public LocalDateTime getThumbnailGeneratedAt() {
+        return thumbnailGeneratedAt;
+    }
+
+    public void setThumbnailGeneratedAt(LocalDateTime thumbnailGeneratedAt) {
+        this.thumbnailGeneratedAt = thumbnailGeneratedAt;
     }
 
     public LocalDateTime getCreatedAt() {

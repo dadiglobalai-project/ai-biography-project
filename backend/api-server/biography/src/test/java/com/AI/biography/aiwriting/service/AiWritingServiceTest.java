@@ -136,6 +136,9 @@ class AiWritingServiceTest {
         assertThat(response.generatedText).isEqualTo("A graceful biography intro.");
         assertThat(response.englishWordCount).isEqualTo(4);
         assertThat(response.chineseCharacterCount).isZero();
+        assertThat(savedRequest.get().getWebsite()).isSameAs(website);
+        assertThat(savedRequest.get().getSection()).isSameAs(section);
+        assertThat(savedRequest.get().getSection().getSectionId()).isEqualTo(SECTION_ID);
         assertThat(savedRequest.get().getStatus()).isEqualTo(AiWritingStatus.COMPLETED);
         assertThat(savedRequest.get().getCompletedAt()).isNotNull();
 
@@ -169,6 +172,25 @@ class AiWritingServiceTest {
         assertThat(response.actionType).isEqualTo(AiWritingAction.REWRITE);
         assertThat(response.generatedText).isEqualTo("Rewritten sentence.");
         assertThat(savedRequest.get().getSourceText()).isEqualTo("Original sentence.");
+    }
+
+    @Test
+    void generateStillWorksWhenSectionIdIsNull() {
+        AiWritingGenerateRequest request = generateRequest();
+        request.sectionId = null;
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website));
+        when(usageRepository.findById(USER_ID)).thenReturn(Optional.empty());
+        when(usageRepository.findWithLockByUserId(USER_ID)).thenReturn(Optional.of(existingUsage(false, 0, 0, 1, 1)));
+        when(promptBuilder.buildPrompt(request)).thenReturn("prompt");
+        when(deepSeekClient.createChatCompletion(any())).thenReturn(new DeepSeekResult("A graceful biography intro.", 3, 4, 7));
+
+        AiWritingResponse response = service.generate(USER_ID, request);
+
+        assertThat(response.generatedText).isEqualTo("A graceful biography intro.");
+        assertThat(savedRequest.get().getWebsite()).isSameAs(website);
+        assertThat(savedRequest.get().getSection()).isNull();
+        verify(sectionRepository, never()).findBySectionIdAndWebsiteWebsiteId(any(), any());
     }
 
     @Test
@@ -216,6 +238,21 @@ class AiWritingServiceTest {
         assertThatThrownBy(() -> service.generate(USER_ID, request))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Website not found");
+
+        verify(requestRepository, never()).save(any());
+        verify(deepSeekClient, never()).createChatCompletion(any());
+    }
+
+    @Test
+    void rejectsSectionFromAnotherWebsite() {
+        AiWritingGenerateRequest request = generateRequest();
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(websiteRepository.findByWebsiteIdAndUserId(WEBSITE_ID, USER_ID)).thenReturn(Optional.of(website));
+        when(sectionRepository.findBySectionIdAndWebsiteWebsiteId(SECTION_ID, WEBSITE_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.generate(USER_ID, request))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("Section not found");
 
         verify(requestRepository, never()).save(any());
         verify(deepSeekClient, never()).createChatCompletion(any());

@@ -1,10 +1,14 @@
 package com.AI.biography.website;
 
+import com.AI.biography.section.exception.BadRequestException;
+import com.AI.biography.section.exception.NotFoundException;
 import com.AI.biography.template.Template;
 import com.AI.biography.template.TemplateRepository;
 import com.AI.biography.website.dto.CreateWebsiteRequest;
+import com.AI.biography.website.dto.UpdateThumbnailRequest;
 import com.AI.biography.website.dto.WebsiteResponse;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -64,6 +68,24 @@ public class WebsiteService {
         return mapToResponse(savedWebsite);
     }
 
+    @Transactional
+    public WebsiteResponse updateThumbnail(String userId, String websiteId, UpdateThumbnailRequest request) {
+
+        if (userId == null || userId.isBlank()) {
+            throw new RuntimeException("Unauthorized request");
+        }
+
+        BiographyWebsite website = biographyWebsiteRepository
+                .findByWebsiteIdAndUserId(websiteId, userId)
+                .orElseThrow(() -> new RuntimeException("Website not found"));
+
+        website.setThumbnailUrl(request.getThumbnailUrl().trim());
+        website.setThumbnailGeneratedAt(LocalDateTime.now());
+        website.setUpdatedAt(LocalDateTime.now());
+
+        return mapToResponse(website);
+    }
+
     public List<WebsiteResponse> getUserWebsites(String userId) {
 
         if (userId == null || userId.isBlank()) {
@@ -96,6 +118,8 @@ public class WebsiteService {
         response.setTemplateId(website.getTemplateId());
         response.setSubjectType(website.getSubjectType());
         response.setStatus(website.getStatus());
+        response.setThumbnailUrl(website.getThumbnailUrl());
+        response.setThumbnailGeneratedAt(website.getThumbnailGeneratedAt());
 
         return response;
     }
@@ -111,5 +135,19 @@ public class WebsiteService {
                 .orElseThrow(() -> new RuntimeException("Website not found"));
 
         return mapToResponse(website);
+    }
+
+    @Transactional
+    public void deleteWebsite(String userId, String websiteId) {
+
+        if (userId == null || userId.isBlank()) {
+            throw new BadRequestException("Unauthorized request");
+        }
+
+        BiographyWebsite website = biographyWebsiteRepository
+                .findByWebsiteIdAndUserId(websiteId, userId)
+                .orElseThrow(() -> new NotFoundException("Website not found"));
+
+        biographyWebsiteRepository.delete(website);
     }
 }

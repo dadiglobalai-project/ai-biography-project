@@ -1,9 +1,11 @@
 package com.AI.biography.website;
 
 import com.AI.biography.website.dto.CreateWebsiteRequest;
+import com.AI.biography.website.dto.UpdateThumbnailRequest;
 import com.AI.biography.website.dto.WebsiteResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -44,5 +46,28 @@ public class WebsiteController {
         String userId = (String) request.getAttribute("userId");
 
         return websiteService.getWebsiteById(userId, websiteId);
+    }
+
+    @PatchMapping("/{websiteId}/thumbnail")
+    public WebsiteResponse updateThumbnail(
+            @PathVariable String websiteId,
+            @Valid @RequestBody UpdateThumbnailRequest request,
+            HttpServletRequest httpRequest) {
+
+        String userId = (String) httpRequest.getAttribute("userId");
+
+        return websiteService.updateThumbnail(userId, websiteId, request);
+    }
+
+    @DeleteMapping("/{websiteId}")
+    public ResponseEntity<Void> deleteWebsite(
+            @PathVariable String websiteId,
+            HttpServletRequest request) {
+
+        String userId = (String) request.getAttribute("userId");
+
+        websiteService.deleteWebsite(userId, websiteId);
+
+        return ResponseEntity.noContent().build();
     }
 }

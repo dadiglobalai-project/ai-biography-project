@@ -1,5 +1,7 @@
 package com.AI.biography.website.dto;
 
+import java.time.LocalDateTime;
+
 public class WebsiteResponse {
 
     private String websiteId;
@@ -8,6 +10,8 @@ public class WebsiteResponse {
     private String templateId;
     private String subjectType;
     private String status;
+    private String thumbnailUrl;
+    private LocalDateTime thumbnailGeneratedAt;
 
     public WebsiteResponse() {
     }
@@ -58,5 +62,21 @@ public class WebsiteResponse {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getThumbnailUrl() {
+        return thumbnailUrl;
+    }
+
+    public void setThumbnailUrl(String thumbnailUrl) {
+        this.thumbnailUrl = thumbnailUrl;
+    }
+
+    public LocalDateTime getThumbnailGeneratedAt() {
+        return thumbnailGeneratedAt;
+    }
+
+    public void setThumbnailGeneratedAt(LocalDateTime thumbnailGeneratedAt) {
+        this.thumbnailGeneratedAt = thumbnailGeneratedAt;
     }
 }
