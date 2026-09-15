@@ -14,16 +14,22 @@ import com.AI.biography.section.repository.WebsiteMediaAssetRepository;
 import com.AI.biography.section.service.BiographySectionService;
 import com.AI.biography.website.BiographyWebsite;
 import com.AI.biography.website.BiographyWebsiteRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
 public class BiographySectionServiceImpl implements BiographySectionService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(BiographySectionServiceImpl.class);
     private final BiographyWebsiteRepository websiteRepository;
     private final BiographySectionRepository sectionRepository;
     private final WebsiteMediaAssetRepository mediaAssetRepository;
@@ -138,61 +144,141 @@ public class BiographySectionServiceImpl implements BiographySectionService {
     @Override
     @Transactional
     public SectionResponse createTimeline(String userId, String websiteId, TimelineSectionRequest request) {
-        BiographySection section = newSection(userId, websiteId, SectionType.LIFE_JOURNEY, "timeline", request.sortOrder, request.isVisible);
-        TimelineSection timeline = new TimelineSection();
-        timeline.setSection(section);
-        applyTimeline(timeline, request, websiteId);
-        section.setTimelineSection(timeline);
-        return mapper.toSectionResponse(sectionRepository.save(section));
+        PerfTimer perf = PerfTimer.start("Timeline create", websiteId, null);
+        registerTransactionCompletion(perf);
+        PerfTimer previous = PerfTimer.setCurrent(perf);
+        try {
+            BiographySection section = perf.time("Timeline section creation/ownership", () ->
+                    newSection(userId, websiteId, SectionType.LIFE_JOURNEY, "timeline", request.sortOrder, request.isVisible));
+            TimelineSection timeline = new TimelineSection();
+            timeline.setSection(section);
+            perf.time("Timeline apply/reconcile", () -> applyTimeline(timeline, request, websiteId));
+            section.setTimelineSection(timeline);
+            SectionResponse response = perf.time("Timeline save + response mapping", () ->
+                    mapper.toSectionResponse(sectionRepository.save(section)));
+            perf.logBodyComplete();
+            return response;
+        } catch (RuntimeException e) {
+            perf.logFailure(e);
+            throw e;
+        } finally {
+            PerfTimer.setCurrent(previous);
+        }
     }
 
     @Override
     @Transactional
     public SectionResponse updateTimeline(String userId, String websiteId, String sectionId, TimelineSectionRequest request) {
-        BiographySection section = requireTimelineSection(userId, websiteId, sectionId);
-        applySettings(section, request.sortOrder, request.isVisible);
-        applyTimeline(section.getTimelineSection(), request, websiteId);
-        return mapper.toSectionResponse(section);
+        PerfTimer perf = PerfTimer.start("Timeline update", websiteId, sectionId);
+        registerTransactionCompletion(perf);
+        PerfTimer previous = PerfTimer.setCurrent(perf);
+        try {
+            BiographySection section = perf.time("Timeline section lookup", () -> requireTimelineSection(userId, websiteId, sectionId));
+            perf.time("Timeline settings apply", () -> applySettings(section, request.sortOrder, request.isVisible));
+            perf.time("Timeline apply/reconcile", () -> applyTimeline(section.getTimelineSection(), request, websiteId));
+            SectionResponse response = perf.time("Timeline response mapping", () -> mapper.toSectionResponse(section));
+            perf.logBodyComplete();
+            return response;
+        } catch (RuntimeException e) {
+            perf.logFailure(e);
+            throw e;
+        } finally {
+            PerfTimer.setCurrent(previous);
+        }
     }
 
     @Override
     @Transactional
     public SectionResponse createGallery(String userId, String websiteId, GallerySectionRequest request) {
-        BiographySection section = newSection(userId, websiteId, SectionType.MEDIA_GALLERY, "gallery", request.sortOrder, request.isVisible);
-        GallerySection gallery = new GallerySection();
-        gallery.setSection(section);
-        applyGallery(gallery, request, websiteId);
-        section.setGallerySection(gallery);
-        return mapper.toSectionResponse(sectionRepository.save(section));
+        PerfTimer perf = PerfTimer.start("Gallery create", websiteId, null);
+        registerTransactionCompletion(perf);
+        PerfTimer previous = PerfTimer.setCurrent(perf);
+        try {
+            BiographySection section = perf.time("Gallery section creation/ownership", () ->
+                    newSection(userId, websiteId, SectionType.MEDIA_GALLERY, "gallery", request.sortOrder, request.isVisible));
+            GallerySection gallery = new GallerySection();
+            gallery.setSection(section);
+            perf.time("Gallery apply/update", () -> applyGallery(gallery, request, websiteId));
+            section.setGallerySection(gallery);
+            SectionResponse response = perf.time("Gallery save + response mapping", () ->
+                    mapper.toSectionResponse(sectionRepository.save(section)));
+            perf.logBodyComplete();
+            return response;
+        } catch (RuntimeException e) {
+            perf.logFailure(e);
+            throw e;
+        } finally {
+            PerfTimer.setCurrent(previous);
+        }
     }
 
     @Override
     @Transactional
     public SectionResponse updateGallery(String userId, String websiteId, String sectionId, GallerySectionRequest request) {
-        BiographySection section = requireTypedSection(userId, websiteId, sectionId, SectionType.MEDIA_GALLERY);
-        applySettings(section, request.sortOrder, request.isVisible);
-        applyGallery(section.getGallerySection(), request, websiteId);
-        return mapper.toSectionResponse(section);
+        PerfTimer perf = PerfTimer.start("Gallery update", websiteId, sectionId);
+        registerTransactionCompletion(perf);
+        PerfTimer previous = PerfTimer.setCurrent(perf);
+        try {
+            BiographySection section = perf.time("Gallery section lookup", () ->
+                    requireTypedSection(userId, websiteId, sectionId, SectionType.MEDIA_GALLERY));
+            perf.time("Gallery settings apply", () -> applySettings(section, request.sortOrder, request.isVisible));
+            perf.time("Gallery apply/update", () -> applyGallery(section.getGallerySection(), request, websiteId));
+            SectionResponse response = perf.time("Gallery response mapping", () -> mapper.toSectionResponse(section));
+            perf.logBodyComplete();
+            return response;
+        } catch (RuntimeException e) {
+            perf.logFailure(e);
+            throw e;
+        } finally {
+            PerfTimer.setCurrent(previous);
+        }
     }
 
     @Override
     @Transactional
     public SectionResponse createContact(String userId, String websiteId, ContactSectionRequest request) {
-        BiographySection section = newSection(userId, websiteId, SectionType.CONTACT, "contact", request.sortOrder, request.isVisible);
-        ContactSection contact = new ContactSection();
-        contact.setSection(section);
-        applyContact(contact, request);
-        section.setContactSection(contact);
-        return mapper.toSectionResponse(sectionRepository.save(section));
+        PerfTimer perf = PerfTimer.start("Contact create", websiteId, null);
+        registerTransactionCompletion(perf);
+        PerfTimer previous = PerfTimer.setCurrent(perf);
+        try {
+            BiographySection section = perf.time("Contact section creation/ownership", () ->
+                    newSection(userId, websiteId, SectionType.CONTACT, "contact", request.sortOrder, request.isVisible));
+            ContactSection contact = new ContactSection();
+            contact.setSection(section);
+            perf.time("Contact apply/update", () -> applyContact(contact, request));
+            section.setContactSection(contact);
+            SectionResponse response = perf.time("Contact save + response mapping", () ->
+                    mapper.toSectionResponse(sectionRepository.save(section)));
+            perf.logBodyComplete();
+            return response;
+        } catch (RuntimeException e) {
+            perf.logFailure(e);
+            throw e;
+        } finally {
+            PerfTimer.setCurrent(previous);
+        }
     }
 
     @Override
     @Transactional
     public SectionResponse updateContact(String userId, String websiteId, String sectionId, ContactSectionRequest request) {
-        BiographySection section = requireTypedSection(userId, websiteId, sectionId, SectionType.CONTACT);
-        applySettings(section, request.sortOrder, request.isVisible);
-        applyContact(section.getContactSection(), request);
-        return mapper.toSectionResponse(section);
+        PerfTimer perf = PerfTimer.start("Contact update", websiteId, sectionId);
+        registerTransactionCompletion(perf);
+        PerfTimer previous = PerfTimer.setCurrent(perf);
+        try {
+            BiographySection section = perf.time("Contact section lookup", () ->
+                    requireTypedSection(userId, websiteId, sectionId, SectionType.CONTACT));
+            perf.time("Contact settings apply", () -> applySettings(section, request.sortOrder, request.isVisible));
+            perf.time("Contact apply/update", () -> applyContact(section.getContactSection(), request));
+            SectionResponse response = perf.time("Contact response mapping", () -> mapper.toSectionResponse(section));
+            perf.logBodyComplete();
+            return response;
+        } catch (RuntimeException e) {
+            perf.logFailure(e);
+            throw e;
+        } finally {
+            PerfTimer.setCurrent(previous);
+        }
     }
 
     private BiographyWebsite requireOwnedWebsite(String userId, String websiteId) {
@@ -256,8 +342,16 @@ public class BiographySectionServiceImpl implements BiographySectionService {
         if (mediaId == null || mediaId.isBlank()) {
             return null;
         }
-        return mediaAssetRepository.findByMediaAssetIdAndWebsiteWebsiteId(mediaId, websiteId)
-                .orElseThrow(() -> new BadRequestException("Media asset does not belong to this website"));
+        long startNanos = System.nanoTime();
+        try {
+            return mediaAssetRepository.findByMediaAssetIdAndWebsiteWebsiteId(mediaId, websiteId)
+                    .orElseThrow(() -> new BadRequestException("Media asset does not belong to this website"));
+        } finally {
+            PerfTimer current = PerfTimer.current();
+            if (current != null) {
+                current.addAggregate("media asset resolution", startNanos);
+            }
+        }
     }
 
     private void applyHero(HeroSection hero, HeroSectionRequest request, String websiteId) {
@@ -365,7 +459,15 @@ public class BiographySectionServiceImpl implements BiographySectionService {
             event.setImageAltText(eventRequest.imageAltText);
             event.setImageCaption(eventRequest.imageCaption);
             event.setSortOrder(eventRequest.sortOrder);
-            reconcileHighlights(event, eventRequest.highlights);
+            long highlightStartNanos = System.nanoTime();
+            try {
+                reconcileHighlights(event, eventRequest.highlights);
+            } finally {
+                PerfTimer current = PerfTimer.current();
+                if (current != null) {
+                    current.addAggregate("Timeline highlight reconcile", highlightStartNanos);
+                }
+            }
             event.setUpdatedAt(LocalDateTime.now());
             if (!timeline.getTimelineEvents().contains(event)) {
                 timeline.getTimelineEvents().add(event);
@@ -498,5 +600,127 @@ public class BiographySectionServiceImpl implements BiographySectionService {
 
     private <T> List<T> nullSafe(List<T> list) {
         return list == null ? List.of() : list;
+    }
+
+    private void registerTransactionCompletion(PerfTimer perf) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                perf.logTransactionComplete(status);
+            }
+        });
+    }
+
+    private static final class PerfTimer {
+        private static final ThreadLocal<PerfTimer> CURRENT = new ThreadLocal<>();
+        private final String label;
+        private final String websiteId;
+        private final String sectionId;
+        private final long startNanos;
+        private final Map<String, AggregateTiming> aggregates = new LinkedHashMap<>();
+        private Long bodyCompleteNanos;
+
+        private PerfTimer(String label, String websiteId, String sectionId) {
+            this.label = label;
+            this.websiteId = websiteId;
+            this.sectionId = sectionId;
+            this.startNanos = System.nanoTime();
+            LOGGER.info("[PERF] {} START website={} section={}", label, websiteId, sectionId);
+        }
+
+        private static PerfTimer start(String label, String websiteId, String sectionId) {
+            return new PerfTimer(label, websiteId, sectionId);
+        }
+
+        private static PerfTimer current() {
+            return CURRENT.get();
+        }
+
+        private static PerfTimer setCurrent(PerfTimer timer) {
+            PerfTimer previous = CURRENT.get();
+            if (timer == null) {
+                CURRENT.remove();
+            } else {
+                CURRENT.set(timer);
+            }
+            return previous;
+        }
+
+        private <T> T time(String stage, Supplier<T> operation) {
+            long stageStartNanos = System.nanoTime();
+            try {
+                return operation.get();
+            } finally {
+                LOGGER.info("[PERF] {} {}: {} ms", label, stage, elapsedMs(stageStartNanos));
+            }
+        }
+
+        private void time(String stage, Runnable operation) {
+            time(stage, () -> {
+                operation.run();
+                return null;
+            });
+        }
+
+        private void addAggregate(String stage, long stageStartNanos) {
+            aggregates.computeIfAbsent(stage, ignored -> new AggregateTiming()).add(System.nanoTime() - stageStartNanos);
+        }
+
+        private void logBodyComplete() {
+            bodyCompleteNanos = System.nanoTime();
+            for (Map.Entry<String, AggregateTiming> entry : aggregates.entrySet()) {
+                AggregateTiming aggregate = entry.getValue();
+                LOGGER.info("[PERF] {} {} total: {} ms count={}", label, entry.getKey(), aggregate.elapsedMs(), aggregate.count);
+            }
+            LOGGER.info("[PERF] {} service body complete: {} ms", label, elapsedMs(startNanos));
+        }
+
+        private void logTransactionComplete(int status) {
+            long totalMs = elapsedMs(startNanos);
+            long bodyMs = bodyCompleteNanos == null ? totalMs : (bodyCompleteNanos - startNanos) / 1_000_000;
+            long flushCommitMs = Math.max(0, totalMs - bodyMs);
+            LOGGER.info(
+                    "[PERF] {} transaction completion status={} flush/commit estimate={} ms TOTAL={} ms website={} section={}",
+                    label,
+                    txStatus(status),
+                    flushCommitMs,
+                    totalMs,
+                    websiteId,
+                    sectionId
+            );
+        }
+
+        private void logFailure(RuntimeException exception) {
+            LOGGER.info("[PERF] {} FAILED after {} ms exception={}", label, elapsedMs(startNanos), exception.getClass().getSimpleName());
+        }
+
+        private long elapsedMs(long fromNanos) {
+            return (System.nanoTime() - fromNanos) / 1_000_000;
+        }
+
+        private String txStatus(int status) {
+            return switch (status) {
+                case TransactionSynchronization.STATUS_COMMITTED -> "COMMITTED";
+                case TransactionSynchronization.STATUS_ROLLED_BACK -> "ROLLED_BACK";
+                default -> "UNKNOWN";
+            };
+        }
+    }
+
+    private static final class AggregateTiming {
+        private long elapsedNanos;
+        private int count;
+
+        private void add(long nanos) {
+            elapsedNanos += nanos;
+            count++;
+        }
+
+        private long elapsedMs() {
+            return elapsedNanos / 1_000_000;
+        }
     }
 }
