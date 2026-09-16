@@ -7,15 +7,19 @@ import { BookOpen, Calendar, Camera, Clock, ArrowRight } from 'lucide-react';
 import { BiographyData, TemplateStyle } from '../types';
 import { ThemeStyles } from '../theme';
 import type { EditableImageTarget } from '../../../LifeJourney/types';
+import InlineEditableText from '../../../../components/InlineEditableText';
 
 interface StoriesSectionProps {
   data: BiographyData;
   style: TemplateStyle;
   styles: ThemeStyles;
   onImageChangeRequest?: (target: EditableImageTarget) => void;
+  editable?: boolean;
+  onStoryChange?: (index: number, field: 'title' | 'date' | 'description', value: string) => void;
+  onEditSectionChange?: () => void;
 }
 
-export default function StoriesSection({ data, style, styles, onImageChangeRequest }: StoriesSectionProps) {
+export default function StoriesSection({ data, style, styles, onImageChangeRequest, editable = false, onStoryChange, onEditSectionChange }: StoriesSectionProps) {
   
   return (
     <section id="stories" className={`py-20 border-t ${styles.borderLight} ${styles.bodyBg} transition-colors duration-500`}>
@@ -88,7 +92,7 @@ export default function StoriesSection({ data, style, styles, onImageChangeReque
                   <div className="flex items-center space-x-3 text-[10px] font-mono text-stone-400 mb-3 uppercase">
                     <span className="flex items-center">
                       <Calendar className="w-3.5 h-3.5 mr-1 text-stone-500" />
-                      {story.date}
+                      <InlineEditableText value={story.date} editable={editable} label={`Story ${index + 1} date`} onFocus={onEditSectionChange} onChange={(value) => onStoryChange?.(index, 'date', value)} />
                     </span>
                     <span>•</span>
                     <span className="flex items-center">
@@ -101,12 +105,12 @@ export default function StoriesSection({ data, style, styles, onImageChangeReque
                   <h3 className={`text-lg md:text-xl font-bold mb-3 hover:text-[#C5A059] transition-colors ${
                     style === 'heritage' ? 'font-serif text-[#0A1F44]' : style === 'modern' ? 'font-sans text-zinc-900' : 'font-serif italic text-stone-950'
                   }`}>
-                    {story.title}
+                    <InlineEditableText value={story.title} editable={editable} label={`Story ${index + 1} title`} onFocus={onEditSectionChange} onChange={(value) => onStoryChange?.(index, 'title', value)} />
                   </h3>
 
                   {/* Description */}
                   <p className={`text-sm mb-6 ${styles.textBody} line-clamp-4`}>
-                    {story.description}
+                    <InlineEditableText value={story.description} editable={editable} multiline label={`Story ${index + 1} description`} onFocus={onEditSectionChange} onChange={(value) => onStoryChange?.(index, 'description', value)} />
                   </p>
 
                 </div>

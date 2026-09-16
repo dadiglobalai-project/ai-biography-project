@@ -7,14 +7,18 @@ import React, { useState } from 'react';
 import { Mail, Linkedin, Facebook, Youtube, Globe, Send, CheckCircle2 } from 'lucide-react';
 import { BiographyData, TemplateStyle } from '../types';
 import { ThemeStyles } from '../theme';
+import InlineEditableText from '../../../../components/InlineEditableText';
 
 interface ContactSectionProps {
   data: BiographyData;
   style: TemplateStyle;
   styles: ThemeStyles;
+  editable?: boolean;
+  onEmailChange?: (value: string) => void;
+  onEditSectionChange?: () => void;
 }
 
-export default function ContactSection({ data, style, styles }: ContactSectionProps) {
+export default function ContactSection({ data, style, styles, editable = false, onEmailChange, onEditSectionChange }: ContactSectionProps) {
   const [formState, setFormState] = useState({ name: '', email: '', message: '' });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -60,7 +64,7 @@ export default function ContactSection({ data, style, styles }: ContactSectionPr
                       style === 'heritage' ? 'text-[#0A1F44]' : style === 'modern' ? 'text-[#10b981]' : 'text-stone-950'
                     }`}
                   >
-                    {data.email}
+                    <InlineEditableText value={data.email} editable={editable} label="Contact email" onFocus={onEditSectionChange} onChange={onEmailChange || (() => undefined)} />
                   </span>
                 </div>
               </div>

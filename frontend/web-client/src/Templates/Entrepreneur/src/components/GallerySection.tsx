@@ -8,15 +8,19 @@ import { Image, Camera, Video } from 'lucide-react';
 import { BiographyData, TemplateStyle } from '../types';
 import { ThemeStyles } from '../theme';
 import type { EditableImageTarget } from '../../../LifeJourney/types';
+import InlineEditableText from '../../../../components/InlineEditableText';
 
 interface GallerySectionProps {
   data: BiographyData;
   style: TemplateStyle;
   styles: ThemeStyles;
   onImageChangeRequest?: (target: EditableImageTarget) => void;
+  editable?: boolean;
+  onGalleryChange?: (index: number, field: 'title' | 'caption', value: string) => void;
+  onEditSectionChange?: () => void;
 }
 
-export default function GallerySection({ data, style, styles, onImageChangeRequest }: GallerySectionProps) {
+export default function GallerySection({ data, style, styles, onImageChangeRequest, editable = false, onGalleryChange, onEditSectionChange }: GallerySectionProps) {
   const [filter, setFilter] = useState<'all' | 'image' | 'video'>('all');
 
   const filteredGallery = data.gallery.filter((item) => {
@@ -73,7 +77,7 @@ export default function GallerySection({ data, style, styles, onImageChangeReque
         </div>
 
         {/* Gallery Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredGallery.map((item) => {
             const itemIndex = data.gallery.findIndex((galleryItem) => galleryItem.id === item.id);
 
@@ -115,8 +119,8 @@ export default function GallerySection({ data, style, styles, onImageChangeReque
 
                     {/* Caption & Title on hover */}
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-white mt-auto pt-2 text-left">
-                      <h3 className={`text-sm font-bold truncate ${styles.fontTitle}`}>{item.title}</h3>
-                      <p className="text-[10px] text-stone-300 truncate mt-0.5">{item.caption}</p>
+                      <h3 className={`text-sm font-bold truncate ${styles.fontTitle}`}><InlineEditableText value={item.title} editable={editable} label={`Gallery item ${itemIndex + 1} title`} onFocus={onEditSectionChange} onChange={(value) => onGalleryChange?.(itemIndex, 'title', value)} /></h3>
+                      <p className="text-[10px] text-stone-300 truncate mt-0.5"><InlineEditableText value={item.caption} editable={editable} label={`Gallery item ${itemIndex + 1} caption`} onFocus={onEditSectionChange} onChange={(value) => onGalleryChange?.(itemIndex, 'caption', value)} /></p>
                     </div>
                   </div>
 

@@ -40,6 +40,18 @@ export default function App({
       timeline: current.timeline.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item),
     }));
   };
+  const updateValueDetail = (index: number, field: 'title' | 'description', value: string) => {
+    onDataChange?.((current) => ({ ...current, values: current.values.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item) }));
+  };
+  const updateHobbyDetail = (index: number, field: 'title' | 'description', value: string) => {
+    onDataChange?.((current) => ({ ...current, hobbies: current.hobbies.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item) }));
+  };
+  const updateGalleryDetail = (index: number, field: 'title' | 'caption', value: string) => {
+    onDataChange?.((current) => ({ ...current, gallery: current.gallery.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item) }));
+  };
+  const updateStoryDetail = (index: number, field: 'title' | 'shortDescription', value: string) => {
+    onDataChange?.((current) => ({ ...current, stories: current.stories.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item) }));
+  };
   const editableText = (value: string, field: 'fullName' | 'tagline' | 'shortIntro' | 'birthDetails' | 'deathDetails' | 'location', className = '') => (
     <InlineEditableText value={value} editable={isEditable} className={className} label={field} onFocus={() => onEditSectionChange?.('hero')} onChange={(nextValue) => updatePersonalDetail(field, nextValue)} />
   );
@@ -447,7 +459,7 @@ export default function App({
                     <BookOpen className="w-6 h-6 text-artistic-gold" />
                     <h4 className="font-serif text-xl font-bold text-artistic-text">Biography Summary</h4>
                   </div>
-                  <p className="text-artistic-text/90 leading-relaxed font-serif text-base sm:text-lg whitespace-pre-line">
+                  <p className={`text-artistic-text/90 leading-relaxed font-serif text-base sm:text-lg whitespace-pre-line ${isEditable ? 'cursor-text rounded px-1 hover:bg-artistic-gold/10 focus:bg-artistic-gold/15 outline-none' : ''}`} contentEditable={isEditable} suppressContentEditableWarning onFocus={() => onEditSectionChange?.('about')} onBlur={(event) => onDataChange?.((current) => ({ ...current, personalDetails: { ...current.personalDetails, bioFull: event.currentTarget.textContent || '' } }))}>
                     {data?.personalDetails.bioFull || 'Born in the gentle hills of New England, Eleanor lived through the unfolding tapestry of the 20th century. Her life was defined by a quiet passion for literature, teaching, and preserving family memories.'}
                   </p>
                 </div>
@@ -462,7 +474,7 @@ export default function App({
                   </h4>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                   {displayValues.map((val, idx) => (
                     <div 
                       key={idx}
@@ -472,13 +484,13 @@ export default function App({
                         <div className="w-8 h-8 rounded-full bg-artistic-panel border border-artistic-gold/30 flex items-center justify-center text-artistic-text text-xs font-serif font-bold">
                           {idx + 1}
                         </div>
-                        <h5 className="font-serif text-lg font-bold text-artistic-text">{val.title}</h5>
+                        <h5 className="font-serif text-lg font-bold text-artistic-text"><InlineEditableText value={val.title} editable={isEditable} label={`Value ${idx + 1} title`} onFocus={() => onEditSectionChange?.('about')} onChange={(value) => updateValueDetail(idx, 'title', value)} /></h5>
                         <p className="font-serif italic text-sm text-artistic-dark leading-relaxed">
                             {val.quote && <>&ldquo;{val.quote}&rdquo;</>}
                         </p>
                       </div>
                       <p className="text-xs text-artistic-text/80 mt-4 leading-relaxed font-sans">
-                        {val.description}
+                        <InlineEditableText value={val.description} editable={isEditable} multiline label={`Value ${idx + 1} description`} onFocus={() => onEditSectionChange?.('about')} onChange={(value) => updateValueDetail(idx, 'description', value)} />
                       </p>
                     </div>
                   ))}
@@ -508,8 +520,8 @@ export default function App({
                         <Flower className="w-4 h-4" />
                       </div>
                       <div>
-                        <h5 className="font-serif text-sm font-bold text-artistic-text">{int.title}</h5>
-                        <p className="text-xs text-artistic-text/80 font-sans mt-0.5">{int.desc}</p>
+                        <h5 className="font-serif text-sm font-bold text-artistic-text"><InlineEditableText value={int.title} editable={isEditable} label={`Interest ${i + 1} title`} onFocus={() => onEditSectionChange?.('pursuits')} onChange={(value) => updateHobbyDetail(i, 'title', value)} /></h5>
+                        <p className="text-xs text-artistic-text/80 font-sans mt-0.5"><InlineEditableText value={int.desc} editable={isEditable} multiline label={`Interest ${i + 1} description`} onFocus={() => onEditSectionChange?.('pursuits')} onChange={(value) => updateHobbyDetail(i, 'description', value)} /></p>
                       </div>
                     </div>
                   ))}
@@ -695,14 +707,14 @@ export default function App({
                       <div className="pt-3 pb-1 px-1 flex-1 flex flex-col justify-between">
                         <div className="flex justify-between items-start gap-2">
                           <h4 className="font-serif text-sm font-bold text-artistic-text leading-tight">
-                            {item.title}
+                            <InlineEditableText value={item.title} editable={isEditable} label={`Gallery item ${idx + 1} title`} onFocus={() => onEditSectionChange?.('gallery')} onChange={(value) => updateGalleryDetail(idx, 'title', value)} />
                           </h4>
                           <span className="text-[10px] font-mono text-artistic-gold font-bold bg-artistic-panel/40 border border-artistic-gold/20 px-1.5 py-0.5 rounded-sm whitespace-nowrap">
                             {item.date}
                           </span>
                         </div>
                         <p className="font-script text-2xl text-artistic-dark mt-2 leading-tight">
-                          &ldquo;{item.caption}&rdquo;
+                          &ldquo;<InlineEditableText value={item.caption} editable={isEditable} label={`Gallery item ${idx + 1} caption`} onFocus={() => onEditSectionChange?.('gallery')} onChange={(value) => updateGalleryDetail(idx, 'caption', value)} />&rdquo;
                         </p>
                       </div>
 
@@ -790,12 +802,12 @@ export default function App({
                         <Quote className="absolute -top-4 -left-6 w-12 h-12 text-artistic-gold/10 fill-current pointer-events-none" />
                         
                         <h4 className="font-serif text-2xl font-bold text-artistic-text leading-tight">
-                          {story.title}
+                          <InlineEditableText value={story.title} editable={isEditable} label={`Story ${i + 1} title`} onFocus={() => onEditSectionChange?.('stories')} onChange={(value) => updateStoryDetail(i, 'title', value)} />
                         </h4>
                       </div>
 
                       <p className="text-sm text-artistic-text/90 leading-relaxed font-serif">
-                        {story.excerpt}
+                        <InlineEditableText value={story.excerpt} editable={isEditable} multiline label={`Story ${i + 1} description`} onFocus={() => onEditSectionChange?.('stories')} onChange={(value) => updateStoryDetail(i, 'shortDescription', value)} />
                       </p>
 
                       {story.handwrittenNote && (

@@ -48,6 +48,7 @@ export default function EntrepreneurTemplate({
   data,
   style = 'heritage',
   activeEditSection = null,
+  onDataChange,
   onEditSectionChange,
   onImageChangeRequest,
 }: EntrepreneurTemplateProps) {
@@ -59,6 +60,11 @@ export default function EntrepreneurTemplate({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const styles = themeStylesMap[currentStyle];
+  const updateEntrepreneurField = (field: 'name' | 'title' | 'tagline' | 'introduction', value: string) => {
+    if (!onDataChange || isEntrepreneurBiographyData(data)) return;
+    const personalField = field === 'name' ? 'fullName' : field === 'title' ? 'occupation' : field === 'tagline' ? 'tagline' : 'shortIntro';
+    onDataChange((current) => ({ ...current, personalDetails: { ...current.personalDetails, [personalField]: value } }));
+  };
 
   // Monitor scroll height to show back-to-top buttons
   useEffect(() => {
@@ -256,25 +262,40 @@ export default function EntrepreneurTemplate({
             style={currentStyle}
             styles={styles}
             onImageChangeRequest={onImageChangeRequest}
+            editable={isEditable}
+            onTextChange={updateEntrepreneurField}
+            onEditSectionChange={() => onEditSectionChange?.('hero')}
           />
         )}
 
         {/* About & Core Character Values Section */}
         {renderTemplateSection(
           'about',
-          <AboutSection data={templateData} style={currentStyle} styles={styles} />
+          <AboutSection data={templateData} style={currentStyle} styles={styles} editable={isEditable} onEditSectionChange={() => onEditSectionChange?.('about')} onSummaryChange={(value) => {
+            if (!onDataChange || isEntrepreneurBiographyData(data)) return;
+            onDataChange((current) => ({ ...current, personalDetails: { ...current.personalDetails, bioFull: value } }));
+          }} onValueChange={(index, field, value) => {
+            if (!onDataChange || isEntrepreneurBiographyData(data)) return;
+            onDataChange((current) => ({ ...current, values: current.values.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item) }));
+          }} />
         )}
 
         {/* Hobbies & Specialized Pursuits Section */}
         {renderTemplateSection(
           'pursuits',
-          <PursuitsSection data={templateData} style={currentStyle} styles={styles} />
+          <PursuitsSection data={templateData} style={currentStyle} styles={styles} editable={isEditable} onEditSectionChange={() => onEditSectionChange?.('pursuits')} onHobbyChange={(index, field, value) => {
+            if (!onDataChange || isEntrepreneurBiographyData(data)) return;
+            onDataChange((current) => ({ ...current, hobbies: current.hobbies.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item) }));
+          }} />
         )}
 
         {/* Timeline Life Journey Section */}
         {renderTemplateSection(
           'timeline',
-          <JourneySection data={templateData} style={currentStyle} styles={styles} />
+          <JourneySection data={templateData} style={currentStyle} styles={styles} editable={isEditable} onEditSectionChange={() => onEditSectionChange?.('timeline')} onMilestoneChange={(index, field, value) => {
+            if (!onDataChange || isEntrepreneurBiographyData(data)) return;
+            onDataChange((current) => ({ ...current, timeline: current.timeline.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item) }));
+          }} />
         )}
 
         {/* Media Photo & Video Gallery Section */}
@@ -285,6 +306,12 @@ export default function EntrepreneurTemplate({
             style={currentStyle}
             styles={styles}
             onImageChangeRequest={onImageChangeRequest}
+            editable={isEditable}
+            onEditSectionChange={() => onEditSectionChange?.('gallery')}
+            onGalleryChange={(index, field, value) => {
+              if (!onDataChange || isEntrepreneurBiographyData(data)) return;
+              onDataChange((current) => ({ ...current, gallery: current.gallery.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item) }));
+            }}
           />
         )}
 
@@ -296,13 +323,22 @@ export default function EntrepreneurTemplate({
             style={currentStyle}
             styles={styles}
             onImageChangeRequest={onImageChangeRequest}
+            editable={isEditable}
+            onEditSectionChange={() => onEditSectionChange?.('stories')}
+            onStoryChange={(index, field, value) => {
+              if (!onDataChange || isEntrepreneurBiographyData(data)) return;
+              onDataChange((current) => ({ ...current, stories: current.stories.map((item, itemIndex) => itemIndex === index ? { ...item, [field === 'description' ? 'shortDescription' : field]: value } : item) }));
+            }}
           />
         )}
 
         {/* Contact Form Section */}
         {renderTemplateSection(
           'contact',
-          <ContactSection data={templateData} style={currentStyle} styles={styles} />
+          <ContactSection data={templateData} style={currentStyle} styles={styles} editable={isEditable} onEditSectionChange={() => onEditSectionChange?.('contact')} onEmailChange={(value) => {
+            if (!onDataChange || isEntrepreneurBiographyData(data)) return;
+            onDataChange((current) => ({ ...current, personalDetails: { ...current.personalDetails, contactEmail: value } }));
+          }} />
         )}
 
       </main>

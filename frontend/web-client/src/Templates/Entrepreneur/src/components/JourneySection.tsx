@@ -6,11 +6,15 @@
 import { Milestone, Sparkles, GraduationCap, Briefcase, Heart, Lightbulb, Compass, MapPin, Clock } from 'lucide-react';
 import { BiographyData, TemplateStyle, TimelineCategory } from '../types';
 import { ThemeStyles } from '../theme';
+import InlineEditableText from '../../../../components/InlineEditableText';
 
 interface JourneySectionProps {
   data: BiographyData;
   style: TemplateStyle;
   styles: ThemeStyles;
+  editable?: boolean;
+  onMilestoneChange?: (index: number, field: 'year' | 'title' | 'location' | 'description', value: string) => void;
+  onEditSectionChange?: () => void;
 }
 
 // Map categories to specific icons
@@ -70,7 +74,7 @@ const getMilestoneMetadata = (category: TimelineCategory, idx: number) => {
   }
 };
 
-export default function JourneySection({ data, style, styles }: JourneySectionProps) {
+export default function JourneySection({ data, style, styles, editable = false, onMilestoneChange, onEditSectionChange }: JourneySectionProps) {
   return (
     <section id="journey" className={`py-24 transition-colors duration-500 ${
       style === 'heritage' 
@@ -192,7 +196,7 @@ export default function JourneySection({ data, style, styles }: JourneySectionPr
                             {meta.ageRange}
                           </span>
                           <span className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-white/5 text-stone-300">
-                            {m.year}
+                            <InlineEditableText value={m.year} editable={editable} label={`Milestone ${idx + 1} year`} onFocus={onEditSectionChange} onChange={(value) => onMilestoneChange?.(idx, 'year', value)} />
                           </span>
                         </div>
                       </div>
@@ -201,14 +205,14 @@ export default function JourneySection({ data, style, styles }: JourneySectionPr
                       <h3 className={`text-xl md:text-2xl font-bold mb-3 text-white ${
                         style === 'heritage' ? 'font-serif' : style === 'modern' ? 'font-sans' : 'font-serif italic'
                       }`}>
-                        {m.title}
+                        <InlineEditableText value={m.title} editable={editable} label={`Milestone ${idx + 1} title`} onFocus={onEditSectionChange} onChange={(value) => onMilestoneChange?.(idx, 'title', value)} />
                       </h3>
 
                       {/* Structured Metadata Row */}
                       <div className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 py-2.5 my-3 border-t border-b text-[11px] font-mono border-stone-800 text-stone-400`}>
                         <span className="flex items-center">
                           <MapPin className="w-3 h-3 mr-1 opacity-70" />
-                          <span>{meta.location}</span>
+                          <InlineEditableText value={m.location} editable={editable} label={`Milestone ${idx + 1} location`} onFocus={onEditSectionChange} onChange={(value) => onMilestoneChange?.(idx, 'location', value)} />
                         </span>
                         <span className="opacity-30">•</span>
                         <span className="flex items-center">
@@ -221,7 +225,7 @@ export default function JourneySection({ data, style, styles }: JourneySectionPr
                       <p className={`text-sm leading-relaxed ${
                         style === 'heritage' ? 'text-stone-200' : style === 'modern' ? 'text-zinc-300' : 'text-stone-300'
                       }`}>
-                        {m.description}
+                        <InlineEditableText value={m.description} editable={editable} multiline label={`Milestone ${idx + 1} description`} onFocus={onEditSectionChange} onChange={(value) => onMilestoneChange?.(idx, 'description', value)} />
                       </p>
 
                       {/* Custom descriptive text block below */}

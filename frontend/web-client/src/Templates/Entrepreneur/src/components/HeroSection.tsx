@@ -9,15 +9,19 @@ import { ArrowRight, Camera, UserCheck, ShieldAlert } from 'lucide-react';
 import { BiographyData, TemplateStyle } from '../types';
 import { ThemeStyles } from '../theme';
 import type { EditableImageTarget } from '../../../LifeJourney/types';
+import InlineEditableText from '../../../../components/InlineEditableText';
 
 interface HeroSectionProps {
   data: BiographyData;
   style: TemplateStyle;
   styles: ThemeStyles;
   onImageChangeRequest?: (target: EditableImageTarget) => void;
+  editable?: boolean;
+  onTextChange?: (field: 'name' | 'title' | 'tagline' | 'introduction', value: string) => void;
+  onEditSectionChange?: () => void;
 }
 
-export default function HeroSection({ data, style, styles, onImageChangeRequest }: HeroSectionProps) {
+export default function HeroSection({ data, style, styles, onImageChangeRequest, editable = false, onTextChange, onEditSectionChange }: HeroSectionProps) {
   
   const handleScrollToStory = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -80,7 +84,7 @@ export default function HeroSection({ data, style, styles, onImageChangeRequest 
               transition={{ duration: 0.6, delay: 0.1 }}
               className={`text-4xl sm:text-5xl md:text-6xl tracking-tight leading-none mb-3 ${styles.textTitle}`}
             >
-              {data.name}
+              <InlineEditableText value={data.name} editable={editable} label="name" onFocus={onEditSectionChange} onChange={(value) => onTextChange?.('name', value)} />
             </motion.h1>
 
             {/* Subtitle / Role */}
@@ -92,7 +96,7 @@ export default function HeroSection({ data, style, styles, onImageChangeRequest 
                 style === 'heritage' ? 'text-[#0A1F44]/90 font-serif italic' : style === 'modern' ? 'text-zinc-500' : 'text-stone-700 italic'
               }`}
             >
-              {data.title}
+              <InlineEditableText value={data.title} editable={editable} label="title" onFocus={onEditSectionChange} onChange={(value) => onTextChange?.('title', value)} />
             </motion.h2>
 
             {/* Accent divider line */}
@@ -117,7 +121,7 @@ export default function HeroSection({ data, style, styles, onImageChangeRequest 
               <p className={`text-lg sm:text-xl font-medium ${
                 style === 'heritage' ? 'text-[#0A1F44]' : style === 'modern' ? 'text-zinc-800' : 'text-stone-900'
               }`}>
-                "{data.tagline}"
+                "<InlineEditableText value={data.tagline} editable={editable} label="tagline" onFocus={onEditSectionChange} onChange={(value) => onTextChange?.('tagline', value)} />"
               </p>
             </motion.div>
 
@@ -128,7 +132,7 @@ export default function HeroSection({ data, style, styles, onImageChangeRequest 
               transition={{ duration: 0.5, delay: 0.5 }}
               className={`text-base sm:text-lg mb-8 max-w-2xl ${styles.textBody}`}
             >
-              {data.introduction}
+              <InlineEditableText value={data.introduction} editable={editable} multiline label="introduction" onFocus={onEditSectionChange} onChange={(value) => onTextChange?.('introduction', value)} />
             </motion.p>
 
             {/* Call to action button */}

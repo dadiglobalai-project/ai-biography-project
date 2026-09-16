@@ -8,14 +8,20 @@ import { User, Bookmark, HeartHandshake } from 'lucide-react';
 import { BiographyData, TemplateStyle } from '../types';
 import { ThemeStyles } from '../theme';
 import LucideIcon from './LucideIcon';
+import InlineEditableText from '../../../../components/InlineEditableText';
 
 interface AboutSectionProps {
   data: BiographyData;
   style: TemplateStyle;
   styles: ThemeStyles;
+  editable?: boolean;
+  onSummaryChange?: (value: string) => void;
+  onEditSectionChange?: () => void;
+  onValueChange?: (index: number, field: 'title' | 'description', value: string) => void;
+  onHobbyChange?: (index: number, field: 'title' | 'description', value: string) => void;
 }
 
-export default function AboutSection({ data, style, styles }: AboutSectionProps) {
+export default function AboutSection({ data, style, styles, editable = false, onSummaryChange, onEditSectionChange, onValueChange }: AboutSectionProps) {
   
   // Staggered entrance animation variants for cards
   const containerVariants = {
@@ -60,7 +66,7 @@ export default function AboutSection({ data, style, styles }: AboutSectionProps)
           </h3>
           
           <p className={`text-base md:text-lg mb-8 leading-relaxed ${styles.textBody}`}>
-            {data.biographySummary}
+            <InlineEditableText value={data.biographySummary} editable={editable} multiline label="Biography summary" onFocus={onEditSectionChange} onChange={(value) => onSummaryChange?.(value)} />
           </p>
 
           {/* In-text pull quote block */}
@@ -98,9 +104,9 @@ export default function AboutSection({ data, style, styles }: AboutSectionProps)
             initial="hidden"
             whileInView="show"
             viewport={{ once: true, margin: "-100px" }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4"
           >
-            {data.values.map((val) => (
+            {data.values.map((val, index) => (
               <motion.div
                 key={val.id}
                 variants={itemVariants}
@@ -121,11 +127,11 @@ export default function AboutSection({ data, style, styles }: AboutSectionProps)
                   <h4 className={`text-base font-bold mb-2 ${
                     style === 'heritage' ? 'text-[#0A1F44] font-serif' : style === 'modern' ? 'text-zinc-900 font-sans' : 'text-stone-900 font-serif italic'
                   }`}>
-                    {val.name}
+                    <InlineEditableText value={val.name} editable={editable} label={`Value ${index + 1} title`} onFocus={onEditSectionChange} onChange={(value) => onValueChange?.(index, 'title', value)} />
                   </h4>
                   
                   <p className={`text-sm ${styles.textBody}`}>
-                    {val.description}
+                    <InlineEditableText value={val.description} editable={editable} multiline label={`Value ${index + 1} description`} onFocus={onEditSectionChange} onChange={(value) => onValueChange?.(index, 'description', value)} />
                   </p>
                 </div>
               </motion.div>
@@ -138,7 +144,7 @@ export default function AboutSection({ data, style, styles }: AboutSectionProps)
   );
 }
 
-export function PursuitsSection({ data, style, styles }: AboutSectionProps) {
+export function PursuitsSection({ data, style, styles, editable = false, onEditSectionChange, onHobbyChange }: AboutSectionProps) {
   return (
     <section className={`py-16 border-t ${styles.borderLight} ${styles.bodyBg} transition-colors duration-500`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -151,8 +157,8 @@ export function PursuitsSection({ data, style, styles }: AboutSectionProps) {
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {data.hobbies.map((hob) => (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {data.hobbies.map((hob, index) => (
             <div
               key={hob.id}
               id={`hobby-card-${hob.id}`}
@@ -170,10 +176,10 @@ export function PursuitsSection({ data, style, styles }: AboutSectionProps) {
                 <h4 className={`text-sm font-bold ${
                   style === 'heritage' ? 'text-[#0A1F44] font-serif' : style === 'modern' ? 'text-zinc-900' : 'text-stone-900'
                 }`}>
-                  {hob.name}
+                  <InlineEditableText value={hob.name} editable={editable} label={`Pursuit ${index + 1} title`} onFocus={onEditSectionChange} onChange={(value) => onHobbyChange?.(index, 'title', value)} />
                 </h4>
                 <p className="text-xs mt-1 text-stone-500 leading-relaxed">
-                  {hob.description}
+                  <InlineEditableText value={hob.description} editable={editable} multiline label={`Pursuit ${index + 1} description`} onFocus={onEditSectionChange} onChange={(value) => onHobbyChange?.(index, 'description', value)} />
                 </p>
               </div>
             </div>

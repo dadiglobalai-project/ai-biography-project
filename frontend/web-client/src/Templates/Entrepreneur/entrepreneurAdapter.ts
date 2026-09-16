@@ -64,6 +64,7 @@ export const adaptBiographyToEntrepreneur = (draft: BiographyCategory): Biograph
   timeline: draft.timeline.map((milestone, index, milestones) => ({
     id: milestone.id || `milestone-${index + 1}`,
     year: milestone.year,
+    location: milestone.location,
     category: getTimelineCategory(milestone, index, milestones.length),
     title: milestone.title,
     description: milestone.description,

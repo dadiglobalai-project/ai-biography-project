@@ -15,6 +15,7 @@ export type TimelineCategory = 'Childhood' | 'Education' | 'Career' | 'Family Li
 export interface TimelineMilestone {
   id: string;
   year: string;
+  location?: string;
   category: TimelineCategory;
   title: string;
   description: string;
