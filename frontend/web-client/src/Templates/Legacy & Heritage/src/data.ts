@@ -141,32 +141,29 @@ export const GALLERY_ITEMS: GalleryItem[] = [
   {
     id: "vid-1",
     title: "Super 8 Home Movies: Summer Picnic",
-    type: "video",
+    type: "photo",
     url: "https://images.unsplash.com/photo-1501555088652-021faa106b9b?q=80&w=500",
     caption: "Reel 4: Family gathering in the heirloom orchard",
     rotation: "rotate-2",
     date: "1961",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-forest-stream-in-the-sunlight-529-large.mp4"
   },
   {
     id: "vid-2",
     title: "The Autumn Equinox Festival",
-    type: "video",
+    type: "photo",
     url: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=500",
     caption: "Reel 9: Golden light on the Vermont hillsides",
     rotation: "-rotate-2",
     date: "1975",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-autumn-leaves-falling-in-the-forest-34135-large.mp4"
   },
   {
     id: "vid-3",
     title: "Winter at the Old Homestead",
-    type: "video",
+    type: "photo",
     url: "https://images.unsplash.com/photo-1482862549707-f63cb32c5fd9?q=80&w=500",
     caption: "Reel 12: Cozy fireplace and heavy snowfall in Arlington",
     rotation: "rotate-1",
     date: "1968",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-fireplace-burning-brightly-in-a-dark-room-42861-large.mp4"
   }
 ];
 

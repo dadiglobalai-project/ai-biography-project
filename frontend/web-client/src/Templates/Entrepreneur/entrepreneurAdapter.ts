@@ -81,6 +81,7 @@ export const adaptBiographyToEntrepreneur = (draft: BiographyCategory): Biograph
     title: story.title,
     date: story.date,
     description: story.shortDescription || story.fullStory,
+    fullStory: story.fullStory,
     imageUrl: story.imageUrl,
     category: story.category,
     readTime: story.readTime,

@@ -1,12 +1,11 @@
 import { NavLink, Link } from 'react-router-dom';
 import { ArrowUpRight, BookOpen, LayoutDashboard, LogOut, RotateCcw, Settings, ShieldCheck } from 'lucide-react';
-import BrandLogo from './BrandLogo';
 import './admin.css';
 
 export function AdminHeader() {
   return (
     <header className="admin-header">
-      <Link to="/" className="admin-brand"><span className="admin-logo-mark"><BrandLogo variant="mark" /></span>Xinghuoji<span className="admin-brand-divider" /> <small>ADMIN</small></Link>
+      <Link to="/" className="admin-brand"><span className="admin-logo-mark"><img src="/favicon.png" alt="Xinghuoji" /></span>Xinghuoji<span className="admin-brand-divider" /> <small>ADMIN</small></Link>
       <div className="admin-header-actions">
         <Link to="/" className="admin-site-link">View website <ArrowUpRight size={15} /></Link>
         <Link to="/account-settings" className="admin-profile" aria-label="Admin account settings"><span>AD</span><div>Administrator<small>Account settings</small></div></Link>

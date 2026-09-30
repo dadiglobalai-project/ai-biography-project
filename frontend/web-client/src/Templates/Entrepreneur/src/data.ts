@@ -161,7 +161,7 @@ export const biographyData: BiographyData = {
       id: "gal-5",
       title: "Documentary Intro",
       caption: "A 3-minute legacy interview on our early struggles and leadership frameworks.",
-      type: "video",
+      type: "image",
       imageUrl: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?q=80&w=800&auto=format&fit=crop"
     },
     {
@@ -182,7 +182,7 @@ export const biographyData: BiographyData = {
       id: "gal-8",
       title: "A Lifetime Achievement Award",
       caption: "Accepting the Legacy Builder Award for civic service and sustainable enterprise architecture.",
-      type: "video",
+      type: "image",
       imageUrl: "https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=800&auto=format&fit=crop"
     }
   ],

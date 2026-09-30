@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -16,12 +16,18 @@ interface AboutSectionProps {
   styles: ThemeStyles;
   editable?: boolean;
   onSummaryChange?: (value: string) => void;
+  aboutTitle?: string;
+  onAboutTitleChange?: (value: string) => void;
+  quote?: string;
+  quoteAttribution?: string;
+  onQuoteChange?: (value: string) => void;
+  onQuoteAttributionChange?: (value: string) => void;
   onEditSectionChange?: () => void;
   onValueChange?: (index: number, field: 'title' | 'description', value: string) => void;
   onHobbyChange?: (index: number, field: 'title' | 'description', value: string) => void;
 }
 
-export default function AboutSection({ data, style, styles, editable = false, onSummaryChange, onEditSectionChange, onValueChange }: AboutSectionProps) {
+export default function AboutSection({ data, style, styles, editable = false, onSummaryChange, aboutTitle, onAboutTitleChange, quote, quoteAttribution, onQuoteChange, onQuoteAttributionChange, onEditSectionChange, onValueChange }: AboutSectionProps) {
   
   // Staggered entrance animation variants for cards
   const containerVariants = {
@@ -47,7 +53,7 @@ export default function AboutSection({ data, style, styles, editable = false, on
         <div className="text-center mb-16">
           <span className={`inline-flex items-center space-x-1.5 text-xs font-mono tracking-widest ${styles.textSubtitle}`}>
             <User className="w-3.5 h-3.5" />
-            <span>01 / The Man Behind the Legacy</span>
+            <span>01 / The Person Behind the Legacy</span>
           </span>
           <h2 className={`text-3xl md:text-4xl mt-3 mb-4 tracking-tight ${styles.textTitle}`}>
             Biographical Portrait &amp; Character
@@ -62,7 +68,7 @@ export default function AboutSection({ data, style, styles, editable = false, on
           <h3 className={`text-xl md:text-3xl font-serif mb-6 leading-tight ${
             style === 'heritage' ? 'text-[#0A1F44]' : style === 'modern' ? 'text-zinc-900 font-sans font-semibold' : 'text-stone-900 italic'
           }`}>
-            A Journey of Grit, Core Values &amp; Civic Devotion
+            <InlineEditableText value={aboutTitle || 'A Journey of Grit, Core Values & Civic Devotion'} editable={editable} label="About section title" onFocus={onEditSectionChange} onChange={(value) => onAboutTitleChange?.(value)} />
           </h3>
           
           <p className={`text-base md:text-lg mb-8 leading-relaxed ${styles.textBody}`}>
@@ -80,10 +86,10 @@ export default function AboutSection({ data, style, styles, editable = false, on
             <p className={`text-base font-medium italic ${
               style === 'heritage' ? 'text-[#0A1F44]' : style === 'modern' ? 'text-zinc-800' : 'text-stone-900'
             }`}>
-              “True wealth is never measured by a ledger of assets, but by the strength of the relationships you build, the character you preserve under pressure, and the doors you open for the dreamers who come after you.”
+              “<InlineEditableText value={quote || 'True wealth is never measured by a ledger of assets, but by the strength of the relationships you build, the character you preserve under pressure, and the doors you open for the dreamers who come after you.'} editable={editable} multiline label="Quote" onFocus={onEditSectionChange} onChange={(value) => onQuoteChange?.(value)} />”
             </p>
             <cite className="block mt-2.5 text-xs font-mono tracking-wider text-stone-500 not-italic uppercase">
-              — Daniel Chen, Annual Founders Assembly Address
+              — <InlineEditableText value={quoteAttribution || 'Daniel Chen, Annual Founders Assembly Address'} editable={editable} label="Quote attribution" onFocus={onEditSectionChange} onChange={(value) => onQuoteAttributionChange?.(value)} />
             </cite>
           </blockquote>
         </div>
@@ -189,3 +195,4 @@ export function PursuitsSection({ data, style, styles, editable = false, onEditS
     </section>
   );
 }
+

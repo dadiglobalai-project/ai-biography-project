@@ -474,6 +474,19 @@ const sidebarSectionItems: Array<{
   { navKey: 'contact', section: 'contact', label: 'Contact', icon: Mail },
 ];
 
+const natureSerenitySidebarItems = [
+  { navKey: 'hero', section: 'hero' as EditableTemplateSection, label: 'Hero', icon: Home },
+  { navKey: 'about', section: 'about' as EditableTemplateSection, label: 'Introduction & Philosophy', icon: Sparkles },
+  { navKey: 'nature-joys', section: 'nature-joys' as EditableTemplateSection, label: 'Daily Joys & Interests', icon: WandSparkles },
+  { navKey: 'nature-seasons', section: 'nature-seasons' as EditableTemplateSection, label: 'Seasons of Life', icon: Clock3 },
+  { navKey: 'timeline', section: 'timeline' as EditableTemplateSection, label: 'Life Journey', icon: Clock3 },
+  { navKey: 'nature-biography', section: 'nature-biography' as EditableTemplateSection, label: 'Full Biography', icon: BookOpen },
+  { navKey: 'gallery', section: 'gallery' as EditableTemplateSection, label: 'Media Gallery', icon: ImageIcon },
+  { navKey: 'stories', section: 'stories' as EditableTemplateSection, label: 'Memories & Stories', icon: FileText },
+  { navKey: 'nature-reflections', section: 'nature-reflections' as EditableTemplateSection, label: 'Reflection Garden', icon: Sparkles },
+  { navKey: 'contact', section: 'contact' as EditableTemplateSection, label: 'Contact', icon: Mail },
+];
+
 const BACKEND_SECTION_ALIASES: Record<ContentEditorSection, string[]> = {
   hero: ['hero', 'hero section'],
   about: ['about', 'about section', 'chronicle', 'chronicle section', 'chronicle overview', 'archival essence'],
@@ -482,6 +495,11 @@ const BACKEND_SECTION_ALIASES: Record<ContentEditorSection, string[]> = {
   gallery: ['gallery', 'gallery section'],
   stories: ['stories', 'story', 'memory', 'memories', 'memories stories', 'memories stories section'],
   contact: ['contact', 'contact section'],
+  'nature-joys': ['pursuits', 'hobbies', 'interests'],
+  'nature-seasons': ['timeline', 'life journey'],
+  'nature-biography': ['about', 'biography'],
+  'nature-reflections': ['about', 'reflections'],
+  places: ['gallery', 'places', 'sacred geography'],
 };
 
 const normalizeBackendSectionText = (value?: string) =>
@@ -551,6 +569,7 @@ const personalFieldsBySection: Record<
   hero: [
     { field: 'fullName', label: 'Full name' },
     { field: 'occupation', label: 'Occupation' },
+    { field: 'lifespan', label: 'Chapter era / lifespan' },
     { field: 'tagline', label: 'Short tagline', multiline: true },
     { field: 'birthDetails', label: 'Birth details' },
     { field: 'deathDetails', label: 'Death details' },
@@ -761,6 +780,10 @@ const getImageTargetLabel = (target: EditableImageTarget | null) => {
       return target.itemIndex != null
         ? `Story image ${target.itemIndex + 1}`
         : 'Story image';
+    case 'places':
+      return target.itemIndex != null
+        ? `Sacred Geography image ${target.itemIndex + 1}`
+        : 'Sacred Geography image';
     default:
       return 'Image';
   }
@@ -1184,7 +1207,8 @@ export default function LifeJourneyEditPage() {
       activeEditorSection === 'pursuits' ||
       activeEditorSection === 'timeline' ||
       activeEditorSection === 'gallery' ||
-      activeEditorSection === 'stories'
+      activeEditorSection === 'stories' ||
+      activeEditorSection === 'places'
         ? activeEditorSection
         : 'gallery';
     const imageTarget = activeImageTarget;
@@ -1263,6 +1287,15 @@ export default function LifeJourneyEditPage() {
                   thumbnailAssetId: backendAssetId,
                 }
               : item
+          ),
+        };
+      }
+
+      if (targetSection === 'places' && imageTarget && currentDraft.places && currentDraft.places.length > 0) {
+        return {
+          ...currentDraft,
+          places: currentDraft.places.map((place, index) =>
+            index === targetIndex ? { ...place, image: imageUrl } : place
           ),
         };
       }
@@ -1387,8 +1420,28 @@ export default function LifeJourneyEditPage() {
         previewViewport === 'desktop'
           ? document
           : devicePreviewFrameRef.current?.contentDocument;
-      const previewSection = previewDocument?.getElementById(`${section}-section`);
-      previewSection?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const sectionIds: Record<string, string[]> = {
+        hero: ['hero-section', 'home'],
+        about: ['about-section', 'about'],
+        pursuits: ['pursuits-section', 'joys'],
+        'nature-joys': ['joys'],
+        'nature-seasons': ['seasons'],
+        'nature-biography': ['biography'],
+        'nature-reflections': ['reflections'],
+        places: ['places'],
+        timeline: ['timeline-section', 'timeline', 'journey'],
+        gallery: ['gallery-section', 'gallery'],
+        stories: ['stories-section', 'stories'],
+        contact: ['contact-section', 'contact'],
+      };
+      const previewSection = (sectionIds[section] || [`${section}-section`, section])
+        .map((id) => previewDocument?.getElementById(id))
+        .find(Boolean);
+      if (previewSection) {
+        previewSection.style.scrollMarginTop = '96px';
+        previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
     });
   };
 
@@ -2344,7 +2397,7 @@ export default function LifeJourneyEditPage() {
         timePeriod: milestone.year || '',
         title: milestone.title || '',
         location: milestone.location || '',
-        quote: milestone.description || '',
+        quote: milestone.annotation || milestone.description || '',
         imageId: getPayloadMediaAssetId(milestone.imageAssetId, omittedMediaAssetIds) || '',
         imageAltText: milestone.title || '',
         imageCaption: milestone.imageCaption || '',
@@ -3348,6 +3401,17 @@ export default function LifeJourneyEditPage() {
     setSaveMessage('Unsaved changes');
   };
 
+  const updateTemplateIdentityField = (
+    field: 'badge' | 'editionLabel' | 'archiveDescription',
+    value: string
+  ) => {
+    setDraft((current) => ({
+      ...current,
+      [field]: value,
+    }));
+    setSaveMessage('Unsaved changes');
+  };
+
   const updateProfileImageSettings = (updates: ImageDisplaySettings) => {
     setDraft((current) => ({
       ...current,
@@ -4010,6 +4074,39 @@ export default function LifeJourneyEditPage() {
     );
   };
 
+  const renderTemplateIdentityFields = () => (
+    <div className="space-y-4 rounded-xl border border-[#FED362]/40 bg-[#FED362]/10 p-4">
+      <div>
+        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-700">
+          Template Identity
+        </h4>
+        <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+          Controls the category marker and short archive description above the hero.
+        </p>
+      </div>
+      {renderTextField({
+        label: 'Template badge',
+        value: draft.badge,
+        section: 'hero',
+        onChange: (value) => updateTemplateIdentityField('badge', value),
+      })}
+      {renderTextField({
+        label: 'Edition label',
+        value: draft.editionLabel || '',
+        section: 'hero',
+        onChange: (value) => updateTemplateIdentityField('editionLabel', value),
+      })}
+      {renderTextField({
+        label: 'Archive description',
+        value: draft.archiveDescription || '',
+        multiline: true,
+        rows: 3,
+        section: 'hero',
+        onChange: (value) => updateTemplateIdentityField('archiveDescription', value),
+      })}
+    </div>
+  );
+
   const renderSectionCopyFields = (section: EditableSectionCopyKey) => {
     const sectionCopy = getSectionCopy(draft.sectionCopy)[section];
 
@@ -4051,6 +4148,7 @@ export default function LifeJourneyEditPage() {
       case 'hero':
         return (
           <div className="space-y-6">
+            {renderTemplateIdentityFields()}
             {renderPersonalFields('hero')}
             {renderImageUploadField({
               label: 'Profile image',
@@ -5573,7 +5671,7 @@ export default function LifeJourneyEditPage() {
           Sections
         </div>
         <nav className="space-y-1">
-          {sidebarSectionItems.map((item) => {
+          {(templateRoute.id === 'nature-serenity' ? natureSerenitySidebarItems : sidebarSectionItems).map((item) => {
             const Icon = item.icon;
             const isActive = activeSidebarItem
               ? activeSidebarItem === item.navKey
@@ -6561,7 +6659,7 @@ export default function LifeJourneyEditPage() {
                   aria-label={`${label} preview`}
                 >
                   <Icon className="h-4 w-4" />
-                  {value === 'desktop' && label}
+                  <span>{label}</span>
                 </button>
               ))}
             </div>

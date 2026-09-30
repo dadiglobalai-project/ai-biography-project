@@ -1,8 +1,9 @@
 .admin-page { min-height: 100vh; background: #f5f6f8; color: #18243b; font-family: var(--font-sans); }
-.admin-header { height: 76px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; background: white; border-bottom: 1px solid #e5e8ee; position: sticky; top: 0; z-index: 40; }
-.admin-brand { display: flex; align-items: center; gap: 10px; font-size: 23px; font-weight: 700; letter-spacing: -.8px; }
+.admin-header { height: 76px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; background: #fbf7ef; border-bottom: 1px solid #dfd4bf; position: sticky; top: 0; z-index: 40; box-shadow: 0 2px 10px rgba(76, 57, 25, .06); }
+.admin-brand { display: flex; align-items: center; gap: 10px; color: #102342; font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 700; letter-spacing: -.6px; }
+.admin-brand:hover { color: #806126; }
 .admin-brand > span:first-child { display: grid; place-items: center; height: 50px; width: 50px; background: transparent; color: #e5c47b; border-radius: 12px; overflow: hidden; }
-.admin-logo-mark > div { width: 48px; height: 48px; filter: invert(1); }
+.admin-logo-mark > img { width: 48px; height: 48px; object-fit: contain; }
 .admin-brand-divider { height: 22px; width: 1px; background: #e2e6ec; margin: 0 7px; }
 .admin-brand small { font-size: 10px; letter-spacing: 2px; color: #7b8494; }
 .admin-header-actions { display: flex; align-items: center; gap: 26px; }

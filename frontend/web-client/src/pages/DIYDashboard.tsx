@@ -440,16 +440,6 @@ export default function DIYDashboard() {
 
   const baseTemplates: Template[] = [
     {
-      id: 'visionary-legacy',
-      title: 'Visionary Legacy',
-      subtitle: 'The Visionary who changed the way WE LIVE',
-      description: 'A high-contrast, bold template designed for leaders, innovators, and creators who forged new paths.',
-      imageUrl: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=800',
-      tag: 'Bold & Creative',
-      previewPath: '/diy-dashboard/templates/visionary-legacy/preview',
-      editPath: '/diy-dashboard/templates/visionary-legacy/edit'
-    },
-    {
       id: 'life-journey',
       title: 'Life Journey',
       subtitle: 'A journey through the land',
@@ -478,6 +468,16 @@ export default function DIYDashboard() {
       tag: 'Heritage',
       previewPath: '/diy-dashboard/templates/legacy-heritage/preview',
       editPath: '/diy-dashboard/templates/legacy-heritage/edit'
+    },
+    {
+      id: 'nature-serenity',
+      title: 'Nature & Serenity',
+      subtitle: 'A quiet life in focus',
+      description: 'A reflective nature-inspired template for peaceful memories, personal rituals, and meaningful life chapters.',
+      imageUrl: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&q=80&w=800',
+      tag: 'Reflective',
+      previewPath: '/diy-dashboard/templates/nature-serenity/preview',
+      editPath: '/diy-dashboard/templates/nature-serenity/edit'
     }
   ];
 

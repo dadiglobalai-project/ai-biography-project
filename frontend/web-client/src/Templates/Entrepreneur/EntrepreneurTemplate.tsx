@@ -271,7 +271,16 @@ export default function EntrepreneurTemplate({
         {/* About & Core Character Values Section */}
         {renderTemplateSection(
           'about',
-          <AboutSection data={templateData} style={currentStyle} styles={styles} editable={isEditable} onEditSectionChange={() => onEditSectionChange?.('about')} onSummaryChange={(value) => {
+          <AboutSection data={templateData} style={currentStyle} styles={styles} editable={isEditable} aboutTitle={!isEntrepreneurBiographyData(data) ? data?.sectionCopy?.about?.title : undefined} quote={!isEntrepreneurBiographyData(data) ? data?.personalDetails.signatureQuote : undefined} quoteAttribution={!isEntrepreneurBiographyData(data) ? data?.personalDetails.signatureQuoteAttribution : undefined} onEditSectionChange={() => onEditSectionChange?.('about')} onQuoteChange={(value) => {
+            if (!onDataChange || isEntrepreneurBiographyData(data)) return;
+            onDataChange((current) => ({ ...current, personalDetails: { ...current.personalDetails, signatureQuote: value } }));
+          }} onQuoteAttributionChange={(value) => {
+            if (!onDataChange || isEntrepreneurBiographyData(data)) return;
+            onDataChange((current) => ({ ...current, personalDetails: { ...current.personalDetails, signatureQuoteAttribution: value } }));
+          }} onAboutTitleChange={(value) => {
+            if (!onDataChange || isEntrepreneurBiographyData(data)) return;
+            onDataChange((current) => ({ ...current, sectionCopy: { ...current.sectionCopy, about: { title: value, description: current.sectionCopy?.about?.description || '' } } }));
+          }} onSummaryChange={(value) => {
             if (!onDataChange || isEntrepreneurBiographyData(data)) return;
             onDataChange((current) => ({ ...current, personalDetails: { ...current.personalDetails, bioFull: value } }));
           }} onValueChange={(index, field, value) => {
@@ -292,9 +301,15 @@ export default function EntrepreneurTemplate({
         {/* Timeline Life Journey Section */}
         {renderTemplateSection(
           'timeline',
-          <JourneySection data={templateData} style={currentStyle} styles={styles} editable={isEditable} onEditSectionChange={() => onEditSectionChange?.('timeline')} onMilestoneChange={(index, field, value) => {
+          <JourneySection data={templateData} style={currentStyle} styles={styles} editable={isEditable} journeyQuote={!isEntrepreneurBiographyData(data) ? data?.personalDetails.journeyQuote : undefined} journeyQuoteAttribution={!isEntrepreneurBiographyData(data) ? data?.personalDetails.journeyQuoteAttribution : undefined} onEditSectionChange={() => onEditSectionChange?.('timeline')} onJourneyQuoteChange={(value) => {
             if (!onDataChange || isEntrepreneurBiographyData(data)) return;
-            onDataChange((current) => ({ ...current, timeline: current.timeline.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item) }));
+            onDataChange((current) => ({ ...current, personalDetails: { ...current.personalDetails, journeyQuote: value } }));
+          }} onJourneyQuoteAttributionChange={(value) => {
+            if (!onDataChange || isEntrepreneurBiographyData(data)) return;
+            onDataChange((current) => ({ ...current, personalDetails: { ...current.personalDetails, journeyQuoteAttribution: value } }));
+          }} onMilestoneChange={(index, field, value) => {
+            if (!onDataChange || isEntrepreneurBiographyData(data)) return;
+            onDataChange((current) => ({ ...current, timeline: current.timeline.map((item, itemIndex) => itemIndex === index ? field === 'highlight' ? { ...item, details: [value, ...(item.details || []).slice(1)] } : { ...item, [field]: value } : item) }));
           }} />
         )}
 

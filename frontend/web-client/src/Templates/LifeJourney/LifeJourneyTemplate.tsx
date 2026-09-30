@@ -507,6 +507,11 @@ export default function LifeJourneyTemplate({
   };
 
   const theme = getThemeStyles();
+  const editionLabel = data.editionLabel || 'HERITAGE WOODCRAFT EDITION';
+  const archiveDescription =
+    data.archiveDescription ||
+    'A visual archive and narrative chronicle honoring traditional timber joinery, maritime shipwright vessels, and coastal memoirs.';
+  const chapterEra = data.personalDetails.lifespan || '1952 - 2026';
 
   const getEditHighlightClass = (section: EditableTemplateSection) => {
     if (activeEditSection !== section) {
@@ -554,7 +559,7 @@ export default function LifeJourneyTemplate({
       <button
         type="button"
         onClick={handleImageChangeRequest(target)}
-        className="pointer-events-auto absolute bottom-3 left-1/2 z-20 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-stone-950/90 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-white opacity-100 shadow-lg backdrop-blur-sm transition hover:bg-stone-900 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#FED362] sm:pointer-events-none sm:opacity-0 sm:group-hover/image:pointer-events-auto sm:group-hover/image:opacity-100 sm:group-focus-within/image:pointer-events-auto sm:group-focus-within/image:opacity-100"
+        className="pointer-events-auto absolute right-3 top-3 z-20 inline-flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-full bg-stone-950/90 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-white opacity-100 shadow-lg backdrop-blur-sm transition hover:bg-stone-900 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#FED362] sm:pointer-events-none sm:opacity-0 sm:group-hover/image:pointer-events-auto sm:group-hover/image:opacity-100 sm:group-focus-within/image:pointer-events-auto sm:group-focus-within/image:opacity-100"
         aria-label="Change picture"
       >
         <ImageIcon className="h-3.5 w-3.5" />
@@ -572,6 +577,16 @@ export default function LifeJourneyTemplate({
         ...current.personalDetails,
         [field]: value,
       },
+    }));
+  };
+
+  const updateCategoryField = (
+    field: 'badge' | 'editionLabel' | 'archiveDescription',
+    value: string
+  ) => {
+    onDataChange?.((current) => ({
+      ...current,
+      [field]: value,
     }));
   };
 
@@ -635,13 +650,14 @@ export default function LifeJourneyTemplate({
   };
 
   const editableTextClass = isInlineEditable
-    ? 'cursor-text rounded-md outline-none transition hover:bg-[#FED362]/10 focus:bg-[#FED362]/15 focus:ring-1 focus:ring-[#FED362]/70 focus:ring-offset-1 focus:ring-offset-white'
+    ? 'cursor-text rounded-md outline-none transition hover:bg-[#FED362]/15 focus:bg-white/95 focus:text-slate-950 focus:ring-2 focus:ring-[#FED362]/80 focus:ring-offset-1 focus:ring-offset-white selection:bg-slate-950 selection:text-white caret-slate-950'
     : '';
 
   const renderEditableText = ({
     as: Component = 'span',
     value,
     className = '',
+    editClassName = '',
     section,
     multiline = false,
     onChange,
@@ -649,6 +665,7 @@ export default function LifeJourneyTemplate({
     as?: EditableTextTag;
     value: string;
     className?: string;
+    editClassName?: string;
     section: EditableTemplateSection;
     multiline?: boolean;
     onChange: (value: string) => void;
@@ -675,7 +692,7 @@ export default function LifeJourneyTemplate({
 
     return (
       <Component
-        className={`${className} ${editableTextClass}`}
+        className={`${className} ${editableTextClass} ${editClassName}`}
         contentEditable={isInlineEditable}
         suppressContentEditableWarning
         dangerouslySetInnerHTML={{ __html: sanitizedValue }}
@@ -1002,7 +1019,15 @@ export default function LifeJourneyTemplate({
         <div className="max-w-6xl mx-auto px-6 md:px-12 h-16 md:h-20 flex items-center justify-between">
           
           {/* Brand Logo */}
-          <a href="#hero-section" className="flex items-center gap-3 group">
+          <a
+            href="#hero-section"
+            className="flex items-center gap-3 group"
+            onClick={(event) => {
+              if (isInlineEditable) {
+                event.preventDefault();
+              }
+            }}
+          >
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-serif font-black border transition-all ${theme.badge}`}>
               JV
             </div>
@@ -1010,9 +1035,12 @@ export default function LifeJourneyTemplate({
               <span className="font-serif font-black text-sm tracking-tight leading-none group-hover:text-amber-700 transition-colors">
                 {data.personalDetails.fullName}
               </span>
-              <span className="font-mono text-[8px] opacity-60 font-bold uppercase tracking-widest mt-0.5">
-                {data.personalDetails.occupation}
-              </span>
+              {renderEditableText({
+                value: data.personalDetails.occupation,
+                section: 'hero',
+                className: 'font-mono text-[8px] opacity-60 font-bold uppercase tracking-widest mt-0.5',
+                onChange: (value) => updatePersonalDetail('occupation', value),
+              })}
             </div>
           </a>
 
@@ -1079,12 +1107,29 @@ export default function LifeJourneyTemplate({
               <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-600"></span>
             </span>
             <span className="font-mono text-[9px] font-extrabold uppercase tracking-widest">
-              CLASSIC MEMOIR // HERITAGE WOODCRAFT EDITION
+              {renderEditableText({
+                value: data.badge,
+                section: 'hero',
+                className: 'uppercase',
+                onChange: (value) => updateCategoryField('badge', value),
+              })}
+              <span className="px-1.5">//</span>
+              {renderEditableText({
+                value: editionLabel,
+                section: 'hero',
+                className: 'uppercase',
+                onChange: (value) => updateCategoryField('editionLabel', value),
+              })}
             </span>
           </div>
-          <p className={`font-serif italic text-xs max-w-lg mx-auto ${theme.textMuted}`}>
-            A visual archive and narrative chronicle honoring traditional timber joinery, maritime shipwright vessels, and coastal memoirs.
-          </p>
+          {renderEditableText({
+            as: 'p',
+            value: archiveDescription,
+            section: 'hero',
+            multiline: true,
+            className: `font-serif italic text-xs max-w-lg mx-auto ${theme.textMuted}`,
+            onChange: (value) => updateCategoryField('archiveDescription', value),
+          })}
         </section>
 
         {/* ========================================================= */}
@@ -1120,7 +1165,14 @@ export default function LifeJourneyTemplate({
 
                 {/* Overlay Year Label */}
                 <div className="absolute bottom-4 right-4 bg-stone-900/80 backdrop-blur-xs px-2.5 py-1 text-[8px] font-mono text-stone-200 rounded-md tracking-wider">
-                  CHAPTER ERA // 1952 – 2026
+                  <span>CHAPTER ERA // </span>
+                  {renderEditableText({
+                    value: chapterEra,
+                    section: 'hero',
+                    className: 'inline',
+                    editClassName: 'focus:bg-white focus:text-slate-950 focus:ring-offset-stone-900 selection:bg-slate-950 selection:text-white',
+                    onChange: (value) => updatePersonalDetail('lifespan', value),
+                  })}
                 </div>
               </div>
             </div>
@@ -1402,6 +1454,7 @@ export default function LifeJourneyTemplate({
                       value: milestone.year,
                       section: 'timeline',
                       className: 'px-2.5 py-1 bg-stone-900 text-amber-50 text-[9px] font-mono font-black tracking-widest rounded-md block w-fit',
+                      editClassName: 'focus:bg-white focus:text-slate-950 focus:ring-offset-stone-900 selection:bg-slate-950 selection:text-white',
                       onChange: (value) => updateTimelineItem(idx, { year: value }),
                     })}
                     {renderEditableText({

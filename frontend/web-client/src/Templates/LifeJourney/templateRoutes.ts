@@ -27,6 +27,11 @@ export const BIOGRAPHY_TEMPLATE_ROUTES: Record<string, BiographyTemplateRoute> =
     id: 'legacy-heritage',
     title: 'Legacy & Heritage',
   },
+  'nature-serenity': {
+    categoryKey: 'life',
+    id: 'nature-serenity',
+    title: 'Nature & Serenity',
+  },
 };
 
 export function getBiographyTemplateRoute(templateId?: string) {

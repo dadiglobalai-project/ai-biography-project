@@ -17,12 +17,12 @@ import {
   ShieldCheck,
   Sparkles,
   UsersRound,
+  ChevronDown,
 } from 'lucide-react';
 import BrandLogo from '../components/BrandLogo';
+import { authService } from '../services/authService';
 import archiveHeroImage from '../assets/images/celestial_library_1781657848291.jpg';
 import lifeJourneyThumbnail from '../Templates/LifeJourney/assets/images/life-journey-thumbnail.png';
-import vintageFamilyImage from '../Templates/LifeJourney/assets/images/vintage_family_1782780785598.jpg';
-import vintageWriterImage from '../Templates/LifeJourney/assets/images/vintage_writer_1782780772321.jpg';
 
 const workflowSteps = [
   {
@@ -53,19 +53,28 @@ const workflowSteps = [
 
 const templates = [
   {
+    id: 'life-journey',
     title: 'Life Journey',
-    subtitle: 'Personal biography, memories, timeline, and gallery.',
+    subtitle: 'Complete autobiography template emphasizing chronologies, personal milestones, and wisdom gathered.',
     image: lifeJourneyThumbnail,
+    tag: 'Classic Memoir',
+    previewPath: '/diy-dashboard/templates/life-journey/preview',
   },
   {
-    title: 'Family Chronicle',
-    subtitle: 'A warm archive for family history and shared moments.',
-    image: vintageFamilyImage,
+    id: 'entrepreneur-story',
+    title: 'Entrepreneur Story',
+    subtitle: 'Tailored for founders, pathfinders, and industry pioneers to archive ventures, failures, and triumphs.',
+    image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=800',
+    tag: 'Professional',
+    previewPath: '/diy-dashboard/templates/entrepreneur-story/preview',
   },
   {
-    title: 'Founder Story',
-    subtitle: 'A structured narrative for builders, leaders, and creators.',
-    image: vintageWriterImage,
+    id: 'legacy-heritage',
+    title: 'Legacy & Heritage',
+    subtitle: 'A warm scrapbook-style template for family legacies, heirloom memories, letters, and heritage stories.',
+    image: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&q=80&w=800',
+    tag: 'Heritage',
+    previewPath: '/diy-dashboard/templates/legacy-heritage/preview',
   },
 ];
 
@@ -135,6 +144,10 @@ const staggerGroup = {
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = React.useState<{ fullName?: string; email: string } | null>(null);
+  React.useEffect(() => {
+    authService.getCurrentUser().then((session) => setCurrentUser(session.user)).catch(() => setCurrentUser(null));
+  }, []);
   const shouldReduceMotion = useReducedMotion();
   const revealInitial = shouldReduceMotion ? false : 'hidden';
   const revealAnimate = shouldReduceMotion ? undefined : 'visible';
@@ -161,19 +174,21 @@ export default function HomePage() {
           </nav>
 
           <div className="flex items-center gap-2">
+            {currentUser ? (
+              <button type="button" onClick={() => navigate('/diy-dashboard')} className="inline-flex items-center gap-2 rounded-full px-1.5 py-1 text-xs font-bold text-[#18243b] transition hover:bg-slate-100" aria-label="Open dashboard">
+                <span>{currentUser.fullName || currentUser.email}</span>
+                <span className="grid h-9 w-9 place-items-center overflow-hidden rounded-full border border-slate-200 bg-[#f4ead4] text-[10px] font-bold text-[#806126]">{(currentUser.fullName || currentUser.email).slice(0, 2).toUpperCase()}</span>
+                <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+              </button>
+            ) : (
+              <button type="button" onClick={() => navigate('/login')} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:border-slate-900 hover:text-[#0A1128]">Login</button>
+            )}
             <button
               type="button"
-              onClick={() => navigate('/login')}
-              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:border-slate-900 hover:text-[#0A1128]"
-            >
-              Login
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/register')}
+              onClick={() => navigate(currentUser ? '/diy-dashboard' : '/register')}
               className="rounded-lg bg-black px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-slate-900"
             >
-              Start Draft
+              {currentUser ? 'Dashboard' : 'Start Draft'}
             </button>
           </div>
         </div>
@@ -344,24 +359,28 @@ export default function HomePage() {
             <motion.div className="grid gap-4 md:grid-cols-3" variants={staggerGroup}>
               {templates.map((template) => (
                 <motion.article
-                  key={template.title}
+                  key={template.id}
                   className="group rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-lg"
                   variants={fadeUp}
                   whileHover={hoverLift}
                 >
-                  <div className="aspect-[4/3] overflow-hidden rounded-md bg-slate-100">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-slate-100">
                     <img
                       src={template.image}
                       alt={`${template.title} preview`}
                       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                      referrerPolicy="no-referrer"
                     />
+                    <span className="absolute left-4 top-4 rounded-full bg-black/70 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#FED362] backdrop-blur">
+                      {template.tag}
+                    </span>
                   </div>
                   <div className="px-1 py-4">
                     <h3 className="font-serif-display text-xl font-bold">{template.title}</h3>
                     <p className="mt-1 text-sm leading-relaxed text-slate-500">{template.subtitle}</p>
                     <button
                       type="button"
-                      onClick={() => navigate('/register')}
+                      onClick={() => navigate(template.previewPath)}
                       className="mt-4 inline-flex items-center gap-2 text-xs font-bold uppercase text-[#8A650E] transition hover:text-black"
                     >
                       Preview Template

@@ -2,6 +2,7 @@ import React from 'react';
 import EntrepreneurTemplate from './Entrepreneur/EntrepreneurTemplate';
 import LegacyHeritageTemplate from './Legacy & Heritage/LegacyHeritageTemplate';
 import LifeJourneyTemplate from './LifeJourney/LifeJourneyTemplate';
+import NatureSerenityTemplate from './Nature & Serenity/NatureSerenityTemplate';
 import { CATEGORIES_DATA } from './LifeJourney/data';
 import type {
   BiographyCategory,
@@ -68,6 +69,10 @@ export default function BiographyTemplateRenderer({
         onImageChangeRequest={onImageChangeRequest}
       />
     );
+  }
+
+  if (templateId === 'nature-serenity') {
+    return <NatureSerenityTemplate data={data} onDataChange={onDataChange} onEditSectionChange={onEditSectionChange} onImageChangeRequest={onImageChangeRequest} />;
   }
 
   return (

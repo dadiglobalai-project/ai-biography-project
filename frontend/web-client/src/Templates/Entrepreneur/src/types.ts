@@ -19,6 +19,7 @@ export interface TimelineMilestone {
   category: TimelineCategory;
   title: string;
   description: string;
+  details?: string[];
 }
 
 export type GalleryType = 'image' | 'video';
@@ -36,6 +37,7 @@ export interface MemoryStory {
   title: string;
   date: string;
   description: string;
+  fullStory?: string;
   imageUrl: string;
   category: string;
   readTime: string;

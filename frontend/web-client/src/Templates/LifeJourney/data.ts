@@ -5,8 +5,10 @@ export const CATEGORIES_DATA: Record<'life' | 'visionary' | 'entrepreneur', Biog
     id: 'life',
     title: 'Life Journey',
     badge: 'CLASSIC MEMOIR',
+    editionLabel: 'HERITAGE WOODCRAFT EDITION',
     quote: '"A JOURNEY THROUGH THE LAND"',
     description: 'Complete autobiography template emphasizing chronologies, personal milestones, and wisdom gathered.',
+    archiveDescription: 'A visual archive and narrative chronicle honoring traditional timber joinery, maritime shipwright vessels, and coastal memoirs.',
     settings: {
       theme: 'cream',
       fontPairing: 'classic',
@@ -14,6 +16,7 @@ export const CATEGORIES_DATA: Record<'life' | 'visionary' | 'entrepreneur', Biog
     },
     personalDetails: {
       fullName: "Julian Vance",
+      lifespan: "1952 â€“ 2026",
       tagline: "Crafting timeless organic furniture and restoring wooden vessels from the ancient cedar and redwood forests of the Oregon coast.",
       birthDetails: "Born May 14, 1952 • Coos Bay, Oregon",
       location: "Currently residing in Cannon Beach, Oregon",
@@ -250,8 +253,10 @@ export const CATEGORIES_DATA: Record<'life' | 'visionary' | 'entrepreneur', Biog
     id: 'visionary',
     title: 'Visionary Legacy',
     badge: 'BOLD & CREATIVE',
+    editionLabel: 'KINETIC TIMBERWORKS EDITION',
     quote: '"THE VISIONARY WHO CHANGED THE WAY WE LIVE"',
     description: 'A high-contrast, bold template designed for leaders, innovators, and creators who forged new paths.',
+    archiveDescription: 'A visual archive of experimental timber structures, kinetic architecture, and design work that reshaped public spaces.',
     settings: {
       theme: 'charcoal',
       fontPairing: 'modern',
@@ -259,6 +264,7 @@ export const CATEGORIES_DATA: Record<'life' | 'visionary' | 'entrepreneur', Biog
     },
     personalDetails: {
       fullName: "Julian Vance",
+      lifespan: "1952 â€“ 2026",
       tagline: "Shaping the future of architectural woodwork. Creating monumental kinetic timber sculptures that bridge nature, geometry, and human experience.",
       birthDetails: "Born May 14, 1952 • Coos Bay, Oregon",
       location: "Currently residing in Cannon Beach, Oregon",
@@ -486,8 +492,10 @@ export const CATEGORIES_DATA: Record<'life' | 'visionary' | 'entrepreneur', Biog
     id: 'entrepreneur',
     title: 'Entrepreneur Story',
     badge: 'PROFESSIONAL',
+    editionLabel: 'PACIFIC TIMBERWORKS EDITION',
     quote: '"DOCUMENT YOUR BUSINESS ADVENTURES"',
     description: 'Tailored for founders, pathfinders, and industry pioneers to archive their ventures, failures, and triumphs.',
+    archiveDescription: 'A founder archive documenting sustainable forestry, artisan manufacturing, leadership lessons, and company-building milestones.',
     settings: {
       theme: 'sage',
       fontPairing: 'editorial',
@@ -495,6 +503,7 @@ export const CATEGORIES_DATA: Record<'life' | 'visionary' | 'entrepreneur', Biog
     },
     personalDetails: {
       fullName: "Julian Vance",
+      lifespan: "1952 â€“ 2026",
       tagline: "Scaling artisan craftsmanship into a global timberworks enterprise. Championing sustainable forestry, business ventures, and industrial design.",
       birthDetails: "Born May 14, 1952 • Coos Bay, Oregon",
       location: "Currently residing in Cannon Beach, Oregon",

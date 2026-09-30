@@ -20,6 +20,11 @@ interface StoriesSectionProps {
 }
 
 export default function StoriesSection({ data, style, styles, onImageChangeRequest, editable = false, onStoryChange, onEditSectionChange }: StoriesSectionProps) {
+  const getReadTime = (story: BiographyData['stories'][number]) => {
+    const sourceText = story.fullStory || story.description;
+    const wordCount = sourceText.trim().split(/\s+/).filter(Boolean).length;
+    return `${Math.max(1, Math.ceil(wordCount / 200))} min read`;
+  };
   
   return (
     <section id="stories" className={`py-20 border-t ${styles.borderLight} ${styles.bodyBg} transition-colors duration-500`}>
@@ -97,7 +102,7 @@ export default function StoriesSection({ data, style, styles, onImageChangeReque
                     <span>•</span>
                     <span className="flex items-center">
                       <Clock className="w-3.5 h-3.5 mr-1 text-stone-500" />
-                      {story.readTime}
+                      {getReadTime(story)}
                     </span>
                   </div>
 

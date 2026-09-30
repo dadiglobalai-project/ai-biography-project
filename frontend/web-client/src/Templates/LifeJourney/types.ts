@@ -39,6 +39,7 @@ export interface TimelineMilestone {
   title: string;
   location: string;
   description: string;
+  annotation?: string;
   details: string[];
   imageUrl?: string;
   imageAssetId?: string;
@@ -71,6 +72,7 @@ export interface MemoryStory {
   imageSettings?: ImageDisplaySettings;
   shortDescription: string;
   fullStory: string;
+  handwrittenNote?: string;
   textSettings?: TextDisplaySettings;
 }
 
@@ -86,6 +88,11 @@ export interface CustomizerSettings {
 }
 
 export interface PersonalDetails {
+  lifespan?: string;
+  status?: string;
+  birthDate?: string;
+  birthPlace?: string;
+  nationality?: string;
   fullName: string;
   tagline: string;
   taglineTextSettings?: TextDisplaySettings;
@@ -101,6 +108,10 @@ export interface PersonalDetails {
   bioFull: string;
   bioTextSettings?: TextDisplaySettings;
   signatureQuote: string;
+  signatureQuoteAttribution?: string;
+  journeyQuote?: string;
+  journeyQuoteAttribution?: string;
+  communionIntro?: string;
   signatureQuoteTextSettings?: TextDisplaySettings;
   occupation: string;
   coordinates: string;
@@ -121,9 +132,14 @@ export type EditableTemplateSection =
   | 'gallery'
   | 'stories'
   | 'contact'
+  | 'nature-joys'
+  | 'nature-seasons'
+  | 'nature-biography'
+  | 'nature-reflections'
+  | 'places'
   | 'style';
 
-export type EditableImageSection = 'hero' | 'pursuits' | 'timeline' | 'gallery' | 'stories';
+export type EditableImageSection = 'hero' | 'pursuits' | 'timeline' | 'gallery' | 'stories' | 'places';
 
 export interface EditableImageTarget {
   section: EditableImageSection;
@@ -143,8 +159,10 @@ export interface BiographyCategory {
   id: 'life' | 'visionary' | 'entrepreneur';
   title: string;
   badge: string;
+  editionLabel?: string;
   quote: string;
   description: string;
+  archiveDescription?: string;
   settings: CustomizerSettings;
   personalDetails: PersonalDetails;
   values: ValueItem[];
@@ -152,5 +170,7 @@ export interface BiographyCategory {
   timeline: TimelineMilestone[];
   gallery: GalleryItem[];
   stories: MemoryStory[];
+  places?: Array<{ name: string; reflection: string; image: string }>;
+  seasons?: Array<{ name: string; desc: string; emoji: string; subtitle?: string }>;
   sectionCopy?: Partial<Record<EditableSectionCopyKey, EditableSectionCopy>>;
 }

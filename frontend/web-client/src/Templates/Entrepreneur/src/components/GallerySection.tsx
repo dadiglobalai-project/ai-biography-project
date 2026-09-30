@@ -3,8 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
-import { Image, Camera, Video } from 'lucide-react';
+import { Image, Camera } from 'lucide-react';
 import { BiographyData, TemplateStyle } from '../types';
 import { ThemeStyles } from '../theme';
 import type { EditableImageTarget } from '../../../LifeJourney/types';
@@ -21,13 +20,6 @@ interface GallerySectionProps {
 }
 
 export default function GallerySection({ data, style, styles, onImageChangeRequest, editable = false, onGalleryChange, onEditSectionChange }: GallerySectionProps) {
-  const [filter, setFilter] = useState<'all' | 'image' | 'video'>('all');
-
-  const filteredGallery = data.gallery.filter((item) => {
-    if (filter === 'all') return true;
-    return item.type === filter;
-  });
-
   return (
     <section id="gallery" className={`py-20 border-t ${styles.borderLight} ${styles.bodyBg} transition-colors duration-500`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -46,39 +38,9 @@ export default function GallerySection({ data, style, styles, onImageChangeReque
           }`}></div>
         </div>
 
-        {/* Filter Toolbar */}
-        <div className="flex justify-center space-x-4 mb-10">
-          {(['all', 'image', 'video'] as const).map((type) => (
-            <button
-              key={type}
-              id={`filter-btn-${type}`}
-              onClick={() => setFilter(type)}
-              className={`px-4 py-2 text-xs font-mono tracking-wider uppercase transition-all duration-300 border ${
-                filter === type
-                  ? style === 'heritage'
-                    ? 'bg-[#0A1F44] text-[#C5A059] border-[#C5A059] font-semibold'
-                    : style === 'modern'
-                      ? 'bg-zinc-900 text-emerald-400 border-emerald-400 font-semibold'
-                      : 'bg-stone-950 text-white border-stone-950 font-semibold'
-                  : style === 'heritage'
-                    ? 'bg-transparent text-stone-500 border-stone-200 hover:border-[#C5A059]/50 hover:text-[#0A1F44]'
-                    : style === 'modern'
-                      ? 'bg-transparent text-zinc-500 border-zinc-200 hover:border-emerald-500/50 hover:text-zinc-900'
-                      : 'bg-transparent text-stone-500 border-stone-200 hover:border-stone-900 hover:text-stone-900'
-              } ${styles.rounded}`}
-            >
-              <span className="flex items-center space-x-1.5">
-                {type === 'image' && <Camera className="w-3 h-3" />}
-                {type === 'video' && <Video className="w-3 h-3" />}
-                <span>{type === 'all' ? 'All Records' : `${type}s`}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-
         {/* Gallery Grid */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredGallery.map((item) => {
+          {data.gallery.map((item) => {
             const itemIndex = data.gallery.findIndex((galleryItem) => galleryItem.id === item.id);
 
             return (
@@ -103,17 +65,8 @@ export default function GallerySection({ data, style, styles, onImageChangeReque
                     {/* Category Indicator Tag */}
                     <div className="self-start">
                       <span className="text-[10px] font-mono tracking-wider px-2 py-0.5 rounded bg-black/65 text-white border border-white/10 uppercase flex items-center space-x-1">
-                        {item.type === 'video' ? (
-                          <>
-                            <Video className="w-2.5 h-2.5 text-red-400" />
-                            <span>Video Clip</span>
-                          </>
-                        ) : (
-                          <>
-                            <Camera className="w-2.5 h-2.5 text-gold-400" />
-                            <span>Photo</span>
-                          </>
-                        )}
+                        <Camera className="w-2.5 h-2.5 text-gold-400" />
+                        <span>Photo</span>
                       </span>
                     </div>
 

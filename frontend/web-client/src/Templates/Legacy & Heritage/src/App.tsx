@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { 
   BookOpen, Heart, Camera, Mail, History, Award, Sparkles, Feather, 
   Calendar, MapPin, Play, Quote, Image as ImageIcon, FileText, Send, 
@@ -34,7 +34,7 @@ export default function App({
   const updatePersonalDetail = (field: 'fullName' | 'tagline' | 'shortIntro' | 'birthDetails' | 'deathDetails' | 'location', value: string) => {
     onDataChange?.((current) => ({ ...current, personalDetails: { ...current.personalDetails, [field]: value } }));
   };
-  const updateTimelineDetail = (index: number, field: 'year' | 'title' | 'location' | 'description', value: string) => {
+  const updateTimelineDetail = (index: number, field: 'year' | 'title' | 'location' | 'description' | 'annotation', value: string) => {
     onDataChange?.((current) => ({
       ...current,
       timeline: current.timeline.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item),
@@ -46,10 +46,10 @@ export default function App({
   const updateHobbyDetail = (index: number, field: 'title' | 'description', value: string) => {
     onDataChange?.((current) => ({ ...current, hobbies: current.hobbies.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item) }));
   };
-  const updateGalleryDetail = (index: number, field: 'title' | 'caption', value: string) => {
+  const updateGalleryDetail = (index: number, field: 'title' | 'caption' | 'year', value: string) => {
     onDataChange?.((current) => ({ ...current, gallery: current.gallery.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item) }));
   };
-  const updateStoryDetail = (index: number, field: 'title' | 'shortDescription', value: string) => {
+  const updateStoryDetail = (index: number, field: 'title' | 'shortDescription' | 'date' | 'category' | 'handwrittenNote', value: string) => {
     onDataChange?.((current) => ({ ...current, stories: current.stories.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item) }));
   };
   const editableText = (value: string, field: 'fullName' | 'tagline' | 'shortIntro' | 'birthDetails' | 'deathDetails' | 'location', className = '') => (
@@ -64,6 +64,7 @@ export default function App({
     title: data?.timeline[index]?.title || milestone.title,
     location: data?.timeline[index]?.location || milestone.location,
     description: data?.timeline[index]?.description || milestone.description,
+    annotation: data?.timeline[index]?.annotation || milestone.annotation,
     image: data?.timeline[index]?.imageUrl || milestone.image,
   }));
   const displayGalleryItems = GALLERY_ITEMS.map((item, index) => ({
@@ -80,6 +81,7 @@ export default function App({
     date: data?.stories[index]?.date || story.date,
     category: data?.stories[index]?.category || story.category,
     excerpt: data?.stories[index]?.shortDescription || story.excerpt,
+    handwrittenNote: data?.stories[index]?.handwrittenNote || story.handwrittenNote,
     image: data?.stories[index]?.imageUrl || story.image,
   }));
   const displayValues = data?.values?.length
@@ -220,7 +222,7 @@ export default function App({
       <div className="w-full bg-artistic-dark text-artistic-light border-b border-artistic-gold/20 py-3 px-4 text-center text-xs font-mono tracking-widest uppercase flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Clock className="w-3.5 h-3.5 text-artistic-gold" />
-          <span>ESTABLISHED ARCHIVE • EST. 2026</span>
+          <span>ESTABLISHED ARCHIVE â€¢ EST. 2026</span>
         </div>
         <div className="hidden sm:block">
           <span>MEMORIES ARE THE HEIRLOOMS OF THE SOUL</span>
@@ -252,18 +254,6 @@ export default function App({
           {/* Nav / Heritage Badge Bar */}
           <header className="pt-12 pb-8 px-6 sm:px-12 border-b border-artistic-gold/20 flex flex-col items-center">
             
-            {/* Elegant Wax Seal Icon Group */}
-            <div className="mb-4 relative">
-              <div className="w-16 h-16 bg-[#7c1a1a] rounded-full flex items-center justify-center shadow-lg border border-[#561010] transform rotate-3 select-none hover:rotate-6 transition-transform duration-300">
-                <div className="absolute inset-1.5 rounded-full border border-dashed border-[#a63a3a] opacity-50"></div>
-                {/* Stamp Icon: Monogram or Rose */}
-                <span className="font-serif font-bold text-artistic-light text-2xl tracking-tighter opacity-80 mt-[-2px]">E</span>
-              </div>
-              <div className="absolute -bottom-1 -right-4 bg-artistic-gold text-[9px] font-mono px-1.5 py-0.5 rounded tracking-wider text-artistic-text border border-artistic-dark/20 shadow-sm uppercase transform rotate-12">
-                VERIFIED
-              </div>
-            </div>
-
             {/* Title / Crest */}
             <h1 className="font-serif text-3xl sm:text-4xl text-center font-bold tracking-wide text-artistic-text uppercase">
               Legacy &amp; Heritage
@@ -274,7 +264,6 @@ export default function App({
               <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-artistic-gold to-transparent"></div>
               <div className="absolute bg-artistic-light px-3 flex items-center gap-1 text-artistic-gold">
                 <Flower className="w-4 h-4" />
-                <span className="text-[10px] tracking-widest font-serif font-medium">EST. 1922</span>
                 <Flower className="w-4 h-4" />
               </div>
             </div>
@@ -323,13 +312,6 @@ export default function App({
           {/* 1. HERO SECTION */}
           <section id="hero-section" className={`${getEditHighlightClass('hero')} py-12 px-6 sm:px-12 md:px-16 grid grid-cols-1 md:grid-cols-12 gap-12 items-center relative border-b border-artistic-gold/20`} {...getSectionInteractionProps('hero')}>
             
-            {/* Antique Postmark background embellishment */}
-            <div className="absolute top-10 right-10 w-32 h-32 rounded-full border-2 border-dashed border-artistic-gold/30 flex flex-col items-center justify-center text-[10px] text-artistic-gold/40 font-mono tracking-widest uppercase rotate-12 pointer-events-none select-none">
-              <span className="text-center font-bold">ARLINGTON VT</span>
-              <span className="my-1 border-y border-artistic-gold/20 py-0.5">OCT 12 1922</span>
-              <span>HERITAGE COMM.</span>
-            </div>
-
             {/* Left Column: Portrait in Vintage Gold Frame */}
             <div className="md:col-span-5 flex justify-center relative">
               <div className="relative p-4 bg-white shadow-xl border border-artistic-dark/10 transform -rotate-2 hover:rotate-0 transition-transform duration-500 max-w-sm w-full group">
@@ -351,33 +333,16 @@ export default function App({
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-artistic-dark/40 via-transparent to-transparent pointer-events-none"></div>
                     {renderChangePictureButton({ section: 'hero' })}
-                  </div>
-                  
-                  {/* Under-photo handwritten label */}
-                  <div className="pt-3 text-center pb-1">
-                    <p className="font-script text-2xl text-artistic-text tracking-wide">
-                      Eleanor Vance, autumn of 1943
-                    </p>
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-artistic-text/50 mt-1">
-                      Wellesley, MA — Photo mount 402
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+                  </div></div></div></div>
 
             {/* Right Column: Title and Bio Brief */}
             <div className="md:col-span-7 space-y-6">
               <div className="space-y-2">
-                <span className="text-xs font-mono uppercase tracking-widest text-artistic-gold font-semibold flex items-center gap-2">
-                  <Feather className="w-3.5 h-3.5" />
-                  THE LIVING CHRONICLE
-                </span>
                 <h2 className="font-serif text-4xl sm:text-5xl font-bold tracking-tight text-artistic-text">
                   {editableText(data?.personalDetails.fullName || 'Eleanor Vance Sterling', 'fullName')}
                 </h2>
-                <p className={`font-serif italic text-lg text-artistic-dark ${isEditable ? 'cursor-text rounded px-1 hover:bg-artistic-gold/10 focus:bg-artistic-gold/15 outline-none' : ''}`} contentEditable={isEditable} suppressContentEditableWarning onFocus={() => onEditSectionChange?.('hero')} onBlur={(event) => updatePersonalDetail('tagline', (event.currentTarget.textContent || '').replace(/[“”]/g, '').trim())}>
-                  &ldquo;{data?.personalDetails.tagline || 'A life of grace, a legacy of stories, and a family’s eternal treasure.'}&rdquo;
+                <p className={`font-serif italic text-lg text-artistic-dark ${isEditable ? 'cursor-text rounded px-1 hover:bg-artistic-gold/10 focus:bg-artistic-gold/15 outline-none' : ''}`} contentEditable={isEditable} suppressContentEditableWarning onFocus={() => onEditSectionChange?.('hero')} onBlur={(event) => updatePersonalDetail('tagline', (event.currentTarget.textContent || '').replace(/[â€œâ€]/g, '').trim())}>
+                  &ldquo;{data?.personalDetails.tagline || 'A life of grace, a legacy of stories, and a familyâ€™s eternal treasure.'}&rdquo;
                 </p>
                 <div className="text-xs font-mono text-artistic-text/60 flex items-center gap-4 pt-1">
                   <span className="bg-artistic-panel px-2 py-0.5 rounded border border-artistic-gold/15 font-semibold">
@@ -393,7 +358,7 @@ export default function App({
               </div>
 
               <p className={`text-base text-artistic-text leading-relaxed font-serif ${isEditable ? 'cursor-text rounded px-1 hover:bg-artistic-gold/10 focus:bg-artistic-gold/15 outline-none' : ''}`} contentEditable={isEditable} suppressContentEditableWarning onFocus={() => onEditSectionChange?.('hero')} onBlur={(event) => updatePersonalDetail('shortIntro', event.currentTarget.textContent || '')}>
-                {data?.personalDetails.shortIntro || 'Welcome to the living archive of Eleanor Vance Sterling—matriarch, educator, and gardener of memories. This digital scrapbook preserves her handwritten diaries, treasured photographs, and the timeless milestones of a beautiful century well-lived. It serves as an heirloom passed down to anchor future generations in their native soil.'}
+                {data?.personalDetails.shortIntro || 'Welcome to the living archive of Eleanor Vance Sterlingâ€”matriarch, educator, and gardener of memories. This digital scrapbook preserves her handwritten diaries, treasured photographs, and the timeless milestones of a beautiful century well-lived. It serves as an heirloom passed down to anchor future generations in their native soil.'}
               </p>
 
               {/* Action Buttons */}
@@ -418,9 +383,6 @@ export default function App({
               <div className="pt-4 flex items-center gap-3 opacity-60">
                 <div className="h-[1px] w-12 bg-artistic-gold/30"></div>
                 <Flower className="w-5 h-5 text-artistic-gold" />
-                <span className="text-[11px] font-mono tracking-wider uppercase text-artistic-text/60">
-                  Vermont Heritage Press Archive
-                </span>
                 <div className="h-[1px] w-12 bg-artistic-gold/30"></div>
               </div>
             </div>
@@ -459,7 +421,7 @@ export default function App({
                     <BookOpen className="w-6 h-6 text-artistic-gold" />
                     <h4 className="font-serif text-xl font-bold text-artistic-text">Biography Summary</h4>
                   </div>
-                  <p className={`text-artistic-text/90 leading-relaxed font-serif text-base sm:text-lg whitespace-pre-line ${isEditable ? 'cursor-text rounded px-1 hover:bg-artistic-gold/10 focus:bg-artistic-gold/15 outline-none' : ''}`} contentEditable={isEditable} suppressContentEditableWarning onFocus={() => onEditSectionChange?.('about')} onBlur={(event) => onDataChange?.((current) => ({ ...current, personalDetails: { ...current.personalDetails, bioFull: event.currentTarget.textContent || '' } }))}>
+                  <p className={`text-artistic-text/90 leading-relaxed font-serif text-base sm:text-lg whitespace-pre-line ${isEditable ? 'cursor-text rounded px-1 hover:bg-artistic-gold/10 focus:bg-artistic-gold/15 outline-none' : ''}`} contentEditable={isEditable} suppressContentEditableWarning onFocus={() => onEditSectionChange?.('about')} onBlur={(event) => { const bioFull = event.currentTarget.textContent || ''; onDataChange?.((current) => ({ ...current, personalDetails: { ...current.personalDetails, bioFull } })); }}>
                     {data?.personalDetails.bioFull || 'Born in the gentle hills of New England, Eleanor lived through the unfolding tapestry of the 20th century. Her life was defined by a quiet passion for literature, teaching, and preserving family memories.'}
                   </p>
                 </div>
@@ -596,7 +558,7 @@ export default function App({
                         {mile.annotation && (
                           <div className="pt-2 border-t border-artistic-gold/10">
                             <span className="font-script text-2xl text-artistic-dark font-medium leading-none inline-block transform -rotate-1">
-                              &ldquo;{mile.annotation}&rdquo;
+                              &ldquo;<InlineEditableText value={mile.annotation || ''} editable={isEditable} label={`Timeline quote ${idx + 1}`} onFocus={() => onEditSectionChange?.('timeline')} onChange={(value) => updateTimelineDetail(idx, 'annotation', value)} />&rdquo;
                             </span>
                           </div>
                         )}
@@ -710,7 +672,7 @@ export default function App({
                             <InlineEditableText value={item.title} editable={isEditable} label={`Gallery item ${idx + 1} title`} onFocus={() => onEditSectionChange?.('gallery')} onChange={(value) => updateGalleryDetail(idx, 'title', value)} />
                           </h4>
                           <span className="text-[10px] font-mono text-artistic-gold font-bold bg-artistic-panel/40 border border-artistic-gold/20 px-1.5 py-0.5 rounded-sm whitespace-nowrap">
-                            {item.date}
+                            <InlineEditableText value={data?.gallery[idx]?.year || item.date || ''} editable={isEditable} label={`Gallery item ${idx + 1} year`} onFocus={() => onEditSectionChange?.('gallery')} onChange={(value) => updateGalleryDetail(idx, 'year', value)} />
                           </span>
                         </div>
                         <p className="font-script text-2xl text-artistic-dark mt-2 leading-tight">
@@ -783,7 +745,7 @@ export default function App({
                           })}
                         </div>
                         <div className="absolute top-1 left-1 bg-artistic-light border border-artistic-gold/30 text-[8px] font-mono px-1 rounded uppercase tracking-wider text-artistic-text">
-                          {story.category}
+                          <InlineEditableText value={story.category} editable={isEditable} label={`Story ${i + 1} category`} onFocus={() => onEditSectionChange?.('stories')} onChange={(value) => updateStoryDetail(i, 'category', value)} />
                         </div>
                       </div>
                     </div>
@@ -792,7 +754,7 @@ export default function App({
                     <div className="space-y-3 flex-grow">
                       <div className="flex flex-wrap items-baseline gap-2 text-xs font-mono">
                         <Calendar className="w-3.5 h-3.5 text-artistic-gold" />
-                        <span className="text-artistic-gold font-bold">{story.date}</span>
+                        <span className="text-artistic-gold font-bold"><InlineEditableText value={story.date} editable={isEditable} label={`Story ${i + 1} date`} onFocus={() => onEditSectionChange?.('stories')} onChange={(value) => updateStoryDetail(i, 'date', value)} /></span>
                         <span className="text-artistic-text/40">|</span>
                         <span className="text-artistic-text/70 uppercase tracking-widest">{story.category}</span>
                       </div>
@@ -813,7 +775,7 @@ export default function App({
                       {story.handwrittenNote && (
                         <div className="pt-3 border-t border-artistic-gold/10 mt-3">
                           <p className="font-script text-2xl text-artistic-dark leading-none">
-                            Note: {story.handwrittenNote}
+                            Note: <InlineEditableText value={story.handwrittenNote || ''} editable={isEditable} multiline label={`Story ${i + 1} note`} onFocus={() => onEditSectionChange?.('stories')} onChange={(value) => updateStoryDetail(i, 'handwrittenNote', value)} />
                           </p>
                         </div>
                       )}
@@ -1147,7 +1109,7 @@ export default function App({
                   
                   <div className="mt-4 flex justify-center items-center gap-1.5 text-[9px] font-mono text-artistic-text/50 uppercase tracking-widest bg-artistic-panel/20 py-1.5 px-3 rounded-sm border border-artistic-gold/10">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping"></span>
-                    <span>PROJECTOR BEAM ACTIVE • KODACHROME FILM REEL NO. {selectedItem.id.replace('vid-', '#')}</span>
+                    <span>PROJECTOR BEAM ACTIVE â€¢ KODACHROME FILM REEL NO. {selectedItem.id.replace('vid-', '#')}</span>
                   </div>
                 </div>
               </div>
@@ -1158,3 +1120,4 @@ export default function App({
     </div>
   );
 }
+

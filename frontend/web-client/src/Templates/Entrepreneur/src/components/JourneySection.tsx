@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -13,8 +13,12 @@ interface JourneySectionProps {
   style: TemplateStyle;
   styles: ThemeStyles;
   editable?: boolean;
-  onMilestoneChange?: (index: number, field: 'year' | 'title' | 'location' | 'description', value: string) => void;
+  onMilestoneChange?: (index: number, field: 'year' | 'category' | 'title' | 'location' | 'description' | 'highlight', value: string) => void;
   onEditSectionChange?: () => void;
+  journeyQuote?: string;
+  journeyQuoteAttribution?: string;
+  onJourneyQuoteChange?: (value: string) => void;
+  onJourneyQuoteAttributionChange?: (value: string) => void;
 }
 
 // Map categories to specific icons
@@ -31,28 +35,28 @@ const getMilestoneMetadata = (category: TimelineCategory, idx: number) => {
   switch (category) {
     case 'Childhood':
       return { 
-        ageRange: 'Age 0 — 17', 
+        ageRange: 'Age 0 – 17', 
         location: 'Seattle, WA', 
         highlightText: 'Foundational childhood values & early entrepreneurial curiosity',
         achievementCount: '1 Core Stage'
       };
     case 'Education':
       return { 
-        ageRange: 'Age 18 — 22', 
+        ageRange: 'Age 18 – 22', 
         location: 'University of Washington', 
         highlightText: 'Academic systems management, coding systems, & business incubation',
         achievementCount: 'Honors Degree'
       };
     case 'Career':
       return { 
-        ageRange: 'Age 23 — 40', 
+        ageRange: 'Age 23 – 40', 
         location: 'Global & Seattle HQ', 
         highlightText: 'Fostering scalable enterprise solutions, high-stakes pivots, & leadership grit',
         achievementCount: 'Global Expansion'
       };
     case 'Family Life':
       return { 
-        ageRange: 'Age 30 — Present', 
+        ageRange: 'Age 30 – Present', 
         location: 'Bellevue, WA', 
         highlightText: 'Building a shared home legacy of deep mutual trust, growth, & balance',
         achievementCount: '3 Generations'
@@ -74,7 +78,7 @@ const getMilestoneMetadata = (category: TimelineCategory, idx: number) => {
   }
 };
 
-export default function JourneySection({ data, style, styles, editable = false, onMilestoneChange, onEditSectionChange }: JourneySectionProps) {
+export default function JourneySection({ data, style, styles, editable = false, onMilestoneChange, onEditSectionChange, journeyQuote, journeyQuoteAttribution, onJourneyQuoteChange, onJourneyQuoteAttributionChange }: JourneySectionProps) {
   return (
     <section id="journey" className={`py-24 transition-colors duration-500 ${
       style === 'heritage' 
@@ -121,9 +125,7 @@ export default function JourneySection({ data, style, styles, editable = false, 
               >
                 <span className="opacity-70 font-bold">0{idx + 1}</span>
                 <span className="opacity-30">|</span>
-                <span>{m.year.split(' ')[0]}</span>
-                <span className="opacity-30">•</span>
-                <span>{m.category}</span>
+                <InlineEditableText value={m.category} editable={editable} label={`Milestone ${idx + 1} category`} onFocus={onEditSectionChange} onChange={(value) => onMilestoneChange?.(idx, 'category', value)} />
               </div>
             );
           })}
@@ -186,15 +188,6 @@ export default function JourneySection({ data, style, styles, editable = false, 
                         </span>
                         
                         <div className="flex items-center space-x-2">
-                          <span className={`px-2 py-0.5 text-[10px] font-mono font-bold border ${
-                            style === 'heritage'
-                              ? 'bg-[#C5A059]/10 text-[#C5A059] border-[#C5A059]/20'
-                              : style === 'modern'
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
-                                : 'bg-stone-800 text-stone-200 border border-stone-700'
-                          }`}>
-                            {meta.ageRange}
-                          </span>
                           <span className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-white/5 text-stone-300">
                             <InlineEditableText value={m.year} editable={editable} label={`Milestone ${idx + 1} year`} onFocus={onEditSectionChange} onChange={(value) => onMilestoneChange?.(idx, 'year', value)} />
                           </span>
@@ -215,10 +208,6 @@ export default function JourneySection({ data, style, styles, editable = false, 
                           <InlineEditableText value={m.location} editable={editable} label={`Milestone ${idx + 1} location`} onFocus={onEditSectionChange} onChange={(value) => onMilestoneChange?.(idx, 'location', value)} />
                         </span>
                         <span className="opacity-30">•</span>
-                        <span className="flex items-center">
-                          <Clock className="w-3 h-3 mr-1 opacity-70" />
-                          <span>{meta.achievementCount}</span>
-                        </span>
                       </div>
 
                       {/* Milestone Description Text */}
@@ -232,7 +221,7 @@ export default function JourneySection({ data, style, styles, editable = false, 
                       <div className={`mt-4 pt-3 border-t text-xs font-mono italic ${
                         style === 'heritage' ? 'border-[#C5A059]/10 text-[#C5A059]/80' : 'border-stone-850 text-emerald-400/80'
                       }`}>
-                        ✦ {meta.highlightText}
+                        ✦ <InlineEditableText value={m.details?.[0] || meta.highlightText} editable={editable} multiline label={`Milestone ${idx + 1} highlight`} onFocus={onEditSectionChange} onChange={(value) => onMilestoneChange?.(idx, 'highlight', value)} />
                       </div>
                     </div>
                   </div>
@@ -274,12 +263,14 @@ export default function JourneySection({ data, style, styles, editable = false, 
             <span className="text-xs font-mono uppercase tracking-widest">Leadership Perspective</span>
           </div>
           <p className="text-sm italic font-serif leading-relaxed">
-            “Failure is simply raw data. It shows you what parameters did not work so you can adjust your equation. The only true catastrophe in business is stopping the search for the solution.”
+            “<InlineEditableText value={journeyQuote || 'Failure is simply raw data. It shows you what parameters did not work so you can adjust your equation. The only true catastrophe in business is stopping the search for the solution.'} editable={editable} multiline label="Leadership perspective quote" onFocus={onEditSectionChange} onChange={(value) => onJourneyQuoteChange?.(value)} />”
           </p>
-          <p className="text-xs font-mono mt-3 text-stone-500">— Daniel Chen, Seattle Business Council, 2014</p>
+          <p className="text-xs font-mono mt-3 text-stone-500">– <InlineEditableText value={journeyQuoteAttribution || 'Daniel Chen, Seattle Business Council, 2014'} editable={editable} label="Leadership perspective attribution" onFocus={onEditSectionChange} onChange={(value) => onJourneyQuoteAttributionChange?.(value)} /></p>
         </div>
 
       </div>
     </section>
   );
 }
+
+
