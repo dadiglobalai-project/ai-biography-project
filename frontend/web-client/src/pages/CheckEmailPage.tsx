@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 import { authService } from '../services/authService';
+import BrandLogo from '../components/BrandLogo';
 
 const RESET_EMAIL_STORAGE_KEY = 'passwordResetEmail';
 const RESET_TOKEN_STORAGE_KEY = 'passwordResetToken';
@@ -52,16 +53,14 @@ export default function CheckEmailPage() {
       <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full bg-[#EAF0EE]/70 blur-[140px] pointer-events-none" />
       <div className="absolute top-[30%] right-[5%] w-[450px] h-[450px] rounded-full bg-amber-500/[0.03] blur-[100px] pointer-events-none" />
 
-      {/* Elegant Header with only "Xinghuoji" text matching Screenshot 2 */}
+      {/* Brand header */}
       <motion.div 
         initial={{ opacity: 0, y: -15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className="flex flex-col items-center text-center mt-6 z-10"
       >
-        <h1 className="font-serif-display text-4xl sm:text-5xl font-medium tracking-wide text-[#0A1128]">
-          Xinghuoji
-        </h1>
+        <BrandLogo variant="desktop" className="w-64 sm:w-72" />
       </motion.div>
 
       {/* Center Check Box Content Container */}

@@ -23,6 +23,7 @@ import BrandLogo from '../components/BrandLogo';
 import { authService } from '../services/authService';
 import archiveHeroImage from '../assets/images/celestial_library_1781657848291.jpg';
 import lifeJourneyThumbnail from '../Templates/LifeJourney/assets/images/life-journey-thumbnail.png';
+import { CANONICAL_BIOGRAPHY_TEMPLATES } from '../data/biographyTemplates';
 
 const workflowSteps = [
   {
@@ -54,26 +55,26 @@ const workflowSteps = [
 const templates = [
   {
     id: 'life-journey',
-    title: 'Life Journey',
-    subtitle: 'Complete autobiography template emphasizing chronologies, personal milestones, and wisdom gathered.',
+    title: CANONICAL_BIOGRAPHY_TEMPLATES['life-journey'].title,
+    subtitle: CANONICAL_BIOGRAPHY_TEMPLATES['life-journey'].description,
     image: lifeJourneyThumbnail,
-    tag: 'Classic Memoir',
+    tag: CANONICAL_BIOGRAPHY_TEMPLATES['life-journey'].tag,
     previewPath: '/diy-dashboard/templates/life-journey/preview',
   },
   {
     id: 'entrepreneur-story',
-    title: 'Entrepreneur Story',
-    subtitle: 'Tailored for founders, pathfinders, and industry pioneers to archive ventures, failures, and triumphs.',
+    title: CANONICAL_BIOGRAPHY_TEMPLATES['entrepreneur-story'].title,
+    subtitle: CANONICAL_BIOGRAPHY_TEMPLATES['entrepreneur-story'].description,
     image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=800',
-    tag: 'Professional',
+    tag: CANONICAL_BIOGRAPHY_TEMPLATES['entrepreneur-story'].tag,
     previewPath: '/diy-dashboard/templates/entrepreneur-story/preview',
   },
   {
     id: 'legacy-heritage',
-    title: 'Legacy & Heritage',
-    subtitle: 'A warm scrapbook-style template for family legacies, heirloom memories, letters, and heritage stories.',
+    title: CANONICAL_BIOGRAPHY_TEMPLATES['legacy-heritage'].title,
+    subtitle: CANONICAL_BIOGRAPHY_TEMPLATES['legacy-heritage'].description,
     image: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&q=80&w=800',
-    tag: 'Heritage',
+    tag: CANONICAL_BIOGRAPHY_TEMPLATES['legacy-heritage'].tag,
     previewPath: '/diy-dashboard/templates/legacy-heritage/preview',
   },
 ];
@@ -160,10 +161,11 @@ export default function HomePage() {
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="w-44 sm:w-48"
+            className="inline-flex items-center"
             aria-label="Xinghuoji homepage"
           >
-            <BrandLogo variant="mobile" />
+            <BrandLogo variant="desktop" className="hidden w-56 sm:inline-flex" />
+            <BrandLogo variant="mobile" className="w-44 sm:hidden" />
           </button>
 
           <nav className="hidden items-center gap-7 text-xs font-bold uppercase text-slate-600 md:flex">
@@ -617,7 +619,7 @@ export default function HomePage() {
       <footer className="bg-white px-5 py-10">
         <div className="mx-auto grid max-w-7xl gap-8 border-t border-slate-100 pt-8 md:grid-cols-[1.2fr_2fr]">
           <div>
-            <BrandLogo variant="mobile" className="w-40" />
+            <BrandLogo variant="desktop" className="w-56" />
             <p className="mt-3 max-w-sm text-xs leading-relaxed text-slate-500">
               Preserving the human narrative through biography, memory, and digital legacy.
             </p>

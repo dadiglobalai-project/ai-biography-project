@@ -7,3 +7,4 @@ coverage/
 .env*
 !.env.example
 .vercel
+mock-api-server.mjs

@@ -274,14 +274,12 @@ export default function PaymentStatusPage() {
   }, [loadStatus]);
 
   const handleCopyPaymentRemark = async () => {
-    const remark = payment?.paymentRemark || payment?.paymentReference || payment?.paymentId || '';
-
-    if (!remark) {
+    if (!paymentRemark) {
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(remark);
+      await navigator.clipboard.writeText(paymentRemark);
       setCopiedPaymentRemark(true);
       window.setTimeout(() => setCopiedPaymentRemark(false), 1800);
     } catch {
@@ -349,7 +347,7 @@ export default function PaymentStatusPage() {
   const displayStatus = hasActiveMembership ? 'ACTIVE' : payment?.status || 'NO_PAYMENT';
   const statusMeta = getPaymentStatusMeta(displayStatus);
   const StatusIcon = statusMeta.icon;
-  const paymentRemark = payment?.paymentRemark || payment?.paymentReference || payment?.paymentId || '';
+  const paymentRemark = accountEmail;
   const paymentReference = payment?.paymentReference || payment?.paymentId || 'Not available yet';
   const displayAmount = formatMoney(payment?.amount, payment?.currency);
   const profileButtonLabel = accountName || accountEmail || 'Profile';
@@ -378,15 +376,8 @@ export default function PaymentStatusPage() {
             className="group flex min-w-0 items-center gap-3 rounded-2xl px-2 py-1.5 transition hover:bg-slate-50"
             aria-label="Xinghuoji dashboard"
           >
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm transition group-hover:border-[#B18625]">
-              <BrandLogo variant="mark" className="w-9" />
-            </span>
-            <span className="hidden min-w-0 sm:block">
-              <BrandLogo variant="mobile" className="w-36" />
-              <span className="mt-[-10px] block text-[10px] font-bold uppercase text-[#B18625]">
-                Payment Status
-              </span>
-            </span>
+            <BrandLogo variant="desktop" className="hidden w-56 sm:inline-flex" />
+            <BrandLogo variant="mobile" className="w-40 sm:hidden" />
           </button>
 
           <button
@@ -432,7 +423,7 @@ export default function PaymentStatusPage() {
 
       <main className="mx-auto max-w-7xl px-5 py-8 sm:px-6 lg:px-8 lg:py-12">
         <div className="max-w-3xl">
-          <p className="font-mono text-xs font-bold uppercase text-[#B18625]">Manual Review</p>
+          <p className="font-mono text-xs font-bold uppercase text-[#B18625]">WeChat Payment Review</p>
           <h1 className="mt-3 text-4xl font-semibold leading-tight text-slate-950 sm:text-5xl">
             Payment Status
           </h1>
@@ -548,8 +539,12 @@ export default function PaymentStatusPage() {
                   <div className="flex items-start gap-3">
                     <ReceiptText className="mt-0.5 h-5 w-5 shrink-0 text-[#B18625]" />
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-950">Payment Reference</p>
+                      <p className="text-sm font-bold text-slate-950">Backend Payment Reference</p>
                       <p className="mt-1 break-all font-mono text-sm text-slate-700">{paymentReference}</p>
+                      <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                        Use your account email below as the WeChat payment note/remark so admin can
+                        identify your payment.
+                      </p>
                     </div>
                   </div>
 
@@ -557,10 +552,10 @@ export default function PaymentStatusPage() {
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
-                          WeChat Payment Remark
+                          WeChat Payment Remark / Note
                         </p>
                         <p className="mt-2 break-all font-mono text-base font-bold text-slate-950">
-                          {paymentRemark || 'Not available yet'}
+                          {paymentRemark || 'Loading account email...'}
                         </p>
                       </div>
                       <button

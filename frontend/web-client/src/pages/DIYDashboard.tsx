@@ -26,6 +26,13 @@ import { authService, BiographyTemplate, BiographyWebsite, DashboardResponse, Su
 import BrandLogo from '../components/BrandLogo';
 import { removeDraft } from '../Templates/LifeJourney/draftStorage';
 import lifeJourneyPreviewImage from '../Templates/LifeJourney/assets/images/life-journey-thumbnail.png';
+import {
+  CANONICAL_BIOGRAPHY_TEMPLATES,
+  getCanonicalTemplateId,
+  getCanonicalTemplateTitle,
+  isCanonicalTemplateMatch,
+  type CanonicalTemplateId,
+} from '../data/biographyTemplates';
 
 type RelationType = 'Myself' | 'Parent' | 'Grandparent' | 'Child' | 'Spouse' | 'Loved One';
 const BIOGRAPHY_LIST_REFRESH_KEY = 'xinghuoji.biographies.changed';
@@ -217,7 +224,8 @@ export default function DIYDashboard() {
       setDeletingWebsiteId(null);
     }
   };
-  const [isLoadingBiographies, setIsLoadingBiographies] = useState(false);
+  const [isLoadingBiographies, setIsLoadingBiographies] = useState(true);
+  const [hasLoadedBiographies, setHasLoadedBiographies] = useState(false);
   const [biographyError, setBiographyError] = useState<string | null>(null);
   const [openingWebsiteId, setOpeningWebsiteId] = useState<string | null>(null);
   const [lastOpenedByWebsiteId, setLastOpenedByWebsiteId] = useState<Record<string, string>>(
@@ -253,6 +261,7 @@ export default function DIYDashboard() {
 
       setBiographyError(message);
     } finally {
+      setHasLoadedBiographies(true);
       setIsLoadingBiographies(false);
     }
   }, [navigate]);
@@ -415,21 +424,26 @@ export default function DIYDashboard() {
   const relations: RelationType[] = ['Myself', 'Parent', 'Grandparent', 'Child', 'Spouse', 'Loved One'];
 
   // Map each selected relation option to a recommended template
-  const getRecommendation = (relation: RelationType): { name: string; id: string } => {
+  const getRecommendation = (relation: RelationType): { name: string; id: CanonicalTemplateId } => {
+    const buildRecommendation = (id: CanonicalTemplateId) => ({
+      id,
+      name: getCanonicalTemplateTitle(id),
+    });
+
     switch (relation) {
       case 'Myself':
-        return { name: 'Personal Memoir', id: 'personal-memoir' };
+        return buildRecommendation('life-journey');
       case 'Parent':
-        return { name: 'Family Legacy', id: 'life-journey' };
+        return buildRecommendation('legacy-heritage');
       case 'Grandparent':
-        return { name: 'Ancestor Chronicles', id: 'ancestor-chronicles' };
+        return buildRecommendation('legacy-heritage');
       case 'Child':
-        return { name: 'Growth & Dreams', id: 'growth-dreams' };
+        return buildRecommendation('nature-serenity');
       case 'Spouse':
-        return { name: 'Love & Union', id: 'love-union' };
+        return buildRecommendation('life-journey');
       case 'Loved One':
       default:
-        return { name: 'Family Legacy', id: 'life-journey' };
+        return buildRecommendation('legacy-heritage');
     }
   };
 
@@ -441,41 +455,41 @@ export default function DIYDashboard() {
   const baseTemplates: Template[] = [
     {
       id: 'life-journey',
-      title: 'Life Journey',
-      subtitle: 'A journey through the land',
-      description: 'Complete autobiography template emphasizing chronologies, personal milestones, and wisdom gathered.',
+      title: CANONICAL_BIOGRAPHY_TEMPLATES['life-journey'].title,
+      subtitle: CANONICAL_BIOGRAPHY_TEMPLATES['life-journey'].subtitle,
+      description: CANONICAL_BIOGRAPHY_TEMPLATES['life-journey'].description,
       imageUrl: lifeJourneyPreviewImage,
-      tag: 'Classic Memoir',
+      tag: CANONICAL_BIOGRAPHY_TEMPLATES['life-journey'].tag,
       previewPath: '/diy-dashboard/templates/life-journey/preview',
       editPath: '/diy-dashboard/templates/life-journey/edit'
     },
     {
       id: 'entrepreneur-story',
-      title: 'Entrepreneur Story',
-      subtitle: 'Document your business adventures',
-      description: 'Tailored for founders, pathfinders, and industry pioneers to archive their ventures, failures, and triumphs.',
+      title: CANONICAL_BIOGRAPHY_TEMPLATES['entrepreneur-story'].title,
+      subtitle: CANONICAL_BIOGRAPHY_TEMPLATES['entrepreneur-story'].subtitle,
+      description: CANONICAL_BIOGRAPHY_TEMPLATES['entrepreneur-story'].description,
       imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=800',
-      tag: 'Professional',
+      tag: CANONICAL_BIOGRAPHY_TEMPLATES['entrepreneur-story'].tag,
       previewPath: '/diy-dashboard/templates/entrepreneur-story/preview',
       editPath: '/diy-dashboard/templates/entrepreneur-story/edit'
     },
     {
       id: 'legacy-heritage',
-      title: 'Legacy & Heritage',
-      subtitle: 'Preserve a family archive',
-      description: 'A warm scrapbook-style template for family legacies, heirloom memories, letters, and heritage stories.',
+      title: CANONICAL_BIOGRAPHY_TEMPLATES['legacy-heritage'].title,
+      subtitle: CANONICAL_BIOGRAPHY_TEMPLATES['legacy-heritage'].subtitle,
+      description: CANONICAL_BIOGRAPHY_TEMPLATES['legacy-heritage'].description,
       imageUrl: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&q=80&w=800',
-      tag: 'Heritage',
+      tag: CANONICAL_BIOGRAPHY_TEMPLATES['legacy-heritage'].tag,
       previewPath: '/diy-dashboard/templates/legacy-heritage/preview',
       editPath: '/diy-dashboard/templates/legacy-heritage/edit'
     },
     {
       id: 'nature-serenity',
-      title: 'Nature & Serenity',
-      subtitle: 'A quiet life in focus',
-      description: 'A reflective nature-inspired template for peaceful memories, personal rituals, and meaningful life chapters.',
+      title: CANONICAL_BIOGRAPHY_TEMPLATES['nature-serenity'].title,
+      subtitle: CANONICAL_BIOGRAPHY_TEMPLATES['nature-serenity'].subtitle,
+      description: CANONICAL_BIOGRAPHY_TEMPLATES['nature-serenity'].description,
       imageUrl: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&q=80&w=800',
-      tag: 'Reflective',
+      tag: CANONICAL_BIOGRAPHY_TEMPLATES['nature-serenity'].tag,
       previewPath: '/diy-dashboard/templates/nature-serenity/preview',
       editPath: '/diy-dashboard/templates/nature-serenity/edit'
     }
@@ -484,7 +498,10 @@ export default function DIYDashboard() {
   const templates = React.useMemo(() => {
     return baseTemplates.map((template) => {
       const backendTemplate = backendTemplates.find(
-        (item) => item.layoutKey === template.id || item.templateId === template.id
+        (item) =>
+          isCanonicalTemplateMatch(item.layoutKey, template.id) ||
+          isCanonicalTemplateMatch(item.templateId, template.id) ||
+          BACKEND_TEMPLATE_ID_FALLBACKS[template.id] === item.templateId
       );
 
       if (!backendTemplate) {
@@ -494,7 +511,7 @@ export default function DIYDashboard() {
       return {
         ...template,
         backendTemplateId: backendTemplate.templateId,
-        title: backendTemplate.name || template.title,
+        title: getCanonicalTemplateTitle(template.id, template.title),
         description: backendTemplate.description || template.description,
         imageUrl: backendTemplate.thumbnailUrl || template.imageUrl,
         tag: backendTemplate.category || template.tag,
@@ -602,8 +619,14 @@ export default function DIYDashboard() {
   };
 
   const getTemplateByIdentifier = (templateId: string) => {
+    const canonicalTemplateId = getCanonicalTemplateId(templateId);
+
     return templates.find(
-      (template) => template.id === templateId || template.backendTemplateId === templateId
+      (template) =>
+        template.id === canonicalTemplateId ||
+        template.id === templateId ||
+        template.backendTemplateId === templateId ||
+        BACKEND_TEMPLATE_ID_FALLBACKS[template.id] === templateId
     );
   };
 
@@ -773,6 +796,9 @@ export default function DIYDashboard() {
       return secondActivityDate - firstActivityDate;
     });
   }, [biographies, lastOpenedByWebsiteId]);
+  const shouldShowBiographyLoading = biographies.length === 0 && (!hasLoadedBiographies || isLoadingBiographies);
+  const shouldShowBiographyEmpty =
+    hasLoadedBiographies && !isLoadingBiographies && !biographyError && displayedBiographies.length === 0;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-between font-sans selection:bg-amber-200">
@@ -791,10 +817,11 @@ export default function DIYDashboard() {
           
           {/* Logo */}
           <div 
-            className="flex items-center cursor-pointer max-w-[150px] sm:max-w-[190px]" 
+            className="flex items-center cursor-pointer" 
             onClick={() => navigate('/preserve-story')}
           >
-            <BrandLogo variant="mobile" className="w-full h-auto" />
+            <BrandLogo variant="desktop" className="hidden w-56 sm:inline-flex" />
+            <BrandLogo variant="mobile" className="w-40 sm:hidden" />
           </div>
 
           {/* Dashboard Navigation */}
@@ -1008,7 +1035,7 @@ export default function DIYDashboard() {
             </div>
           )}
 
-          {isLoadingBiographies && biographies.length === 0 ? (
+          {shouldShowBiographyLoading ? (
             <div className="rounded-xl border border-slate-100 bg-white px-5 py-5 text-sm text-slate-500 shadow-sm">
               Loading biographies...
             </div>
@@ -1033,7 +1060,7 @@ export default function DIYDashboard() {
                         <div className="flex items-center gap-2 text-[#B18625]">
                           <BookOpen className="w-4 h-4 shrink-0" />
                           <span className="text-[10px] font-mono font-bold uppercase tracking-wider">
-                            {websiteTemplate?.title || website.templateId || 'Template'}
+                            {websiteTemplate?.title || getCanonicalTemplateTitle(website.templateId, website.templateId || 'Template')}
                           </span>
                         </div>
                         <h3 className="font-serif-display text-xl font-semibold text-[#0A1128] truncate">
@@ -1113,11 +1140,11 @@ export default function DIYDashboard() {
                 );
               })}
             </div>
-          ) : (
+          ) : shouldShowBiographyEmpty ? (
             <div className="rounded-xl border border-dashed border-slate-200 bg-white px-5 py-6 text-sm text-slate-500">
               No biographies yet. Start with a template below to create your first draft.
             </div>
-          )}
+          ) : null}
         </section>
 
         {/* Interactive "Let AI Recommend a Template" Dark Card */}

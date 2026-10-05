@@ -55,6 +55,157 @@
   animation: fade-in 220ms ease-out both;
 }
 
+@keyframes auth-hero-drift {
+  0%, 100% {
+    transform: scale(1.03) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: scale(1.08) translate3d(-1.2%, -0.8%, 0);
+  }
+}
+
+@keyframes auth-hero-light-breathe {
+  0%, 100% {
+    opacity: 0.28;
+    transform: translate3d(-1%, 1%, 0) scale(0.96);
+  }
+  50% {
+    opacity: 0.45;
+    transform: translate3d(1%, -1%, 0) scale(1.04);
+  }
+}
+
+@keyframes auth-hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes auth-hero-line-glow {
+  0%, 100% {
+    opacity: 0.45;
+    box-shadow: 0 0 0 rgba(197, 168, 128, 0);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 18px rgba(197, 168, 128, 0.65);
+  }
+}
+
+@keyframes auth-hero-particle-drift {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0) scale(0.7);
+  }
+  12%, 72% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(26px, -92px, 0) scale(1);
+  }
+}
+
+.auth-hero-image {
+  animation: auth-hero-drift 24s ease-in-out infinite;
+  will-change: transform;
+}
+
+.auth-hero-light {
+  background:
+    radial-gradient(circle at 50% 36%, rgba(255, 238, 184, 0.26), transparent 20rem),
+    linear-gradient(115deg, transparent 18%, rgba(255, 240, 190, 0.14) 42%, transparent 64%);
+  animation: auth-hero-light-breathe 8s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+.auth-hero-title,
+.auth-hero-quote,
+.auth-hero-footer {
+  animation: auth-hero-rise 720ms ease-out both;
+}
+
+.auth-hero-quote {
+  animation-delay: 180ms;
+}
+
+.auth-hero-footer {
+  animation-delay: 360ms;
+}
+
+.auth-hero-accent-line {
+  animation: auth-hero-line-glow 3.8s ease-in-out infinite;
+}
+
+.auth-hero-particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: rgba(223, 205, 171, 0.9);
+  box-shadow: 0 0 12px rgba(223, 205, 171, 0.8);
+  animation: auth-hero-particle-drift 11s linear infinite;
+}
+
+.auth-hero-particle:nth-child(1) {
+  left: 13%;
+  top: 72%;
+  animation-delay: 0s;
+}
+
+.auth-hero-particle:nth-child(2) {
+  left: 26%;
+  top: 66%;
+  animation-delay: 1.5s;
+  animation-duration: 13s;
+}
+
+.auth-hero-particle:nth-child(3) {
+  left: 45%;
+  top: 78%;
+  animation-delay: 2.8s;
+  animation-duration: 12s;
+}
+
+.auth-hero-particle:nth-child(4) {
+  left: 62%;
+  top: 69%;
+  animation-delay: 4.2s;
+  animation-duration: 14s;
+}
+
+.auth-hero-particle:nth-child(5) {
+  left: 78%;
+  top: 74%;
+  animation-delay: 5.4s;
+  animation-duration: 12.5s;
+}
+
+.auth-hero-particle:nth-child(6) {
+  left: 34%;
+  top: 88%;
+  animation-delay: 6.8s;
+  animation-duration: 15s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-hero-image,
+  .auth-hero-light,
+  .auth-hero-title,
+  .auth-hero-quote,
+  .auth-hero-footer,
+  .auth-hero-accent-line,
+  .auth-hero-particle {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 .artistic-radial-bg {
   background-image:
     radial-gradient(circle at 18% 12%, rgba(185, 138, 56, 0.16), transparent 28rem),

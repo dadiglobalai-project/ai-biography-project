@@ -119,7 +119,7 @@ export default function PaymentPage() {
   const [paymentError, setPaymentError] = React.useState('');
 
   React.useEffect(() => {
-    document.title = 'Manual Payment Confirmation | Xinghuoji';
+    document.title = 'WeChat Payment | Xinghuoji';
 
     let active = true;
     const loadPaymentData = async () => {
@@ -216,15 +216,12 @@ export default function PaymentPage() {
   };
 
   const handleCopyPaymentRemark = async () => {
-    const remark =
-      currentPayment?.paymentRemark || currentPayment?.paymentReference || currentPayment?.paymentId || '';
-
-    if (!remark) {
+    if (!paymentRemark) {
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(remark);
+      await navigator.clipboard.writeText(paymentRemark);
       setCopiedPaymentRemark(true);
       window.setTimeout(() => setCopiedPaymentRemark(false), 1800);
     } catch {
@@ -276,7 +273,7 @@ export default function PaymentPage() {
         paymentMethod: DEFAULT_PAYMENT_METHOD,
       });
       setCurrentPayment(payment);
-      setPaymentMessage('Payment request created. Pay through WeChat using the exact payment remark below, then wait for admin confirmation.');
+      setPaymentMessage('Payment request created. Pay through WeChat and put your account email in the WeChat note/remark field, then wait for admin confirmation.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to create payment request.';
 
@@ -306,9 +303,7 @@ export default function PaymentPage() {
     : selectedPlan
       ? formatMoney(selectedPlan.standardPrice, selectedPlan.currency)
       : fallbackPrice;
-  const paymentReferenceCode =
-    currentPayment?.paymentReference || currentPayment?.paymentId || websiteId || 'Generated after payment request';
-  const paymentRemark = currentPayment?.paymentRemark || currentPayment?.paymentReference || currentPayment?.paymentId || '';
+  const paymentRemark = accountEmail;
   const canShowWechatInstructions = Boolean(currentPayment?.paymentId && normalizedPaymentStatus !== 'REJECTED' && normalizedPaymentStatus !== 'FAILED');
   const canViewStatus = Boolean(currentPayment?.paymentId || hasActiveMembership);
   const membershipStatus = membership?.status || 'No active membership';
@@ -318,22 +313,15 @@ export default function PaymentPage() {
   return (
     <div className="min-h-screen bg-[#f4f8fb] text-slate-950">
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 shadow-[0_12px_34px_rgba(15,23,42,0.06)] backdrop-blur-xl">
-        <div className="relative mx-auto flex min-h-20 max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:min-h-[88px] lg:px-8">
+        <div className="relative mx-auto flex min-h-24 max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:min-h-[104px] lg:px-8">
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="group flex min-w-0 items-center gap-3 rounded-2xl px-2 py-1.5 transition hover:bg-slate-50"
+            className="group flex min-w-0 items-center gap-4 rounded-2xl px-2 py-1.5 transition hover:bg-slate-50"
             aria-label="Xinghuoji homepage"
           >
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm transition group-hover:border-[#B18625]">
-              <BrandLogo variant="mark" className="w-9" />
-            </span>
-            <span className="hidden min-w-0 sm:block">
-              <BrandLogo variant="mobile" className="w-36" />
-              <span className="mt-[-10px] block text-[10px] font-bold uppercase text-[#B18625]">
-                Manual Activation
-              </span>
-            </span>
+            <BrandLogo variant="desktop" className="hidden w-60 sm:inline-flex" />
+            <BrandLogo variant="mobile" className="w-44 sm:hidden" />
           </button>
 
           <button
@@ -455,9 +443,9 @@ export default function PaymentPage() {
               <div className="flex items-start gap-3">
                 <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#B18625]" />
                 <p>
-                  Enter the exact payment remark shown below when paying through WeChat. The
-                  admin will match that remark to your pending payment request before activating
-                  your membership.
+                  When paying through WeChat, enter your account email in the payment note/remark
+                  field. This helps the admin identify which user the payment belongs to before
+                  activating your membership.
                 </p>
               </div>
             </div>
@@ -477,7 +465,7 @@ export default function PaymentPage() {
                       <p className="line-clamp-2 text-sm font-bold text-slate-950">{biographyTitle}</p>
                       <p className="mt-1 text-xs text-slate-500">{templateRoute.title} template</p>
                       <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                        Manual Activation
+                        Admin Verification
                       </span>
                     </div>
                   </div>
@@ -536,12 +524,12 @@ export default function PaymentPage() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-xl font-bold text-slate-950">Manual Payment Instructions</h2>
+                      <h2 className="text-xl font-bold text-slate-950">WeChat Payment Instructions</h2>
                       <ShieldCheck className="h-4 w-4 text-[#B18625]" />
                     </div>
                     <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                      Create a backend payment request first, then use the generated reference
-                      and payment remark for the manual WeChat payment.
+                      Create a backend payment request first, then scan the WeChat QR code and use
+                      your account email as the payment note/remark.
                     </p>
                   </div>
                   <span className="inline-flex w-fit items-center gap-2 rounded-full border border-amber-100 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
@@ -648,11 +636,11 @@ export default function PaymentPage() {
                     },
                     {
                       title: 'Pay via WeChat',
-                      description: 'Scan the QR code and enter the exact payment remark.',
+                      description: 'Scan the QR code and enter your account email as the remark.',
                     },
                     {
                       title: 'Admin Confirms',
-                      description: 'Admin matches the remark and activates your membership.',
+                      description: 'Admin matches the email remark and activates your membership.',
                     },
                   ].map((item, index) => (
                     <div key={item.title} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
@@ -693,8 +681,11 @@ export default function PaymentPage() {
                     <div className="flex items-start gap-3">
                       <FileText className="mt-0.5 h-5 w-5 shrink-0 text-[#B18625]" />
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-950">Backend Payment Reference</p>
-                        <p className="mt-1 break-all font-mono text-sm text-slate-700">{paymentReferenceCode}</p>
+                        <p className="text-sm font-bold text-slate-950">WeChat Payment Instructions</p>
+                        <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                          Scan the QR code, pay {displayAmount}, then type the account email below
+                          in the WeChat payment note/remark field.
+                        </p>
                       </div>
                     </div>
 
@@ -702,10 +693,10 @@ export default function PaymentPage() {
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
                           <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
-                            WeChat Payment Remark
+                            WeChat Payment Remark / Note
                           </p>
                           <p className="mt-2 break-all font-mono text-base font-bold text-slate-950">
-                            {paymentRemark || 'Create a payment request to generate this remark'}
+                            {paymentRemark || 'Loading account email...'}
                           </p>
                         </div>
                         <button
@@ -723,14 +714,14 @@ export default function PaymentPage() {
                     {!canShowWechatInstructions && (
                       <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold leading-relaxed text-slate-500">
                         Create a payment request first so the admin has a backend record to match
-                        against the WeChat payment remark.
+                        against your email remark.
                       </div>
                     )}
 
                     <ol className="mt-5 space-y-2 text-sm leading-relaxed text-slate-600">
                       <li>1. Create a payment request if no pending request exists.</li>
                       <li>2. Scan the WeChat QR code and pay {displayAmount}.</li>
-                      <li>3. Put the exact payment remark in the WeChat payment remarks field.</li>
+                      <li>3. Put your account email in the WeChat payment note/remark field.</li>
                       <li>4. Wait for admin verification and membership activation.</li>
                     </ol>
                   </div>

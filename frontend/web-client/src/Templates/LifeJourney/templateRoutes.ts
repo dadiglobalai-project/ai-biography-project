@@ -1,4 +1,9 @@
 import type { BiographyCategory } from './types';
+import {
+  CANONICAL_BIOGRAPHY_TEMPLATES,
+  getCanonicalTemplate,
+  type CanonicalTemplateId,
+} from '../../data/biographyTemplates';
 
 export interface BiographyTemplateRoute {
   categoryKey: BiographyCategory['id'];
@@ -10,30 +15,33 @@ export const BIOGRAPHY_TEMPLATE_ROUTES: Record<string, BiographyTemplateRoute> =
   'visionary-legacy': {
     categoryKey: 'visionary',
     id: 'visionary-legacy',
-    title: 'Visionary Legacy',
+    title: CANONICAL_BIOGRAPHY_TEMPLATES['visionary-legacy'].title,
   },
   'life-journey': {
     categoryKey: 'life',
     id: 'life-journey',
-    title: 'Life Journey',
+    title: CANONICAL_BIOGRAPHY_TEMPLATES['life-journey'].title,
   },
   'entrepreneur-story': {
     categoryKey: 'entrepreneur',
     id: 'entrepreneur-story',
-    title: 'Entrepreneur Story',
+    title: CANONICAL_BIOGRAPHY_TEMPLATES['entrepreneur-story'].title,
   },
   'legacy-heritage': {
     categoryKey: 'life',
     id: 'legacy-heritage',
-    title: 'Legacy & Heritage',
+    title: CANONICAL_BIOGRAPHY_TEMPLATES['legacy-heritage'].title,
   },
   'nature-serenity': {
     categoryKey: 'life',
     id: 'nature-serenity',
-    title: 'Nature & Serenity',
+    title: CANONICAL_BIOGRAPHY_TEMPLATES['nature-serenity'].title,
   },
 };
 
 export function getBiographyTemplateRoute(templateId?: string) {
-  return BIOGRAPHY_TEMPLATE_ROUTES[templateId || ''] ?? BIOGRAPHY_TEMPLATE_ROUTES['life-journey'];
+  const canonicalTemplate = getCanonicalTemplate(templateId);
+  const routeId = canonicalTemplate?.id as CanonicalTemplateId | undefined;
+
+  return BIOGRAPHY_TEMPLATE_ROUTES[routeId || templateId || ''] ?? BIOGRAPHY_TEMPLATE_ROUTES['life-journey'];
 }

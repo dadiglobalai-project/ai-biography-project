@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, AlertCircle } from 'lucide-react';
 import { authService } from '../services/authService';
+import BrandLogo from '../components/BrandLogo';
 
 const RESET_EMAIL_STORAGE_KEY = 'passwordResetEmail';
 const RESET_TOKEN_STORAGE_KEY = 'passwordResetToken';
@@ -74,8 +75,9 @@ export default function ForgotPasswordPage() {
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className="flex flex-col items-center text-center space-y-2 mt-4 z-10"
       >
+        <BrandLogo variant="desktop" className="w-64 sm:w-72" />
         {/* Elegant Hand-crafted Dandelion Breeze Star logo as requested in Picture 2 */}
-        <div className="mb-2 shrink-0">
+        <div className="hidden mb-2 shrink-0">
           <svg className="w-36 h-36 mx-auto" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
             {/* Ambient shadow glow under the dandelion head */}
             <circle cx="170" cy="210" r="100" fill="url(#dandelion-glow)" opacity="0.15" />
@@ -258,10 +260,10 @@ export default function ForgotPasswordPage() {
             <circle cx="355" cy="120" r="1.2" fill="#C59B27" opacity="0.7" />
           </svg>
         </div>
-        <h1 className="font-serif-display text-4xl sm:text-5xl font-medium tracking-wide text-[#0A1128]">
+        <h1 className="hidden font-serif-display text-4xl sm:text-5xl font-medium tracking-wide text-[#0A1128]">
           Xinghuoji
         </h1>
-        <p className="text-[10px] font-mono tracking-[0.25em] text-[#C5A880] font-semibold uppercase">
+        <p className="hidden text-[10px] font-mono tracking-[0.25em] text-[#C5A880] font-semibold uppercase">
           PRESERVING THE ETERNAL SPARK
         </p>
       </motion.div>

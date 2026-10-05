@@ -44,10 +44,11 @@ export default function ProfessionalDashboard() {
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <button
             type="button"
-            className="flex items-center max-w-[150px] sm:max-w-[190px] cursor-pointer"
+            className="flex items-center cursor-pointer"
             onClick={() => navigate('/professional-dashboard')}
           >
-            <BrandLogo variant="mobile" className="w-full h-auto" />
+            <BrandLogo variant="desktop" className="hidden w-56 sm:inline-flex" />
+            <BrandLogo variant="mobile" className="w-40 sm:hidden" />
           </button>
 
           <div className="flex items-center gap-4">

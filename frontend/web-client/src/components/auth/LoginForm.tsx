@@ -158,7 +158,12 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
   return (
     <div className="w-full max-w-md mx-auto relative z-10 select-none">
       <div className="mb-10 text-left">
-        <BrandLogo variant="mobile" className="mb-8 w-44 max-w-full lg:hidden -ml-2" />
+        <div className="mb-9 -ml-2">
+          <BrandLogo variant="mobile" className="w-52 max-w-full sm:w-60" />
+          <p className="ml-3 mt-1 text-[10px] font-mono font-semibold uppercase tracking-[0.18em] text-[#B18625]">
+            AI Biography & Digital Legacy Platform
+          </p>
+        </div>
 
         <h2 className="font-serif-display text-4xl text-legacy-navy font-semibold tracking-normal leading-tight mb-2">
           Sign in to Xinghuoji

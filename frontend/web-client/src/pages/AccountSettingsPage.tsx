@@ -20,6 +20,7 @@ import BrandLogo from '../components/BrandLogo';
 import { authService } from '../services/authService';
 import type { BiographyWebsite, ServiceType, SubjectType } from '../services/authService';
 import { getDashboardPath } from '../utils/dashboardRouting';
+import { getCanonicalTemplateTitle } from '../data/biographyTemplates';
 
 type SettingsSection = 'profile' | 'security' | 'preferences' | 'storage' | 'account';
 
@@ -29,6 +30,7 @@ type StoredAccountPreferences = {
 };
 
 const ACCOUNT_PREFERENCES_STORAGE_KEY = 'xinghuoji.account.preferences';
+const DEFAULT_TEMPLATE_TITLE = getCanonicalTemplateTitle('life-journey');
 
 const subjectOptions: Array<{ value: SubjectType; label: string }> = [
   { value: 'SELF', label: 'Myself' },
@@ -46,7 +48,7 @@ const readStoredPreferences = (email?: string): StoredAccountPreferences => {
   try {
     const storedValue = window.localStorage.getItem(getPreferencesStorageKey(email));
     if (!storedValue) {
-      return { defaultSubjectType: 'SELF', defaultTemplate: 'Life Journey' };
+      return { defaultSubjectType: 'SELF', defaultTemplate: DEFAULT_TEMPLATE_TITLE };
     }
 
     const parsedValue = JSON.parse(storedValue) as Partial<StoredAccountPreferences>;
@@ -54,11 +56,11 @@ const readStoredPreferences = (email?: string): StoredAccountPreferences => {
 
     return {
       defaultSubjectType: validSubject ? parsedValue.defaultSubjectType as SubjectType : 'SELF',
-      defaultTemplate: parsedValue.defaultTemplate || 'Life Journey',
+      defaultTemplate: getCanonicalTemplateTitle(parsedValue.defaultTemplate, parsedValue.defaultTemplate || DEFAULT_TEMPLATE_TITLE),
     };
   } catch {
     window.localStorage.removeItem(getPreferencesStorageKey(email));
-    return { defaultSubjectType: 'SELF', defaultTemplate: 'Life Journey' };
+    return { defaultSubjectType: 'SELF', defaultTemplate: DEFAULT_TEMPLATE_TITLE };
   }
 };
 
@@ -102,7 +104,7 @@ export default function AccountSettingsPage() {
   const [profileEmail, setProfileEmail] = React.useState('');
   const [serviceType, setServiceType] = React.useState<ServiceType>('DIY');
   const [defaultSubjectType, setDefaultSubjectType] = React.useState<SubjectType>('SELF');
-  const [defaultTemplate, setDefaultTemplate] = React.useState('Life Journey');
+  const [defaultTemplate, setDefaultTemplate] = React.useState(DEFAULT_TEMPLATE_TITLE);
   const [biographies, setBiographies] = React.useState<BiographyWebsite[]>([]);
   const [mediaCount, setMediaCount] = React.useState(0);
   const [activeSection, setActiveSection] = React.useState<SettingsSection>('profile');
