@@ -47,6 +47,12 @@ function apiUrl(path: string) {
   return `${API_BASE_URL}${path}`;
 }
 
+function formatBackendLocalDateTime(date = new Date()) {
+  const pad = (value: number) => String(value).padStart(2, '0');
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 function getAuthHeaders(): HeadersInit {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -291,15 +297,33 @@ export interface AdminPaymentResponse extends PaymentResponse {
   userId?: string;
   userName?: string;
   userEmail?: string;
+  userFullName?: string;
   biographyTitle?: string;
   websiteId?: string;
   planId?: string;
   planName?: string;
   proofOfPaymentUrl?: string;
+  adminReviewNotes?: string;
+  rejectionReason?: string;
+  summaryFlags?: Record<string, unknown> | string[];
+}
+
+export interface AdminMembershipActivationQuery {
+  status?: AdminPaymentStatus | 'All';
+  q?: string;
+  page?: number;
+  size?: number;
+  sort?: string;
+  includeCounts?: boolean;
 }
 
 export interface ConfirmAdminPaymentPayload {
   paidAt?: string;
+}
+
+export interface RejectAdminPaymentPayload {
+  adminReviewNotes?: string;
+  rejectionReason?: string;
 }
 
 export interface AdminRefundResponse extends RefundResponse {
@@ -1199,7 +1223,7 @@ function getMembershipPlansFromResponse(data: any) {
 }
 
 function getPaymentFromResponse(data: any) {
-  return data?.payment || data?.currentPayment || data?.data || data;
+  return data?.payment || data?.activation || data?.membershipActivation || data?.currentPayment || data?.item || data?.data || data;
 }
 
 function getRefundFromResponse(data: any) {
@@ -1217,6 +1241,14 @@ function getAdminPaymentsFromResponse(data: any) {
 
   if (Array.isArray(data?.adminPayments)) {
     return data.adminPayments;
+  }
+
+  if (Array.isArray(data?.membershipActivations)) {
+    return data.membershipActivations;
+  }
+
+  if (Array.isArray(data?.activations)) {
+    return data.activations;
   }
 
   if (Array.isArray(data?.items)) {
@@ -1344,63 +1376,109 @@ function normalizeRefundResponse(data: any): RefundResponse {
 }
 
 function normalizeAdminPaymentResponse(data: any): AdminPaymentResponse {
-  const payment = normalizePaymentResponse(data);
-  const user = data?.user || data?.account || data?.member || {};
-  const website = data?.website || data?.biographyWebsite || data?.biography || {};
-  const plan = data?.plan || data?.membershipPlan || {};
+  const activation = data?.activation || data?.membershipActivation || data?.item || data?.data || data || {};
+  const paymentData = activation?.payment || activation?.currentPayment || data?.payment || data?.currentPayment || {};
+  const mergedPaymentData = { ...activation, ...paymentData };
+  const payment = normalizePaymentResponse(mergedPaymentData);
+  const user = activation?.user || activation?.account || activation?.member || paymentData?.user || {};
+  const website =
+    activation?.website ||
+    activation?.websiteSummary ||
+    activation?.relatedWebsite ||
+    activation?.relatedWebsiteSummary ||
+    activation?.biographyWebsite ||
+    activation?.biography ||
+    paymentData?.website ||
+    paymentData?.biographyWebsite ||
+    {};
+  const plan = activation?.plan || activation?.membershipPlan || paymentData?.plan || paymentData?.membershipPlan || {};
+  const userFullName = String(
+    activation?.userFullName ||
+      activation?.fullName ||
+      activation?.userName ||
+      paymentData?.userFullName ||
+      paymentData?.userName ||
+      getFullNameFromData(activation) ||
+      getFullNameFromData(user) ||
+      ''
+  );
 
   return {
     ...payment,
-    paymentId: payment.paymentId || String(data?.paymentId || data?.id || ''),
+    paymentId: payment.paymentId || String(activation?.paymentId || activation?.id || data?.paymentId || data?.id || ''),
     userId:
-      typeof data?.userId === 'string' && data.userId.trim()
-        ? data.userId
+      typeof activation?.userId === 'string' && activation.userId.trim()
+        ? activation.userId
         : typeof user?.userId === 'string' && user.userId.trim()
           ? user.userId
           : typeof user?.id === 'string' && user.id.trim()
             ? user.id
             : undefined,
     userName:
-      String(data?.userName || data?.customerName || getFullNameFromData(data) || getFullNameFromData(user) || '') ||
+      String(userFullName || activation?.customerName || getFullNameFromData(activation) || getFullNameFromData(user) || '') ||
       undefined,
+    userFullName: userFullName || undefined,
     userEmail:
-      String(data?.userEmail || data?.email || getEmailFromData(data) || getEmailFromData(user) || '') ||
+      String(
+        activation?.userEmail ||
+          activation?.email ||
+          paymentData?.userEmail ||
+          paymentData?.email ||
+          getEmailFromData(activation) ||
+          getEmailFromData(user) ||
+          ''
+      ) ||
       undefined,
     biographyTitle:
       String(
-        data?.biographyTitle ||
-          data?.websiteTitle ||
+        activation?.biographyTitle ||
+          activation?.websiteTitle ||
+          paymentData?.biographyTitle ||
+          paymentData?.websiteTitle ||
           website?.title ||
-          data?.title ||
+          activation?.title ||
           ''
       ) || undefined,
     websiteId:
-      typeof data?.websiteId === 'string' && data.websiteId.trim()
-        ? data.websiteId
+      typeof activation?.websiteId === 'string' && activation.websiteId.trim()
+        ? activation.websiteId
         : typeof website?.websiteId === 'string' && website.websiteId.trim()
           ? website.websiteId
           : typeof website?.id === 'string' && website.id.trim()
             ? website.id
             : undefined,
     planId:
-      typeof data?.planId === 'string' && data.planId.trim()
-        ? data.planId
+      typeof activation?.planId === 'string' && activation.planId.trim()
+        ? activation.planId
         : typeof plan?.planId === 'string' && plan.planId.trim()
           ? plan.planId
           : undefined,
     planName:
       String(
-        data?.planName ||
-          (typeof data?.plan === 'string' ? data.plan : '') ||
+        activation?.planName ||
+          paymentData?.planName ||
+          (typeof activation?.plan === 'string' ? activation.plan : '') ||
           plan?.name ||
           ''
       ) || undefined,
     proofOfPaymentUrl:
-      typeof data?.proofOfPaymentUrl === 'string' && data.proofOfPaymentUrl.trim()
-        ? data.proofOfPaymentUrl
-        : typeof data?.proofUrl === 'string' && data.proofUrl.trim()
-          ? data.proofUrl
+      typeof activation?.proofOfPaymentUrl === 'string' && activation.proofOfPaymentUrl.trim()
+        ? activation.proofOfPaymentUrl
+        : typeof activation?.proofUrl === 'string' && activation.proofUrl.trim()
+          ? activation.proofUrl
           : undefined,
+    adminReviewNotes:
+      typeof activation?.adminReviewNotes === 'string' && activation.adminReviewNotes.trim()
+        ? activation.adminReviewNotes
+        : undefined,
+    rejectionReason:
+      typeof activation?.rejectionReason === 'string' && activation.rejectionReason.trim()
+        ? activation.rejectionReason
+        : undefined,
+    summaryFlags:
+      typeof activation?.summaryFlags === 'object' && activation.summaryFlags !== null
+        ? activation.summaryFlags
+        : undefined,
   };
 }
 
@@ -1918,11 +1996,31 @@ export const authService = {
     return normalizeRefundResponse(getRefundFromResponse(data));
   },
 
-  async getAdminPayments(status?: AdminPaymentStatus): Promise<AdminPaymentResponse[]> {
-    const path =
-      status && status !== 'All'
-        ? `/api/admin/payments?status=${encodeURIComponent(status)}`
-        : '/api/admin/payments';
+  async getAdminPayments(
+    options?: AdminPaymentStatus | AdminMembershipActivationQuery
+  ): Promise<AdminPaymentResponse[]> {
+    const query: AdminMembershipActivationQuery =
+      typeof options === 'string' ? { status: options } : options || {};
+    const params = new URLSearchParams();
+
+    if (query.status && query.status !== 'All') {
+      params.set('status', query.status);
+    }
+
+    if (query.q?.trim()) {
+      params.set('q', query.q.trim());
+    }
+
+    params.set('page', String(query.page ?? 0));
+    params.set('size', String(query.size ?? 20));
+    params.set('sort', query.sort || 'createdAt,desc');
+
+    if (query.includeCounts ?? true) {
+      params.set('includeCounts', 'true');
+    }
+
+    const search = params.toString();
+    const path = `/api/admin/membership-activations${search ? `?${search}` : ''}`;
     const response = await fetch(apiUrl(path), {
       method: 'GET',
       headers: getAuthHeaders(),
@@ -1931,7 +2029,7 @@ export const authService = {
     const data = await parseResponseBody(response);
 
     if (!response.ok) {
-      throw new Error(getMessage(data, 'Unable to load admin payments'));
+      throw new Error(getMessage(data, 'Unable to load membership activations'));
     }
 
     return getAdminPaymentsFromResponse(data)
@@ -1940,31 +2038,33 @@ export const authService = {
   },
 
   async getAdminPayment(paymentId: string): Promise<AdminPaymentResponse> {
-    const response = await fetch(apiUrl(`/api/admin/payments/${encodeURIComponent(paymentId)}`), {
-      method: 'GET',
-      headers: getAuthHeaders(),
-    });
+    const response = await fetch(
+      apiUrl(`/api/admin/membership-activations/${encodeURIComponent(paymentId)}`),
+      {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      }
+    );
 
     const data = await parseResponseBody(response);
 
     if (!response.ok) {
-      throw new Error(getMessage(data, 'Unable to load admin payment details'));
+      throw new Error(getMessage(data, 'Unable to load membership activation details'));
     }
 
-    return normalizeAdminPaymentResponse(getPaymentFromResponse(data));
+    return normalizeAdminPaymentResponse(data);
   },
 
   async confirmAdminPayment(
     paymentId: string,
     payload?: ConfirmAdminPaymentPayload
   ): Promise<AdminPaymentResponse> {
-    const hasBody = Boolean(payload?.paidAt);
     const response = await fetch(
-      apiUrl(`/api/admin/payments/${encodeURIComponent(paymentId)}/confirm`),
+      apiUrl(`/api/admin/membership-activations/${encodeURIComponent(paymentId)}/confirm`),
       {
         method: 'PATCH',
-        headers: hasBody ? getAuthHeaders() : getAuthorizationHeaders(),
-        body: hasBody ? JSON.stringify(payload) : undefined,
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload || { paidAt: formatBackendLocalDateTime() }),
       }
     );
 
@@ -1974,15 +2074,19 @@ export const authService = {
       throw new Error(getMessage(data, 'Unable to confirm payment'));
     }
 
-    return normalizeAdminPaymentResponse(getPaymentFromResponse(data));
+    return normalizeAdminPaymentResponse(data);
   },
 
-  async rejectAdminPayment(paymentId: string): Promise<AdminPaymentResponse> {
+  async rejectAdminPayment(
+    paymentId: string,
+    payload?: RejectAdminPaymentPayload
+  ): Promise<AdminPaymentResponse> {
     const response = await fetch(
-      apiUrl(`/api/admin/payments/${encodeURIComponent(paymentId)}/reject`),
+      apiUrl(`/api/admin/membership-activations/${encodeURIComponent(paymentId)}/reject`),
       {
         method: 'PATCH',
-        headers: getAuthorizationHeaders(),
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload || {}),
       }
     );
 
@@ -1992,7 +2096,7 @@ export const authService = {
       throw new Error(getMessage(data, 'Unable to reject payment'));
     }
 
-    return normalizeAdminPaymentResponse(getPaymentFromResponse(data));
+    return normalizeAdminPaymentResponse(data);
   },
 
   async getAdminRefunds(status?: AdminRefundStatus): Promise<AdminRefundResponse[]> {

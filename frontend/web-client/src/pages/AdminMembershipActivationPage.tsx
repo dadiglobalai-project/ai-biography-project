@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Clock3,
   ExternalLink,
-  FileText,
   Landmark,
   Loader2,
   MessageSquare,
@@ -39,6 +38,9 @@ type MembershipRequest = {
   paymentMethod: string;
   status: ActivationStatus;
   notes: string;
+  paymentRemark?: string;
+  adminReviewNotes?: string;
+  rejectionReason?: string;
   proofOfPaymentUrl?: string;
   paidAt?: string;
   verifiedAt?: string;
@@ -113,7 +115,7 @@ const getStatusFromPayment = (status?: string): ActivationStatus => {
 };
 
 const getPaymentUserName = (payment: AdminPaymentResponse) =>
-  payment.userName || payment.userEmail || 'Unknown user';
+  payment.userFullName || payment.userName || payment.userEmail || 'Unknown user';
 
 const mapPaymentToRequest = (
   payment: AdminPaymentResponse,
@@ -130,7 +132,10 @@ const mapPaymentToRequest = (
   submittedAt: formatDateTime(payment.createdAt),
   paymentMethod: payment.paymentMethod || 'Not available yet',
   status: getStatusFromPayment(payment.status),
-  notes: payment.paymentRemark || '',
+  notes: payment.adminReviewNotes || payment.paymentRemark || '',
+  paymentRemark: payment.paymentRemark,
+  adminReviewNotes: payment.adminReviewNotes,
+  rejectionReason: payment.rejectionReason,
   proofOfPaymentUrl: payment.proofOfPaymentUrl,
   paidAt: payment.paidAt,
   verifiedAt: payment.verifiedAt,
@@ -198,9 +203,14 @@ export default function AdminMembershipActivationPage() {
     setPageMessage('');
 
     try {
-      const payments = await authService.getAdminPayments(
-        statusFilter === 'All' ? undefined : statusFilter as AdminPaymentStatus
-      );
+      const payments = await authService.getAdminPayments({
+        status: statusFilter === 'All' ? undefined : statusFilter as AdminPaymentStatus,
+        q: searchQuery.trim() || undefined,
+        page: 0,
+        size: 100,
+        sort: 'createdAt,desc',
+        includeCounts: true,
+      });
       const nextRequests = payments.map((payment) => mapPaymentToRequest(payment));
 
       setRequests(nextRequests);
@@ -214,7 +224,7 @@ export default function AdminMembershipActivationPage() {
         setAdminNotes('');
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to load admin payments.';
+      const message = error instanceof Error ? error.message : 'Unable to load membership activations.';
       if (/unauthorized|forbidden|session|token/i.test(message)) {
         navigate('/login', { replace: true });
         return;
@@ -226,7 +236,7 @@ export default function AdminMembershipActivationPage() {
     } finally {
       setIsLoadingRequests(false);
     }
-  }, [navigate, statusFilter]);
+  }, [navigate, searchQuery, statusFilter]);
 
   React.useEffect(() => {
     void loadPayments();
@@ -263,7 +273,15 @@ export default function AdminMembershipActivationPage() {
     return requests.filter((request) => {
       const matchesSearch =
         !normalizedSearch ||
-        [request.userName, request.email, request.biographyTitle, request.reference, request.id]
+        [
+          request.userName,
+          request.email,
+          request.biographyTitle,
+          request.reference,
+          request.id,
+          request.paymentRemark,
+          request.adminReviewNotes,
+        ]
           .join(' ')
           .toLowerCase()
           .includes(normalizedSearch);
@@ -299,7 +317,7 @@ export default function AdminMembershipActivationPage() {
       setRequests((currentRequests) => upsertRequest(currentRequests, nextRequest));
       setSelectedRequestId(nextRequest.id);
       setIsActivationModalOpen(false);
-      setPageMessage(`${nextRequest.userName} payment has been confirmed and membership activation was requested.`);
+      setPageMessage(`${nextRequest.userName} payment has been confirmed and the membership was activated.`);
     } catch (error) {
       setPageError(error instanceof Error ? error.message : 'Unable to confirm payment.');
     } finally {
@@ -317,7 +335,11 @@ export default function AdminMembershipActivationPage() {
     setPageMessage('');
 
     try {
-      const payment = await authService.rejectAdminPayment(selectedRequest.id);
+      const payment = await authService.rejectAdminPayment(selectedRequest.id, {
+        adminReviewNotes:
+          adminNotes.trim() || 'Could not match the WeChat payment to the account.',
+        rejectionReason: 'PAYMENT_NOT_FOUND',
+      });
       const membership = await loadPaymentMembership(payment);
       const nextRequest = mapPaymentToRequest(payment, membership);
 
@@ -332,7 +354,7 @@ export default function AdminMembershipActivationPage() {
   };
 
   const handleSaveNotes = () => {
-    setPageMessage('Admin notes need a backend update endpoint before they can be saved.');
+    setPageMessage('Admin notes are sent to the backend when you reject a payment request.');
     setPageError('');
   };
 
@@ -369,7 +391,7 @@ export default function AdminMembershipActivationPage() {
       iconClassName: 'bg-rose-100 text-rose-700',
     },
     {
-      label: 'Loaded Payments',
+      label: 'Loaded Requests',
       value: counts.total.toLocaleString(),
       icon: Users,
       className: 'text-slate-950',
@@ -391,7 +413,7 @@ export default function AdminMembershipActivationPage() {
                 Membership Activation
               </h1>
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-500">
-                Review payments, verify the details, and welcome new members.
+                Review pending WeChat payments, match the payment remark, and activate memberships.
               </p>
             </div>
 
@@ -436,7 +458,7 @@ export default function AdminMembershipActivationPage() {
                   <input
                     aria-label="Search requests" value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search by user, email, title, or reference"
+                    placeholder="Search by user, email, remark, title, or reference"
                     className="min-w-0 flex-1 bg-transparent text-sm text-slate-950 outline-none"
                   />
                 </label>
@@ -467,7 +489,7 @@ export default function AdminMembershipActivationPage() {
                   onClick={() => void loadPayments()}
                   disabled={isLoadingRequests}
                   className="flex min-h-12 items-center justify-center rounded-lg border border-slate-200 px-4 text-slate-600 transition hover:bg-slate-50 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
-                  aria-label="Refresh admin payments"
+                  aria-label="Refresh membership activations"
                 >
                   {isLoadingRequests ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -564,7 +586,7 @@ export default function AdminMembershipActivationPage() {
 
               {!isLoadingRequests && filteredRequests.length === 0 && (
                 <div className="border-t border-slate-200 px-5 py-12 text-center text-sm text-slate-500">
-                  No admin payments found for the selected filters.
+                  No membership activations found for the selected filters.
                 </div>
               )}
 
@@ -661,6 +683,25 @@ export default function AdminMembershipActivationPage() {
                   )}
                 </div>
 
+                <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
+                  <p className="text-sm font-semibold text-amber-800">WeChat Remark Check</p>
+                  <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+                    <div>
+                      <p className="font-semibold text-slate-500">Account Email</p>
+                      <p className="mt-1 break-all font-mono text-slate-900">{selectedRequest.email}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-500">Payment Remark</p>
+                      <p className="mt-1 break-all font-mono text-slate-900">
+                        {selectedRequest.paymentRemark || 'No payment remark returned'}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs leading-relaxed text-amber-800">
+                    Confirm only after the WeChat remark and amount match this membership request.
+                  </p>
+                </div>
+
                 <div className="mt-8">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-semibold text-slate-700">Proof of Payment Preview</p>
@@ -701,7 +742,7 @@ export default function AdminMembershipActivationPage() {
                     onChange={(event) => setAdminNotes(event.target.value)}
                     rows={4}
                     className="mt-3 w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-[#B18625] focus:ring-4 focus:ring-amber-100"
-                    placeholder="Admin notes are UI-only until a backend notes endpoint is available."
+                    placeholder="Add rejection notes here before rejecting a payment."
                   />
                   <button
                     type="button"
@@ -743,7 +784,7 @@ export default function AdminMembershipActivationPage() {
           ) : (
             <div className="admin-detail-empty">
               <ShieldCheck className="mx-auto mb-4 h-9 w-9 text-slate-300" />
-              {isLoadingRequests ? 'Loading admin payments...' : 'Select a payment request to review.'}
+              {isLoadingRequests ? 'Loading membership activations...' : 'Select a payment request to review.'}
             </div>
           )}
         </aside>
